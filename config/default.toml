@@ -1,0 +1,32 @@
+[general]
+hostname = ""
+daemon = true
+loglevel = "INFO"
+
+[transport]
+backend = "onion"
+
+[tor]
+host = "127.0.0.1"
+port = 9050
+control_port = 9051
+password = ""
+
+[smtp]
+listen = "0.0.0.0"
+port = 25
+max_message_size = 52428800
+timeout = 300
+
+[queue]
+directory = "./queue"
+retry_interval = 300
+max_retry = 48
+
+[logging]
+directory = "./logs"
+file = "garlicsmtp.log"
+
+[security]
+allow_plain_auth = false
+require_tls = false

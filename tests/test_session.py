@@ -1,0 +1,8 @@
+from garlicsmtp.smtp.session import SMTPSession
+from garlicsmtp.smtp.state import SMTPState
+
+
+def test_session_initial_state():
+    session = SMTPSession("127.0.0.1")
+    assert session.client_ip == "127.0.0.1"
+    assert session.state == SMTPState.CONNECT
