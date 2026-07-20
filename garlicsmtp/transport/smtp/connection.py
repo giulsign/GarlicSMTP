@@ -3,39 +3,6 @@
 
 class SMTPConnection:
 
-    def __init__(self, timeout: float = 30.0):
-        self.timeout = timeout
-        self.socket = None
-
-    def connect(self, host: str, port: int = 25):
-
-        self.socket = socket.create_connection(
-            (host, port),
-            timeout=self.timeout,
-        )
-
-    def send(self, line: str):
-
-        self.socket.sendall(
-            line.encode("utf-8")
-        )
-
-    def receive(self) -> str:
-
-        return self.socket.recv(
-            4096
-        ).decode("utf-8")
-
-    def close(self):
-
-        if self.socket:
-            self.socket.close()"""
-
-import socket
-
-
-class SMTPConnection:
-
     def __init__(
         self,
         timeout: float = 30.0,
@@ -105,3 +72,14 @@ class SMTPConnection:
             self.socket = None
 
         self._buffer = b""
+        """
+
+from garlicsmtp.network.text import (
+    TextConnection,
+)
+
+
+class SMTPConnection(
+    TextConnection,
+):
+    pass

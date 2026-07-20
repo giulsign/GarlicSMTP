@@ -1,8 +1,13 @@
 from collections import defaultdict
 from uuid import uuid4
+from copy import deepcopy
 
 from garlicsmtp.models import MailMessage
 from garlicsmtp.storage.backend import MessageStoreBackend
+from datetime import UTC, datetime
+from uuid import uuid4
+
+from garlicsmtp.storage.entry import MessageEntry
 
 
 class MemoryMessageStoreBackend(
@@ -11,19 +16,80 @@ class MemoryMessageStoreBackend(
 
     def __init__(self):
         self._mailboxes = defaultdict(dict)
+        self._next_uids = defaultdict(
+            lambda: 1
+        )
+        self._mailbox_names = set()
+        self._subscriptions: set[str] = set()
 
     def save(
         self,
         mailbox: str,
         message: MailMessage,
     ) -> str:
+        return self.save_entry(
+            mailbox,
+            message,
+        ).id
+    
+    def save_entry(
+        self,
+        mailbox: str,
+        message: MailMessage,
+    ) -> MessageEntry:
+        self._mailbox_names.add(
+            mailbox
+        )
+
         message_id = str(uuid4())
+        uid = self._next_uids[mailbox]
+
+        self._next_uids[mailbox] += 1
+
+        entry = MessageEntry(
+            id=message_id,
+            mailbox=mailbox,
+            uid=uid,
+            message=message,
+            internal_date=datetime.now(UTC),
+        )
 
         self._mailboxes[mailbox][
             message_id
-        ] = message
+        ] = entry
 
-        return message_id
+        return entry
+    
+    def append_entry(
+        self,   
+        mailbox: str,
+        message: MailMessage,
+        flags: set[str],
+        internal_date: datetime,
+    ) -> MessageEntry:
+        self._mailbox_names.add(
+            mailbox
+        )
+
+        message_id = str(uuid4())
+        uid = self._next_uids[mailbox]
+
+        self._next_uids[mailbox] += 1
+
+        entry = MessageEntry(
+            id=message_id,
+            mailbox=mailbox,
+            uid=uid,
+            message=message,
+            internal_date=internal_date,
+            flags=set(flags),
+        )
+
+        self._mailboxes[
+            mailbox
+        ][message_id] = entry
+
+        return entry
 
     def list_messages(
         self,
@@ -38,20 +104,317 @@ class MemoryMessageStoreBackend(
         mailbox: str,
         message_id: str,
     ) -> MailMessage | None:
+        entry = self.get_entry(
+            mailbox,
+            message_id,
+        )
+
+        if entry is None:
+            return None
+
+        return entry.message
+    
+
+    def get_entry(
+        self,
+        mailbox: str,
+        message_id: str,
+    ) -> MessageEntry | None:
         return self._mailboxes[
             mailbox
         ].get(message_id)
     
+    
+    def list_entries(
+        self,
+        mailbox: str,
+    ) -> list[MessageEntry]:
+        return sorted(
+            self._mailboxes[
+                mailbox
+            ].values(),
+            key=lambda entry: entry.uid,
+        )
+    
+    
     def list_mailboxes(self) -> list[str]:
-        return [
-            mailbox
-            for mailbox, messages
-            in self._mailboxes.items()
-            if messages
-        ]
+        return sorted(
+            self._mailbox_names
+        )
+    
+    def create_mailbox(
+        self,
+        mailbox: str,
+    ) -> bool:
+        if mailbox in self._mailbox_names:
+            return False
 
+        self._mailbox_names.add(
+            mailbox
+        )
+
+        return True
+
+    def delete_mailbox(
+        self,
+        mailbox: str,   
+    ) -> bool:
+        if mailbox not in self._mailbox_names:
+            return False
+
+        self._mailbox_names.remove(
+            mailbox
+        )
+
+        self._mailboxes.pop(
+            mailbox,
+            None,
+        )
+
+        self._next_uids.pop(
+            mailbox,
+            None,
+        )
+
+        self._subscriptions.discard(
+            mailbox
+        )
+
+        return True
+
+    def rename_mailbox(
+        self,
+        source: str,
+        destination: str,
+    ) -> bool:
+        if source not in self._mailbox_names:
+            return False
+
+        if destination in self._mailbox_names:
+            return False
+
+        self._mailbox_names.remove(
+            source
+        )
+
+        self._mailbox_names.add(
+            destination
+        )
+
+        if source in self._mailboxes:
+            self._mailboxes[destination] = (
+                self._mailboxes.pop(source)
+            )
+
+        if source in self._next_uids:
+            self._next_uids[destination] = (
+                self._next_uids.pop(source)
+            )
+
+        if source in self._subscriptions:
+            self._subscriptions.remove(
+                source
+            )
+
+            self._subscriptions.add(
+                destination
+            )
+
+        return True
+
+    def subscribe_mailbox(
+        self,
+        mailbox: str,
+    ) -> bool:
+        if mailbox not in self._mailbox_names:
+            return False
+
+        self._subscriptions.add(
+            mailbox
+        )
+
+        return True
+
+    def unsubscribe_mailbox(
+        self,
+        mailbox: str,
+    ) -> bool:
+        if mailbox not in self._subscriptions:
+            return False
+
+        self._subscriptions.remove(
+            mailbox
+        )
+
+        return True
+
+    def list_subscribed_mailboxes(
+        self,
+    ) -> list[str]:
+        return sorted(
+            self._subscriptions
+        )
 
     def count(self, mailbox: str) -> int:
         return len(
             self._mailboxes[mailbox]
+        )
+    
+    def set_flags(
+        self,
+        mailbox: str,
+        message_id: str,
+        flags: set[str],
+    ) -> bool:
+        entry = self.get_entry(
+            mailbox,
+            message_id,
+        )
+
+        if entry is None:
+            return False
+
+        entry.flags = set(flags)
+
+        return True
+    
+
+    def add_flags(
+        self,
+        mailbox: str,
+        message_id: str,
+        flags: set[str],
+    ) -> bool:
+        entry = self.get_entry(
+            mailbox,
+            message_id,
+        )
+
+        if entry is None:
+            return False
+
+        entry.flags.update(flags)
+
+        return True
+
+
+    def remove_flags(
+        self,
+        mailbox: str,
+        message_id: str,
+        flags: set[str],
+    ) -> bool:
+        entry = self.get_entry(
+            mailbox,
+            message_id,
+        )
+
+        if entry is None:
+            return False
+
+        entry.flags.difference_update(flags)
+
+        return True
+    
+
+    def test_memory_store_deletes_entry(
+        message,
+    ):
+        store = MessageStore()
+
+        first = store.save_entry(
+            "bob@test.onion",
+            message,
+        )
+
+        second = store.save_entry(
+            "bob@test.onion",
+            message,
+        )
+
+        assert store.delete_entry(
+            "bob@test.onion",
+            first.id,
+        ) is True
+
+        assert store.get_entry(
+            "bob@test.onion",
+            first.id,
+        ) is None
+
+        restored = store.get_entry(
+            "bob@test.onion",
+            second.id,
+        )
+
+        assert restored is not None
+        assert restored.id == second.id
+
+
+    def test_memory_store_delete_returns_false_for_missing_entry(
+        message,
+    ):
+        store = MessageStore()
+
+        store.save_entry(
+            "bob@test.onion",
+            message,
+        )
+
+        assert store.delete_entry(
+            "bob@test.onion",
+            "missing",
+        ) is False
+
+    def copy_entry(
+        self,
+        source_mailbox: str,
+        message_id: str,
+        destination_mailbox: str,
+    ) -> MessageEntry | None:
+        source = self.get_entry(
+            source_mailbox,
+            message_id,
+        )
+
+        if source is None:
+            return None
+                
+        self._mailbox_names.add(
+            destination_mailbox
+        )
+
+        copied_id = str(uuid4())
+        copied_uid = self._next_uids[
+            destination_mailbox
+        ]
+
+        self._next_uids[
+            destination_mailbox
+        ] += 1
+
+        copied = MessageEntry(
+            id=copied_id,
+            mailbox=destination_mailbox,
+            uid=copied_uid,
+            message=deepcopy(source.message),
+            internal_date=source.internal_date,
+            flags=set(source.flags),
+        )
+
+        self._mailboxes[
+            destination_mailbox
+        ][copied_id] = copied
+
+        return copied
+
+    def delete_entry(
+        self,
+        mailbox: str,
+        message_id: str,
+    ) -> bool:
+        return (
+            self._mailboxes[mailbox]
+            .pop(message_id, None)
+            is not None
         )

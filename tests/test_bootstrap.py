@@ -3,6 +3,7 @@ from garlicsmtp.core.engine import GarlicSMTPConfig
 
 
 
+
 def test_bootstrap_builds_application():
 
     app = Bootstrap().build()

@@ -51,3 +51,26 @@ class MessageSerializer:
         return MessageSerializer.from_dict(
             json.loads(text)
         )
+    
+
+    @staticmethod
+    def to_rfc5322(
+        message: MailMessage,
+    ) -> str:
+        lines = []
+
+        for name, value in message.headers.fields.items():
+            if isinstance(value, list):
+                for item in value:
+                    lines.append(
+                        f"{name}: {item}"
+                    )
+            else:
+                lines.append(
+                    f"{name}: {value}"
+                )
+
+        lines.append("")
+        lines.append(message.body or "")
+
+        return "\r\n".join(lines)

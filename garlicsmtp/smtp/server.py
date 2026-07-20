@@ -70,7 +70,13 @@ class SMTPServer(Service, Tickable):
         if not self.running:
             return
 
-        accepted = self.server.accept_once()
+        try:
+            accepted = self.server.accept_once()
+        except OSError:
+            if not self.running:
+                return
+
+            raise
 
         if accepted is None:
             return

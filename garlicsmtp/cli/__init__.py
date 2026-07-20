@@ -5,6 +5,7 @@ from garlicsmtp.cli.mailbox import (
     list_mailboxes,
     list_messages,
     show_message,
+    update_flags,
 )
 from garlicsmtp.core.engine import Bootstrap
 from garlicsmtp.version import print_version
@@ -69,6 +70,36 @@ def build_parser() -> argparse.ArgumentParser:
         help="Message position or full message ID.",
     )
 
+    flags_parser = mailbox_subparsers.add_parser(
+        "flags",
+        help="Add or remove flags from a message.",
+    )
+
+    flags_parser.add_argument(
+        "mailbox",
+        help="Full mailbox address.",
+    )
+
+    flags_parser.add_argument(
+        "message",
+        help="Message UID or full message ID.",
+    )
+
+    flags_parser.add_argument(
+        "operation",
+        choices=[
+            "add",
+            "remove",
+            "set",
+        ],
+    )
+
+    flags_parser.add_argument(
+        "flags",
+        nargs="+",
+        help=r"Flags such as \Seen or \Flagged.",
+    )
+
     return parser
 
 
@@ -110,6 +141,15 @@ def main(argv=None) -> int:
                 args.mailbox_db,
                 args.mailbox,
                 args.message,
+            )
+        
+        if args.mailbox_command == "flags":
+            return update_flags(
+                database_path=args.mailbox_db,
+                mailbox=args.mailbox,
+                message_reference=args.message,
+                operation=args.operation,
+                flags=set(args.flags),
             )
 
     parser.error("Unsupported command")

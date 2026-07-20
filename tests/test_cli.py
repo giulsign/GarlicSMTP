@@ -116,3 +116,40 @@ def test_cli_mailbox_show(
     assert result == 0
     assert "Subject: CLI show" in output
     assert "Visible body" in output
+
+
+def test_cli_mailbox_flags(
+    tmp_path,
+    message,
+    capsys,
+):
+    database = tmp_path / "mailboxes.db"
+
+    backend = SQLiteMessageStoreBackend(
+        database
+    )
+
+    backend.save(
+        "bob@test.onion",
+        message,
+    )
+
+    backend.close()
+
+    result = main(
+        [
+            "--mailbox-db",
+            str(database),
+            "mailbox",
+            "flags",
+            "bob@test.onion",
+            "1",
+            "add",
+            "\\Seen",
+        ]
+    )
+
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "UID 1 flags: \\Seen" in output

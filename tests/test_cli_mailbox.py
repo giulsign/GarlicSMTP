@@ -6,7 +6,7 @@ from garlicsmtp.cli.mailbox import (
 from garlicsmtp.storage.sqlite import (
     SQLiteMessageStoreBackend,
 )
-
+from garlicsmtp.cli.mailbox import update_flags
 
 def create_mailbox_database(
     path,
@@ -123,3 +123,47 @@ def test_cli_show_returns_error_for_missing_message(
 
     assert result == 1
     assert "Message not found." in output
+
+
+def test_cli_updates_message_flags(
+    tmp_path,
+    message,
+    capsys,
+):
+    database = tmp_path / "mailboxes.db"
+
+    create_mailbox_database(
+        database,
+        message,
+    )
+
+    result = update_flags(
+        database_path=str(database),
+        mailbox="bob@test.onion",
+        message_reference="1",
+        operation="add",
+        flags={
+            "\\Seen",
+        },
+    )
+
+    output = capsys.readouterr().out
+
+    assert result == 0
+    assert "UID 1 flags: \\Seen" in output
+
+    backend = SQLiteMessageStoreBackend(
+        database
+    )
+
+    try:
+        entries = backend.list_entries(
+            "bob@test.onion"
+        )
+
+        assert entries[0].flags == {
+            "\\Seen",
+        }
+
+    finally:
+        backend.close()
