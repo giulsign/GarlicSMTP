@@ -55,7 +55,13 @@ def test_imap_server_handles_connection():
         "* OK GarlicSMTP IMAP ready\r\n",
         (
             "* CAPABILITY "
-            "IMAP4rev1 UIDPLUS UNSELECT MOVE\r\n"
+            "IMAP4rev1 "
+            "UIDPLUS "
+            "UNSELECT "
+            "MOVE "
+            "NAMESPACE "
+            "ID "
+            "ENABLE\r\n"
         ),
         (
             "A001 OK "

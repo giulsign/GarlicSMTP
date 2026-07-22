@@ -99,8 +99,13 @@ def test_imap_server_real_connection(
 
             assert receive_line(client) == (
                 "* CAPABILITY "
-                "IMAP4rev1 UIDPLUS "
-                "UNSELECT MOVE\r\n"
+                "IMAP4rev1 "
+                "UIDPLUS "
+                "UNSELECT "
+                "MOVE "
+                "NAMESPACE "
+                "ID "
+                "ENABLE\r\n"
             )
 
             assert receive_line(client) == (

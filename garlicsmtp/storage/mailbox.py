@@ -99,6 +99,16 @@ class MailboxView:
             default=0,
         ) + 1
 
+    def uid_validity(
+        self,
+    ) -> int:
+        return 1
+
+    def highest_modseq(
+        self,
+    ) -> int:
+        return 1
+
     def first_unseen_uid(
         self,
     ) -> int | None:

@@ -57,8 +57,13 @@ def test_imap_capability():
     assert replies == [
         (
             "* CAPABILITY "
-            "IMAP4rev1 UIDPLUS "
-            "UNSELECT MOVE\r\n"
+            "IMAP4rev1 "
+            "UIDPLUS "
+            "UNSELECT "
+            "MOVE "
+            "NAMESPACE "
+            "ID "
+            "ENABLE\r\n"
         ),
         (
             "A001 OK "
@@ -4449,3 +4454,486 @@ def test_unsubscribe_rejects_too_many_arguments():
             "UNSUBSCRIBE requires mailbox\r\n"
         ),
     ]
+
+
+def test_lsub_returns_subscribed_mailboxes():
+    store = MessageStore()
+
+    store.create_mailbox(
+        "Archive"
+    )
+
+    store.create_mailbox(
+        "Work"
+    )
+
+    store.subscribe_mailbox(
+        "Archive"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 LSUB "" "*"'
+        )
+    )
+
+    assert replies == [
+        '* LSUB () "/" "Archive"\r\n',
+        "A002 OK LSUB completed\r\n",
+    ]
+
+
+def test_lsub_returns_empty_list():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 LSUB "" "*"'
+        )
+    )
+
+    assert replies == [
+        "A002 OK LSUB completed\r\n",
+    ]
+
+
+def test_lsub_requires_authentication():
+    protocol = IMAPProtocol()
+
+    replies = serialize(
+        protocol.execute(
+            'A001 LSUB "" "*"'
+        )
+    )
+
+    assert replies == [
+        "A001 NO Authentication required\r\n",
+    ]
+
+
+def test_lsub_rejects_wrong_argument_count():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 LSUB ""'
+        )
+    )
+
+    assert replies == [
+        (
+            "A002 BAD "
+            "LSUB requires reference and mailbox\r\n"
+        ),
+    ]
+
+
+def test_namespace_returns_default_namespace():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 NAMESPACE"
+        )
+    )
+
+    assert replies == [
+        '* NAMESPACE (("" "/")) NIL NIL\r\n',
+        "A002 OK NAMESPACE completed\r\n",
+    ]
+
+
+def test_namespace_requires_authentication():
+    protocol = IMAPProtocol()
+
+    replies = serialize(
+        protocol.execute(
+            "A001 NAMESPACE"
+        )
+    )
+
+    assert replies == [
+        "A001 NO Authentication required\r\n",
+    ]
+
+
+def test_namespace_rejects_arguments():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 NAMESPACE extra'
+        )
+    )
+
+    assert replies == [
+        (
+            "A002 BAD "
+            "NAMESPACE does not accept arguments\r\n"
+        ),
+    ]
+
+
+def test_id_returns_server_identification():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 ID NIL"
+        )
+    )
+
+    assert replies == [
+        (
+            '* ID ("name" "GarlicSMTP" '
+            '"version" "1.0")\r\n'
+        ),
+        "A002 OK ID completed\r\n",
+    ]
+
+
+def test_id_accepts_no_arguments():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 ID"
+        )
+    )
+
+    assert replies == [
+        (
+            '* ID ("name" "GarlicSMTP" '
+            '"version" "1.0")\r\n'
+        ),
+        "A002 OK ID completed\r\n",
+    ]
+
+
+def test_id_requires_authentication():
+    protocol = IMAPProtocol()
+
+    replies = serialize(
+        protocol.execute(
+            "A001 ID NIL"
+        )
+    )
+
+    assert replies == [
+        "A001 NO Authentication required\r\n",
+    ]
+
+
+def test_id_rejects_too_many_arguments():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 ID NIL extra'
+        )
+    )
+
+    assert replies == [
+        (
+            "A002 BAD "
+            "ID accepts zero or one argument\r\n"
+        ),
+    ]
+
+
+def test_enable_accepts_capabilities():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 ENABLE UTF8=ACCEPT"
+        )
+    )
+
+    assert replies == [
+        "A002 OK ENABLE completed\r\n",
+    ]
+
+
+def test_enable_accepts_multiple_capabilities():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 ENABLE UTF8=ACCEPT CONDSTORE"
+        )
+    )
+
+    assert replies == [
+        "A002 OK ENABLE completed\r\n",
+    ]
+
+
+def test_enable_requires_authentication():
+    protocol = IMAPProtocol()
+
+    replies = serialize(
+        protocol.execute(
+            "A001 ENABLE UTF8=ACCEPT"
+        )
+    )
+
+    assert replies == [
+        "A001 NO Authentication required\r\n",
+    ]
+
+
+def test_enable_requires_capability():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 ENABLE"
+        )
+    )
+
+    assert replies == [
+        (
+            "A002 BAD "
+            "ENABLE requires one or more capabilities\r\n"
+        ),
+    ]
+
+
+def test_imap_capability_advertises_supported_extensions():
+    protocol = IMAPProtocol()
+
+    replies = serialize(
+        protocol.execute(
+            "A001 CAPABILITY"
+        )
+    )
+
+    assert len(replies) == 2
+
+    capability_reply = replies[0]
+
+    assert capability_reply.startswith(
+        "* CAPABILITY "
+    )
+
+    assert "IMAP4rev1" in capability_reply
+    assert "MOVE" in capability_reply
+    assert "NAMESPACE" in capability_reply
+    assert "ID" in capability_reply
+    assert "ENABLE" in capability_reply
+
+    assert replies[1] == (
+        "A001 OK CAPABILITY completed\r\n"
+    )
+
+
+def test_status_returns_uidvalidity(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "Archive",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 STATUS "Archive" (UIDVALIDITY)'
+        )
+    )
+
+    assert replies == [
+        (
+            '* STATUS "Archive" '
+            '(UIDVALIDITY 1)\r\n'
+        ),
+        "A002 OK STATUS completed\r\n",
+    ]
+
+
+def test_status_returns_highest_modseq(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "Archive",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 STATUS "Archive" (HIGHESTMODSEQ)'
+        )
+    )
+
+    assert replies == [
+        (
+            '* STATUS "Archive" '
+            '(HIGHESTMODSEQ 1)\r\n'
+        ),
+        "A002 OK STATUS completed\r\n",
+    ]
+
+
+def test_idle_enters_idle_without_replies():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A002 IDLE"
+        )
+    )
+
+    assert replies == []

@@ -31,6 +31,13 @@ from garlicsmtp.imap.message_parser import (
     IMAPMessageParseError,
     IMAPMessageParser,
 )
+from garlicsmtp.imap.command_result import (
+    IMAPCommandResult,
+)
+from garlicsmtp.imap.command_result import (
+    IMAPCommandAction,
+    IMAPCommandResult,
+)
 
 
 class IMAPProtocol:
@@ -62,6 +69,39 @@ class IMAPProtocol:
         ]
 
 
+    def _command_handler(
+        self,
+        command,
+    ):
+        return getattr(
+            self,
+            f"command_{command.name.lower()}",
+            None,
+        )
+    
+
+    def _execute_command(
+        self,
+        result: IMAPCommandResult,
+    ) -> IMAPCommandResult:
+        return result
+
+
+    def _unsupported_command_reply(
+        self,
+        command,
+    ) -> list[IMAPResponse]:
+        return [
+            IMAPReply.tagged(
+                command.tag,
+                "BAD",
+                (
+                    "Unsupported command "
+                    f"{command.name}"
+                ),
+            )
+        ]
+
     def execute(
         self,
         line: str,
@@ -81,24 +121,76 @@ class IMAPProtocol:
                 )
             ]
 
-        handler = getattr(
-            self,
-            f"command_{command.name.lower()}",
-            None,
+        handler = self._command_handler(
+            command
         )
 
         if handler is None:
+            return self._unsupported_command_reply(
+                command
+            )
 
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "BAD",
-                    f"Unsupported command {command.name}",
-                )
-            ]
+        result = handler(command)
 
-        return handler(command)
+        if not isinstance(
+            result,
+            IMAPCommandResult,
+        ):
+            result = IMAPCommandResult.complete(
+                result,
+            )
+
+        result = self._execute_command(
+            result,
+        )
+
+        self._handle_command_action(
+            result,
+        )
+
+        return result.as_list()
     
+    def _handle_command_action(
+        self,
+        result: IMAPCommandResult,
+    ) -> None:
+        if (
+            result.action
+            is IMAPCommandAction.ENTER_IDLE
+        ):
+            pass
+
+    def command_idle(
+        self,
+        command,
+    ) -> IMAPCommandResult:
+        authentication_error = (
+            self._require_authenticated(
+                command,
+            )
+        )
+
+        if authentication_error is not None:
+            return IMAPCommandResult.complete(
+                authentication_error,
+            )
+
+        if command.arguments:
+            return IMAPCommandResult.complete(
+                [
+                    IMAPReply(
+                        command.tag,
+                        "BAD",
+                        "IDLE does not accept arguments",
+                    )
+                ]
+            )
+
+        return IMAPCommandResult.enter_idle(
+            []
+        )
+
+
     def append_literal(
         self,
         request: IMAPAppendRequest,
@@ -292,16 +384,28 @@ class IMAPProtocol:
     def command_capability(
         self,
         command,
-    ) -> list[IMAPResponse]:
+    ):
+        if command.arguments:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "CAPABILITY does not accept arguments",
+                )
+            ]
+
         return [
-            IMAPReply.untagged(
-                "CAPABILITY",
+            IMAPReply(
                 (
+                    "* CAPABILITY "
                     "IMAP4rev1 "
                     "UIDPLUS "
                     "UNSELECT "
-                    "MOVE"
-                ),
+                    "MOVE "
+                    "NAMESPACE "
+                    "ID "
+                    "ENABLE"
+                )
             ),
             IMAPReply.tagged(
                 command.tag,
@@ -434,21 +538,54 @@ class IMAPProtocol:
             )
         ]
     
+    def _list_mailboxes(
+        self,
+        tag,
+        mailboxes,
+        pattern,
+        reply_name,
+        completion_message,
+    ):
+        replies = []
+
+        for mailbox in mailboxes:
+            if not self._matches_mailbox_pattern(
+                mailbox,
+                pattern,
+            ):
+                continue
+
+            replies.append(
+                IMAPReply(
+                    (
+                        f'* {reply_name} () "/" '
+                        f'"{mailbox}"'
+                    )
+                )
+            )
+
+        replies.append(
+            IMAPReply.tagged(
+                tag,
+                "OK",
+                completion_message,
+            )
+        )
+
+        return replies
 
     def command_list(
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 2:
             return [
@@ -470,48 +607,67 @@ class IMAPProtocol:
                 )
             ]
 
-        mailboxes = self.store.list_mailboxes()
-
-        replies = []
-
-        for mailbox in mailboxes:
-            if not self._matches_mailbox_pattern(
-                mailbox,
-                pattern,
-            ):
-                continue
-
-            replies.append(
-                IMAPReply(
-                    f'* LIST () "/" "{mailbox}"'
-                )
-            )
-
-        replies.append(
-            IMAPReply.tagged(
-                command.tag,
-                "OK",
-                "LIST completed",
+        return self._list_mailboxes(
+            command.tag,
+            self.store.list_mailboxes(),
+            pattern,
+            "LIST",
+            "LIST completed",
+        )
+    
+    def command_lsub(
+        self,
+        command,
+    ):
+        authentication_error = (
+            self._require_authenticated(
+                command
             )
         )
 
-        return replies
-    
+        if authentication_error is not None:
+            return authentication_error
+
+        if len(command.arguments) != 2:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "LSUB requires reference and mailbox",
+                )
+            ]
+
+        reference, pattern = command.arguments
+
+        if reference not in {"", '""'}:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Unsupported LSUB reference",
+                )
+            ]
+
+        return self._list_mailboxes(
+            command.tag,
+            self.store.list_subscribed_mailboxes(),
+            pattern,
+            "LSUB",
+            "LSUB completed",
+        )
 
     def command_create(
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 1:
             return [
@@ -547,16 +703,14 @@ class IMAPProtocol:
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 1:
             return [
@@ -592,16 +746,14 @@ class IMAPProtocol:
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 2:
             return [
@@ -639,16 +791,14 @@ class IMAPProtocol:
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 1:
             return [
@@ -684,16 +834,14 @@ class IMAPProtocol:
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 1:
             return [
@@ -740,10 +888,28 @@ class IMAPProtocol:
 
         return mailbox == normalized
     
-    def command_status(
+    def _status_values(
+        self,
+        mailbox_view,
+    ) -> dict[str, int]:
+        return {
+            "MESSAGES": mailbox_view.count(),
+            "UIDNEXT": mailbox_view.next_uid(),
+            "UIDVALIDITY": (
+                mailbox_view.uid_validity()
+            ),
+            "UNSEEN": (
+                mailbox_view.unseen_count()
+            ),
+            "HIGHESTMODSEQ": (
+                mailbox_view.highest_modseq()
+            ),
+        }
+
+    def _require_authenticated(
         self,
         command,
-    ) -> list[IMAPResponse]:
+    ) -> list[IMAPResponse] | None:
         if self.session.state is (
             IMAPSessionState.NOT_AUTHENTICATED
         ):
@@ -754,6 +920,21 @@ class IMAPProtocol:
                     "Authentication required",
                 )
             ]
+
+        return None
+
+    def command_status(
+        self,
+        command,
+    ) -> list[IMAPResponse]:
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) < 2:
             return [
@@ -792,7 +973,9 @@ class IMAPProtocol:
         supported_items = {
             "MESSAGES",
             "UIDNEXT",
+            "UIDVALIDITY",
             "UNSEEN",
+            "HIGHESTMODSEQ",
         }
 
         for item in requested_items:
@@ -821,13 +1004,9 @@ class IMAPProtocol:
             mailbox
         )
 
-        values = {
-            "MESSAGES": mailbox_view.count(),
-            "UIDNEXT": mailbox_view.next_uid(),
-            "UNSEEN": (
-                mailbox_view.unseen_count()
-            ),
-        }
+        values = self._status_values(
+            mailbox_view
+        )
 
         status_values = " ".join(
             (
@@ -855,16 +1034,14 @@ class IMAPProtocol:
         self,
         command,
     ):
-        if self.session.state is (
-            IMAPSessionState.NOT_AUTHENTICATED
-        ):
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "NO",
-                    "Authentication required",
-                )
-            ]
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
 
         if len(command.arguments) != 1:
             return [
@@ -1725,5 +1902,108 @@ class IMAPProtocol:
                 command.tag,
                 "OK",
                 "UNSELECT completed",
+            )
+        ]
+    
+    def command_namespace(
+        self,
+        command,
+    ):
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
+
+        if command.arguments:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "NAMESPACE does not accept arguments",
+                )
+            ]
+
+        return [
+            IMAPReply(
+                '* NAMESPACE (("" "/")) NIL NIL'
+            ),
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "NAMESPACE completed",
+            ),
+        ]
+
+
+    def command_id(
+        self,
+        command,
+    ):
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
+
+        if len(command.arguments) > 1:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "ID accepts zero or one argument",
+                )
+            ]
+
+        return [
+            IMAPReply(
+                (
+                    '* ID ('
+                    '"name" "GarlicSMTP" '
+                    '"version" "1.0"'
+                    ')'
+                )
+            ),
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "ID completed",
+            ),
+        ]
+    
+
+    def command_enable(
+        self,
+        command,
+    ):
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
+
+        if not command.arguments:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "ENABLE requires one or more capabilities",
+                )
+            ]
+
+        return [
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "ENABLE completed",
             )
         ]
