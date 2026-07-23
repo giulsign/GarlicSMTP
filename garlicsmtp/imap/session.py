@@ -46,14 +46,14 @@ class IMAPSession:
             IMAPSessionState.SELECTED
         )
 
-    def close_selected_mailbox(
+    def close_mailbox(
         self,
     ) -> None:
         if self.state is not (
             IMAPSessionState.SELECTED
         ):
             raise RuntimeError(
-                "Mailbox is not selected"
+                "Mailbox not selected"
             )
 
         self.selected_mailbox = None

@@ -651,6 +651,62 @@ def test_imap_examine_rejects_uid_store(
     assert "\\Seen" not in stored.flags
 
 
+def test_imap_examine_rejects_expunge(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {entry.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    protocol.execute(
+        'A004 EXAMINE "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A005 EXPUNGE"
+        )
+    )
+
+    assert replies == [
+        "A005 NO Mailbox is read-only\r\n"
+    ]
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+
+
 def test_imap_select_rejects_missing_mailbox():
 
     authenticator = MemoryAuthenticator(
@@ -5085,3 +5141,177 @@ def test_idle_exposes_enter_idle_action():
         protocol.command_action()
         is IMAPCommandAction.ENTER_IDLE
     )
+
+
+def test_imap_examine_close_does_not_expunge(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        f"A003 UID STORE {entry.uid} +FLAGS (\\Deleted)"
+    )
+
+    protocol.execute(
+        'A004 EXAMINE "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A005 CLOSE"
+        )
+    )
+
+    assert replies == [
+        "A005 OK CLOSE completed\r\n"
+    ]
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+
+    assert (
+        protocol.session.state
+        is IMAPSessionState.AUTHENTICATED
+    )
+
+
+def test_imap_examine_rejects_uid_move(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 EXAMINE "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID MOVE {entry.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 NO Mailbox is read-only\r\n"
+    ]
+
+    source_entry = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert source_entry is not None
+
+    destination_entries = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert destination_entries == []
+
+
+def test_imap_examine_allows_uid_copy(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 EXAMINE "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f'A003 UID COPY {entry.uid} '
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 OK [COPYUID 1 1 1] UID COPY completed\r\n"
+    ]
+
+    source = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert source is not None
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 1

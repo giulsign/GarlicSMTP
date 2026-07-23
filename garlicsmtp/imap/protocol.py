@@ -1486,7 +1486,15 @@ class IMAPProtocol:
         )
 
         mailbox = self.session.selected_mailbox
-
+        if self.session.selected_mailbox_read_only:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox is read-only",
+                )
+            ]
+        
         if mailbox is None:
             return [
                 IMAPReply.tagged(
@@ -1667,6 +1675,15 @@ class IMAPProtocol:
             self.session.selected_mailbox
         )
 
+        if self.session.selected_mailbox_read_only:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox is read-only",
+                )
+            ]
+        
         if selected_mailbox is None:
             return [
                 IMAPReply.tagged(
@@ -1859,6 +1876,15 @@ class IMAPProtocol:
 
         mailbox = self.session.selected_mailbox
 
+        if self.session.selected_mailbox_read_only:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox is read-only",
+                )
+            ]
+        
         if mailbox is None:
             return [
                 IMAPReply.tagged(
@@ -1919,6 +1945,17 @@ class IMAPProtocol:
             ]
 
         mailbox = self.session.selected_mailbox
+
+        if self.session.selected_mailbox_read_only:
+            self.session.close_mailbox()
+
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "OK",
+                    "CLOSE completed",
+                )
+            ]
 
         if mailbox is None:
             return [
