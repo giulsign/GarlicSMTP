@@ -1,6 +1,14 @@
 import threading
 
+from garlicsmtp.imap.append import (
+    IMAPAppendError,
+    IMAPAppendParser,
+)
+from garlicsmtp.imap.command_result import (
+    IMAPCommandAction,
+)
 from garlicsmtp.imap.protocol import IMAPProtocol
+from garlicsmtp.imap.reply import IMAPReply
 from garlicsmtp.imap.session import IMAPSessionState
 from garlicsmtp.network.server import TCPServer
 from garlicsmtp.network.text import TextConnection
@@ -9,13 +17,25 @@ from garlicsmtp.security.auth import (
     RejectingAuthenticator,
 )
 from garlicsmtp.storage.store import MessageStore
-from garlicsmtp.imap.append import (
-    IMAPAppendError,
-    IMAPAppendParser,
+from garlicsmtp.imap.idle import (
+    IMAPIdleSession,
 )
-from garlicsmtp.imap.reply import (
-    IMAPReply,
+from garlicsmtp.imap.notification_sink import (
+    IMAPNotificationSink,
 )
+from garlicsmtp.imap.null_notification_sink import (
+    NullIMAPNotificationSink,
+)
+from dataclasses import dataclass
+
+
+
+@dataclass
+class IMAPConnectionContext:
+    connection: TextConnection
+    protocol: IMAPProtocol
+    idle: IMAPIdleSession
+
 
 class IMAPServer:
 
@@ -41,11 +61,12 @@ class IMAPServer:
         self._connection_threads = set()
         self._threads_lock = threading.Lock()
         self.connection_factory = TextConnection
-        self.authenticator = (authenticator or RejectingAuthenticator())
+        self.authenticator = (
+            authenticator
+            or RejectingAuthenticator()
+        )
         self.store = store or MessageStore()
-        self._clients_lock = threading.Lock()
-        self._client_threads = set()
-        #self._clients = set()
+        self._imap_notification_sink = (NullIMAPNotificationSink())
 
     def start(self) -> None:
         self.server.start()
@@ -108,40 +129,276 @@ class IMAPServer:
         thread.start()
 
     @staticmethod
-    def _append_tag(
-        line: str,
-    ) -> str:
-        parts = line.strip().split(
-            None,
-            1,
-        )
-
-        if not parts:
-            return "*"
-
-        return parts[0]
-    
-    @staticmethod
     def _send_continuation(
         connection,
+        message: str = (
+            "Ready for literal data"
+        ),
     ) -> None:
         connection.send(
-            "+ Ready for literal data\r\n"
+            f"+ {message}\r\n"
         )
+
+    def _serve_connection(
+        self,
+        client_socket,
+        address,
+    ) -> None:
+        current = threading.current_thread()
+
+        context = self._create_connection_context(
+            client_socket,
+        )
+
+        handler = IMAPConnectionHandler(
+            self,
+            context,
+        )
+
+        connection = context.connection
+        protocol = context.protocol
+        idle = context.idle
+
+        try:
+            self._send_replies(
+                connection,
+                protocol.greeting(),
+            )
+
+            while self.running:
+                if not handler.process_iteration():
+                    break
+
+        finally:
+            self._set_notification_sink(
+                NullIMAPNotificationSink()
+            )
+
+            connection.close()
+
+            with self._threads_lock:
+                self._connection_threads.discard(
+                    current
+                )
+
+    @staticmethod
+    def _send_replies(
+        connection: TextConnection,
+        replies,
+    ) -> None:
+        for response in replies:
+            response.send(
+                connection
+            )
+
+    @property
+    def active_connections(self) -> int:
+        with self._threads_lock:
+            return len(
+                self._connection_threads
+            )
+
+    def _create_connection(
+        self,
+        client_socket,
+    ) -> TextConnection:
+        return self.connection_factory(
+            connected_socket=client_socket,
+        )
+
+    def _notification_sink(
+        self,
+    ) -> IMAPNotificationSink:
+        return self._imap_notification_sink
+
+
+    def _set_notification_sink(
+        self,
+        sink: IMAPNotificationSink,
+    ) -> None:
+        self._imap_notification_sink = sink
+
+
+    def _create_protocol(
+        self,
+    ) -> IMAPProtocol:
+        return IMAPProtocol(
+            authenticator=self.authenticator,
+            store=self.store,
+        )
+    
+    def _create_idle_session(
+            self,
+        ) -> IMAPIdleSession:
+            return IMAPIdleSession()
+        
+    def _create_connection_context(
+        self,
+        client_socket,
+    ) -> IMAPConnectionContext:
+        return IMAPConnectionContext(
+            connection=self._create_connection(
+                client_socket,
+            ),
+            protocol=self._create_protocol(),
+            idle=self._create_idle_session(),
+        )
+    
+
+class IMAPConnectionHandler:
+
+    def __init__(
+        self,
+        server: "IMAPServer",
+        context: IMAPConnectionContext,
+    ) -> None:
+        self._server = server
+        self._context = context
+
+    def process_iteration(
+        self,
+    ) -> bool:
+        connection = self._context.connection
+
+        line = connection.receive_line()
+
+        if line is None:
+            return False
+
+        self._send_idle_notifications()
+
+        if self._handle_idle_input(
+                line,
+            ):
+                return True
+
+        if (
+            IMAPAppendParser
+            .is_append_command(line)
+        ):
+            return self._handle_append(
+                line,
+            )
+
+        self._execute_command(
+            line,
+        )
+
+        return not self._should_close_connection()
+        
+    def _should_close_connection(
+        self,
+    ) -> bool:
+        return (
+            self._context.protocol.session.state
+            is IMAPSessionState.LOGOUT
+        )
+    
+
+    def _execute_command(
+        self,
+        line: str,
+    ) -> None:
+        connection = self._context.connection
+        protocol = self._context.protocol
+        idle = self._context.idle
+
+        replies = protocol.execute(
+            line,
+        )
+
+        self._server._send_replies(
+            connection,
+            replies,
+        )
+
+        self._enter_idle(line)
+
+    def _handle_idle_input(
+        self,
+        line: str,
+    ) -> bool:
+        idle = self._context.idle
+        connection = self._context.connection
+
+        if not idle.active:
+            return False
+
+        replies = idle.handle_input(
+            line,
+        )
+
+        self._server._send_replies(
+            connection,
+            replies,
+        )
+
+        if not idle.active:
+            self._server._set_notification_sink(
+                NullIMAPNotificationSink(),
+            )
+
+        return True
+
+
+    def _enter_idle(
+        self,
+        line: str,
+    ) -> None:
+        protocol = self._context.protocol
+        idle = self._context.idle
+        connection = self._context.connection
+
+        if (
+            protocol.command_action()
+            is not IMAPCommandAction.ENTER_IDLE
+        ):
+            return
+
+        replies = idle.enter(
+            self._append_tag(line),
+        )
+
+        self._server._send_replies(
+            connection,
+            replies,
+        )
+
+        self._server._set_notification_sink(
+            idle,
+        )
+
+
+    
+    def _send_idle_notifications(
+        self,
+    ) -> None:
+        connection = self._context.connection
+        sink = self._server._notification_sink()
+        if not sink.has_notifications():
+            return
+
+        for notification in (
+            sink.drain_notifications()
+        ):
+            connection.send(
+                f"{notification}\r\n"
+            )
 
     def _handle_append(
         self,
-        connection,
-        protocol: IMAPProtocol,
         line: str,
     ) -> bool:
+        connection = self._context.connection
+        protocol = self._context.protocol
+
         try:
             request = IMAPAppendParser.parse(
                 line
             )
 
         except IMAPAppendError as exc:
-            self._send_replies(
+            self._server._send_replies(
                 connection,
                 [
                     IMAPReply.tagged(
@@ -160,7 +417,7 @@ class IMAPServer:
 
         for item in request.items:
             if not item.non_synchronizing:
-                self._send_continuation(
+                self._server._send_continuation(
                     connection
                 )
 
@@ -180,100 +437,23 @@ class IMAPServer:
             literals,
         )
 
-        self._send_replies(
+        self._server._send_replies(
             connection,
             replies,
         )
 
         return True
 
-    def _serve_connection(
-        self,
-        client_socket,
-        address,
-    ) -> None:
-        current = threading.current_thread()
-
-        connection = self._create_connection(
-            client_socket
+    @staticmethod
+    def _append_tag(
+        line: str,
+    ) -> str:
+        parts = line.strip().split(
+            None,
+            1,
         )
 
-        protocol = IMAPProtocol(
-            authenticator=self.authenticator,
-            store=self.store,
-        )
+        if not parts:
+            return "*"
 
-        try:
-            self._send_replies(
-                connection,
-                protocol.greeting(),
-            )
-
-            while self.running:
-                line = connection.receive_line()
-
-                if line is None:
-                    break
-
-                if (
-                    IMAPAppendParser
-                    .is_append_command(line)
-                ):
-                    completed = self._handle_append(
-                        connection,
-                        protocol,
-                        line,
-                    )
-
-                    if not completed:
-                        break
-
-                    continue
-
-                replies = protocol.execute(
-                    line
-                )
-
-                self._send_replies(
-                    connection,
-                    replies,
-                )
-
-                if (
-                    protocol.session.state
-                    is IMAPSessionState.LOGOUT
-                ):
-                    break
-
-        finally:
-            connection.close()
-
-            with self._clients_lock:
-                self._client_threads.discard(
-                    current
-                )
-
-    @staticmethod   
-    def _send_replies(
-        connection: TextConnection,
-        replies,
-    ) -> None:
-        for response in replies:
-            response.send(
-                connection
-            )
-
-    @property
-    def active_connections(self) -> int:
-        with self._threads_lock:
-            return len(
-                self._connection_threads
-            )
-        
-    def _create_connection(
-        self,
-        client_socket,
-    ) -> TextConnection:
-        return self.connection_factory(
-            connected_socket=client_socket,
-        )
+        return parts[0]

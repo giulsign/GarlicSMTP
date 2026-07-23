@@ -24,6 +24,9 @@ from datetime import timedelta
 from garlicsmtp.imap.append import (
     IMAPAppendParser,
 )
+from garlicsmtp.imap.command_result import (
+    IMAPCommandAction,
+)
 
 
 def serialize(replies):
@@ -524,6 +527,128 @@ def test_imap_select_mailbox(
         protocol.session.selected_mailbox
         == "bob@test.onion"
     )
+
+
+def test_imap_examine_mailbox(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.add_flags(
+        "bob@test.onion",
+        first.id,
+        {
+            "\\Seen",
+        },
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 EXAMINE "bob@test.onion"'
+        )
+    )
+
+    assert replies == [
+        (
+            "* FLAGS "
+            "(\\Seen \\Answered \\Flagged "
+            "\\Deleted \\Draft)\r\n"
+        ),
+        "* 2 EXISTS\r\n",
+        "* 0 RECENT\r\n",
+        (
+            "* OK [UIDNEXT 3] "
+            "Predicted next UID\r\n"
+        ),
+        (
+            f"* OK [UNSEEN {second.uid}] "
+            "First unseen message\r\n"
+        ),
+        (
+            "A002 OK [READ-ONLY] "
+            "EXAMINE completed\r\n"
+        ),
+    ]
+
+    assert protocol.session.state is (
+        IMAPSessionState.SELECTED
+    )
+
+    assert (
+        protocol.session.selected_mailbox
+        == "bob@test.onion"
+    )
+
+def test_imap_examine_rejects_uid_store(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 EXAMINE "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID STORE {entry.uid} "
+                "+FLAGS (\\Seen)"
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 NO Mailbox is read-only\r\n"
+    ]
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
 
 
 def test_imap_select_rejects_missing_mailbox():
@@ -4937,3 +5062,26 @@ def test_idle_enters_idle_without_replies():
     )
 
     assert replies == []
+
+
+def test_idle_exposes_enter_idle_action():
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        "A002 IDLE"
+    )
+
+    assert (
+        protocol.command_action()
+        is IMAPCommandAction.ENTER_IDLE
+    )

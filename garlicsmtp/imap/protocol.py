@@ -154,11 +154,13 @@ class IMAPProtocol:
         self,
         result: IMAPCommandResult,
     ) -> None:
-        if (
-            result.action
-            is IMAPCommandAction.ENTER_IDLE
-        ):
-            pass
+        self._command_action = result.action
+
+    def command_action(
+        self,
+    ) -> IMAPCommandAction:
+        return self._command_action
+
 
     def command_idle(
         self,
@@ -1112,7 +1114,91 @@ class IMAPProtocol:
         )
 
         return replies
-   
+
+
+    def command_examine(
+        self,
+        command,
+    ):
+        authentication_error = (
+            self._require_authenticated(
+                command
+            )
+        )
+
+        if authentication_error is not None:
+            return authentication_error
+
+        if len(command.arguments) != 1:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "EXAMINE requires mailbox",
+                )
+            ]
+
+        mailbox = command.arguments[0].strip('"')
+
+        if mailbox not in self.store.list_mailboxes():
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not found",
+                )
+            ]
+
+        mailbox_view = self.store.open_mailbox(
+            mailbox
+        )
+
+        exists = mailbox_view.count()
+        next_uid = mailbox_view.next_uid()
+        unseen_uid = (
+            mailbox_view.first_unseen_uid()
+        )
+
+        self.session.select(
+            mailbox,
+            read_only=True,
+        )
+
+        replies = [
+            IMAPReply(
+                "* FLAGS "
+                "(\\Seen \\Answered \\Flagged "
+                "\\Deleted \\Draft)"
+            ),
+            IMAPReply(
+                f"* {exists} EXISTS"
+            ),
+            IMAPReply(
+                "* 0 RECENT"
+            ),
+            IMAPReply(
+                f"* OK [UIDNEXT {next_uid}] "
+                "Predicted next UID"
+            ),
+        ]
+
+        if unseen_uid is not None:
+            replies.append(
+                IMAPReply(
+                    f"* OK [UNSEEN {unseen_uid}] "
+                    "First unseen message"
+                )
+            )
+
+        replies.append(
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "[READ-ONLY] EXAMINE completed",
+            )
+        )
+
+        return replies
 
     def command_uid(
         self,
