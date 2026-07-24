@@ -5315,3 +5315,1652 @@ def test_imap_examine_allows_uid_copy(
     )
 
     assert len(copied) == 1
+
+
+def test_imap_select_after_examine_restores_read_write(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 EXAMINE "bob@test.onion"'
+    )
+
+    protocol.execute(
+        'A003 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A004 UID STORE {entry.uid} "
+                "+FLAGS (\\Seen)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS (\\Seen))\r\n",
+        "A004 OK UID STORE completed\r\n",
+    ]
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_status_selected_mailbox(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A003 STATUS "bob@test.onion" '
+            "(MESSAGES UIDNEXT UIDVALIDITY)"
+        )
+    )
+
+    assert replies == [
+        (
+            '* STATUS "bob@test.onion" '
+            "(MESSAGES 1 UIDNEXT 2 "
+            "UIDVALIDITY 1)\r\n"
+        ),
+        "A003 OK STATUS completed\r\n",
+    ]
+
+
+def test_imap_status_returns_only_requested_items(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 STATUS "bob@test.onion" (UIDNEXT)'
+        )
+    )
+
+    assert replies == [
+        '* STATUS "bob@test.onion" (UIDNEXT 2)\r\n',
+        "A002 OK STATUS completed\r\n",
+    ]
+
+def test_imap_uid_copy_to_same_mailbox(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f'A003 UID COPY {entry.uid} '
+                '"bob@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 1 2] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    entries = store.list_entries(
+        "bob@test.onion"
+    )
+
+    assert len(entries) == 2
+    assert entries[0].uid == 1
+    assert entries[1].uid == 2
+
+
+def test_imap_uid_copy_multiple_messages_returns_copyuid_mapping(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID COPY "
+                f"{first.uid},{second.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 1,2 1,2] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 2
+    assert copied[0].uid == 1
+    assert copied[1].uid == 2
+
+
+def test_imap_uid_copy_multiple_does_not_copy_partial_result(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID COPY "
+                f"{first.uid},999 "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 NO Message not found\r\n",
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert copied == []
+
+
+def test_imap_uid_copy_accepts_uid_range(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID COPY "
+                f"{first.uid}:{second.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 1,2 1,2] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 2
+    assert copied[0].uid == 1
+    assert copied[1].uid == 2
+
+
+def test_imap_uid_copy_accepts_reverse_uid_range(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID COPY "
+                f"{second.uid}:{first.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 1,2 1,2] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 2
+
+
+def test_imap_uid_copy_accepts_star(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID COPY * '
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 "
+            f"{second.uid} 1] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 1
+
+
+def test_imap_uid_copy_accepts_range_to_star(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID COPY "
+                f"{first.uid}:* "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 "
+            "1,2,3 1,2,3] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 3
+    assert [
+        entry.uid
+        for entry in copied
+    ] == [1, 2, 3]
+
+
+def test_imap_uid_copy_range_skips_missing_uids(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    protocol.execute(
+        "A004 EXPUNGE"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A005 UID COPY "
+                f"{first.uid}:{third.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A005 OK [COPYUID 1 "
+            "1,3 1,2] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 2
+    assert [
+        entry.uid
+        for entry in copied
+    ] == [1, 2]
+
+
+def test_imap_uid_copy_accepts_mixed_uid_sequence_set(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    fourth = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    fifth = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A003 UID COPY "
+                "1,3:4,* "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 "
+            "1,3,4,5 1,2,3,4] "
+            "UID COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 4
+
+    assert [
+        entry.uid
+        for entry in copied
+    ] == [1, 2, 3, 4]
+
+
+def test_imap_uid_move_multiple_messages_returns_copyuid_mapping(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID MOVE "
+                f"{first.uid},{second.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 EXPUNGE\r\n",
+        "* 1 EXPUNGE\r\n",
+        (
+            "A003 OK [COPYUID 1 "
+            "1,2 1,2] "
+            "UID MOVE completed\r\n"
+        ),
+    ]
+
+    source = store.list_entries(
+        "bob@test.onion"
+    )
+
+    destination = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert source == []
+    assert len(destination) == 2
+    assert [
+        entry.uid
+        for entry in destination
+    ] == [1, 2]
+
+
+def test_imap_uid_move_accepts_uid_range(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID MOVE "
+                f"{first.uid}:{second.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 EXPUNGE\r\n",
+        "* 1 EXPUNGE\r\n",
+        (
+            "A003 OK [COPYUID 1 "
+            "1,2 1,2] "
+            "UID MOVE completed\r\n"
+        ),
+    ]
+
+    assert store.list_entries(
+        "bob@test.onion"
+    ) == []
+
+    moved = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(moved) == 2
+    assert [
+        entry.uid
+        for entry in moved
+    ] == [1, 2]
+
+
+def test_imap_uid_move_accepts_reverse_uid_range(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID MOVE "
+                f"{second.uid}:{first.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 EXPUNGE\r\n",
+        "* 1 EXPUNGE\r\n",
+        (
+            "A003 OK [COPYUID 1 "
+            "1,2 1,2] "
+            "UID MOVE completed\r\n"
+        ),
+    ]
+
+    assert store.list_entries(
+        "bob@test.onion"
+    ) == []
+
+    moved = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(moved) == 2
+
+
+def test_imap_uid_move_accepts_star(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID MOVE * '
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "* 2 EXPUNGE\r\n",
+        (
+            "A003 OK [COPYUID 1 "
+            f"{second.uid} 1] "
+            "UID MOVE completed\r\n"
+        ),
+    ]
+
+    remaining = store.list_entries(
+        "bob@test.onion"
+    )
+
+    assert len(remaining) == 1
+    assert remaining[0].uid == first.uid
+
+    moved = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(moved) == 1
+    assert moved[0].uid == 1
+
+
+def test_imap_uid_move_range_skips_missing_uids(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    protocol.execute(
+        "A004 EXPUNGE"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A005 UID MOVE "
+                f"{first.uid}:{third.uid} "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 EXPUNGE\r\n",
+        "* 1 EXPUNGE\r\n",
+        (
+            "A005 OK [COPYUID 1 "
+            "1,3 1,2] "
+            "UID MOVE completed\r\n"
+        ),
+    ]
+
+    assert store.list_entries(
+        "bob@test.onion"
+    ) == []
+
+    moved = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(moved) == 2
+
+    assert [
+        entry.uid
+        for entry in moved
+    ] == [1, 2]
+
+
+def test_imap_uid_move_multiple_does_not_move_partial_result(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID MOVE "
+                f"{first.uid},999 "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 NO Message not found\r\n",
+    ]
+
+    source = store.list_entries(
+        "bob@test.onion"
+    )
+
+    destination = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(source) == 1
+    assert source[0].uid == first.uid
+    assert destination == []
+
+
+def test_imap_uid_fetch_multiple_messages(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH "
+                f"{first.uid},{second.uid} "
+                "(UID FLAGS)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS ())\r\n",
+        "* 2 FETCH (UID 2 FLAGS ())\r\n",
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_accepts_uid_range(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH "
+                f"{first.uid}:{second.uid} "
+                "(UID FLAGS)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS ())\r\n",
+        "* 2 FETCH (UID 2 FLAGS ())\r\n",
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_accepts_star(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 UID FETCH * (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        (
+            "* 2 FETCH "
+            f"(UID {second.uid} FLAGS ())\r\n"
+        ),
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_range_skips_missing_uids(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    protocol.execute(
+        "A004 EXPUNGE"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A005 UID FETCH "
+                f"{first.uid}:{third.uid} "
+                "(UID FLAGS)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS ())\r\n",
+        "* 2 FETCH (UID 3 FLAGS ())\r\n",
+        "A005 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_store_multiple_messages(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID STORE "
+                f"{first.uid},{second.uid} "
+                "+FLAGS (\\Seen)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS (\\Seen))\r\n",
+        "* 2 FETCH (UID 2 FLAGS (\\Seen))\r\n",
+        "A003 OK UID STORE completed\r\n",
+    ]
+
+
+def test_imap_uid_store_accepts_uid_range(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID STORE "
+                f"{first.uid}:{second.uid} "
+                "+FLAGS (\\Seen)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS (\\Seen))\r\n",
+        "* 2 FETCH (UID 2 FLAGS (\\Seen))\r\n",
+        "A003 OK UID STORE completed\r\n",
+    ]
+
+
+def test_imap_uid_store_accepts_star(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 UID STORE * "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    assert replies == [
+        (
+            "* 2 FETCH "
+            "(UID 2 FLAGS (\\Seen))\r\n"
+        ),
+        "A003 OK UID STORE completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" not in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_uid_store_range_skips_missing_uids(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    protocol.execute(
+        "A004 EXPUNGE"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A005 UID STORE "
+                f"{first.uid}:{third.uid} "
+                "+FLAGS (\\Seen)"
+            )
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS (\\Seen))\r\n",
+        "* 2 FETCH (UID 3 FLAGS (\\Seen))\r\n",
+        "A005 OK UID STORE completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    third_stored = store.get_entry(
+        "bob@test.onion",
+        third.id,
+    )
+
+    assert first_stored is not None
+    assert third_stored is not None
+
+    assert "\\Seen" in first_stored.flags
+    assert "\\Seen" in third_stored.flags
+
+
+def test_imap_uid_search_seen(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH SEEN"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Seen" not in first_stored.flags

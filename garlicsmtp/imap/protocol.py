@@ -57,6 +57,82 @@ class IMAPProtocol:
 
         self.store = store or MessageStore()
 
+    def _resolve_uid_sequence_set(
+        self,
+        uid_reference: str,
+        existing_uids: set[int],
+        *,
+        require_explicit_uids: bool = True,
+    ) -> list[int]:
+        highest_uid = (
+            max(existing_uids)
+            if existing_uids
+            else None
+        )
+
+        def resolve_uid(
+            value: str,
+        ) -> int:
+            if value == "*":
+                if highest_uid is None:
+                    raise ValueError
+
+                return highest_uid
+
+            uid = int(value)
+
+            if uid <= 0:
+                raise ValueError
+
+            return uid
+
+        uids: list[int] = []
+
+        for part in uid_reference.split(","):
+            if ":" in part:
+                start_text, end_text = part.split(
+                    ":",
+                    1,
+                )
+
+                start_uid = resolve_uid(
+                    start_text
+                )
+                end_uid = resolve_uid(
+                    end_text
+                )
+
+                lower = min(
+                    start_uid,
+                    end_uid,
+                )
+                upper = max(
+                    start_uid,
+                    end_uid,
+                )
+
+                uids.extend(
+                    uid
+                    for uid in range(
+                        lower,
+                        upper + 1,
+                    )
+                    if uid in existing_uids
+                )
+
+                continue
+
+            uid = resolve_uid(part)
+
+            if uid not in existing_uids:
+                if require_explicit_uids:
+                    raise LookupError
+
+                continue
+
+            uids.append(uid)
+
+        return uids
 
     def greeting(
         self,
@@ -1283,17 +1359,6 @@ class IMAPProtocol:
 
         uid_reference = command.arguments[1]
 
-        try:
-            uid = int(uid_reference)
-        except ValueError:
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "BAD",
-                    "Invalid UID",
-                )
-            ]
-
         requested_items = self._parse_fetch_items(
             command.arguments[2:]
         )
@@ -1313,13 +1378,40 @@ class IMAPProtocol:
             mailbox
         )
 
-        result = mailbox_view.fetch_by_uid(
-            uid
+        entries = self.store.list_entries(
+            mailbox
         )
+
+        existing_uids = {
+            entry.uid
+            for entry in entries
+        }
+
+        try:
+            uids = self._resolve_uid_sequence_set(
+                uid_reference,
+                existing_uids,
+                require_explicit_uids=False,
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid UID",
+                )
+            ]
 
         replies: list[IMAPResponse] = []
 
-        if result is not None:
+        for uid in uids:
+            result = mailbox_view.fetch_by_uid(
+                uid
+            )
+
+            if result is None:
+                continue
+
             sequence_number, selected = result
 
             renderer = IMAPFetchRenderer(
@@ -1381,7 +1473,6 @@ class IMAPProtocol:
         return replies
     
   
-
     @staticmethod
     def _parse_fetch_items(
         arguments: list[str],
@@ -1437,17 +1528,6 @@ class IMAPProtocol:
 
         uid_reference = command.arguments[1]
 
-        try:
-            uid = int(uid_reference)
-        except ValueError:
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "BAD",
-                    "Invalid UID",
-                )
-            ]
-
         operation_text = (
             command.arguments[2].upper()
         )
@@ -1486,6 +1566,7 @@ class IMAPProtocol:
         )
 
         mailbox = self.session.selected_mailbox
+
         if self.session.selected_mailbox_read_only:
             return [
                 IMAPReply.tagged(
@@ -1494,7 +1575,7 @@ class IMAPProtocol:
                     "Mailbox is read-only",
                 )
             ]
-        
+
         if mailbox is None:
             return [
                 IMAPReply.tagged(
@@ -1508,33 +1589,60 @@ class IMAPProtocol:
             mailbox
         )
 
-        result = mailbox_view.store_flags(
-            uid=uid,
-            operation=operation,
-            flags=flags,
+        entries = self.store.list_entries(
+            mailbox
         )
+
+        existing_uids = {
+            entry.uid
+            for entry in entries
+        }
+
+        try:
+            uids = self._resolve_uid_sequence_set(
+                uid_reference,
+                existing_uids,
+                require_explicit_uids=False,
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid UID",
+                )
+            ]
 
         replies: list[IMAPResponse] = []
 
-        if result is not None:
+        for uid in uids:
+            result = mailbox_view.store_flags(
+                uid=uid,
+                operation=operation,
+                flags=flags,
+            )
+
+            if result is None:
+                continue
+
             sequence_number, refreshed = result
 
-            if not silent:
-                renderer = IMAPFetchRenderer(
-                    entry=refreshed,
-                    sequence_number=(
-                        sequence_number
-                    ),
-                )
+            if silent:
+                continue
 
-                replies.append(
-                    renderer.render(
-                        {
-                            "FLAGS",
-                            "UID",
-                        }
-                    )
+            renderer = IMAPFetchRenderer(
+                entry=refreshed,
+                sequence_number=sequence_number,
+            )
+
+            replies.append(
+                renderer.render(
+                    {
+                        "FLAGS",
+                        "UID",
+                    }
                 )
+            )
 
         replies.append(
             IMAPReply.tagged(
@@ -1563,17 +1671,6 @@ class IMAPProtocol:
             ]
 
         uid_reference = command.arguments[1]
-
-        try:
-            uid = int(uid_reference)
-        except ValueError:
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "BAD",
-                    "Invalid UID",
-                )
-            ]
 
         destination_mailbox = (
             command.arguments[2].strip('"')
@@ -1608,12 +1705,29 @@ class IMAPProtocol:
             selected_mailbox
         )
 
-        copied = mailbox_view.copy_by_uid(
-            uid,
-            destination_mailbox,
+        entries = self.store.list_entries(
+            selected_mailbox
         )
 
-        if copied is None:
+        existing_uids = {
+            entry.uid
+            for entry in entries
+        }
+
+        try:
+            uids = self._resolve_uid_sequence_set(
+                uid_reference,
+                existing_uids,
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid UID",
+                )
+            ]
+        except LookupError:
             return [
                 IMAPReply.tagged(
                     command.tag,
@@ -1622,7 +1736,49 @@ class IMAPProtocol:
                 )
             ]
 
-        source_uid, destination_uid = copied
+        if not uids:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Message not found",
+                )
+            ]
+
+        source_uids: list[int] = []
+        destination_uids: list[int] = []
+
+        for uid in uids:
+            copied = mailbox_view.copy_by_uid(
+                uid,
+                destination_mailbox,
+            )
+
+            if copied is None:
+                return [
+                    IMAPReply.tagged(
+                        command.tag,
+                        "NO",
+                        "Message not found",
+                    )
+                ]
+
+            source_uid, destination_uid = copied
+
+            source_uids.append(source_uid)
+            destination_uids.append(
+                destination_uid
+            )
+
+        source_set = ",".join(
+            str(uid)
+            for uid in source_uids
+        )
+
+        destination_set = ",".join(
+            str(uid)
+            for uid in destination_uids
+        )
 
         return [
             IMAPReply.tagged(
@@ -1630,8 +1786,8 @@ class IMAPProtocol:
                 "OK",
                 (
                     "[COPYUID 1 "
-                    f"{source_uid} "
-                    f"{destination_uid}] "
+                    f"{source_set} "
+                    f"{destination_set}] "
                     "UID COPY completed"
                 ),
             )
@@ -1656,17 +1812,6 @@ class IMAPProtocol:
 
         uid_reference = command.arguments[1]
 
-        try:
-            uid = int(uid_reference)
-        except ValueError:
-            return [
-                IMAPReply.tagged(
-                    command.tag,
-                    "BAD",
-                    "Invalid UID",
-                )
-            ]
-
         destination_mailbox = (
             command.arguments[2].strip('"')
         )
@@ -1683,7 +1828,7 @@ class IMAPProtocol:
                     "Mailbox is read-only",
                 )
             ]
-        
+
         if selected_mailbox is None:
             return [
                 IMAPReply.tagged(
@@ -1724,12 +1869,29 @@ class IMAPProtocol:
             selected_mailbox
         )
 
-        moved = mailbox_view.move_by_uid(
-            uid,
-            destination_mailbox,
+        entries = self.store.list_entries(
+            selected_mailbox
         )
 
-        if moved is None:
+        existing_uids = {
+            entry.uid
+            for entry in entries
+        }
+
+        try:
+            uids = self._resolve_uid_sequence_set(
+                uid_reference,
+                existing_uids,
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid UID",
+                )
+            ]
+        except LookupError:
             return [
                 IMAPReply.tagged(
                     command.tag,
@@ -1738,30 +1900,224 @@ class IMAPProtocol:
                 )
             ]
 
-        (
-            source_uid,
-            destination_uid,
-            sequence_number,
-        ) = moved
-
-        return [
-            IMAPReply(
-                (
-                    f"* {sequence_number} "
-                    "EXPUNGE"
+        if not uids:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Message not found",
                 )
-            ),
+            ]
+
+        replies: list[IMAPResponse] = []
+        source_uids: list[int] = []
+        destination_uids: list[int] = []
+
+        for uid in uids:
+            moved = mailbox_view.move_by_uid(
+                uid,
+                destination_mailbox,
+            )
+
+            if moved is None:
+                return [
+                    IMAPReply.tagged(
+                        command.tag,
+                        "NO",
+                        "Message not found",
+                    )
+                ]
+
+            (
+                source_uid,
+                destination_uid,
+                sequence_number,
+            ) = moved
+
+            replies.append(
+                IMAPReply(
+                    (
+                        f"* {sequence_number} "
+                        "EXPUNGE"
+                    )
+                )
+            )
+
+            source_uids.append(source_uid)
+            destination_uids.append(
+                destination_uid
+            )
+
+        source_set = ",".join(
+            str(uid)
+            for uid in source_uids
+        )
+
+        destination_set = ",".join(
+            str(uid)
+            for uid in destination_uids
+        )
+
+        replies.append(
             IMAPReply.tagged(
                 command.tag,
                 "OK",
                 (
                     "[COPYUID 1 "
-                    f"{source_uid} "
-                    f"{destination_uid}] "
+                    f"{source_set} "
+                    f"{destination_set}] "
                     "UID MOVE completed"
                 ),
-            ),
-        ]
+            )
+        )
+
+        return replies
+
+        def resolve_uid(
+            value: str,
+        ) -> int:
+            if value == "*":
+                if highest_uid is None:
+                    raise ValueError
+
+                return highest_uid
+
+            uid = int(value)
+
+            if uid <= 0:
+                raise ValueError
+
+            return uid
+
+        try:
+            uids: list[int] = []
+
+            for part in uid_reference.split(","):
+                if ":" in part:
+                    start_text, end_text = part.split(
+                        ":",
+                        1,
+                    )
+
+                    start_uid = resolve_uid(
+                        start_text
+                    )
+                    end_uid = resolve_uid(
+                        end_text
+                    )
+
+                    lower = min(
+                        start_uid,
+                        end_uid,
+                    )
+                    upper = max(
+                        start_uid,
+                        end_uid,
+                    )
+
+                    uids.extend(
+                        uid
+                        for uid in range(
+                            lower,
+                            upper + 1,
+                        )
+                        if uid in existing_uids
+                    )
+                else:
+                    uid = resolve_uid(part)
+
+                    if uid not in existing_uids:
+                        return [
+                            IMAPReply.tagged(
+                                command.tag,
+                                "NO",
+                                "Message not found",
+                            )
+                        ]
+
+                    uids.append(uid)
+
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid UID",
+                )
+            ]
+
+        if not uids:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid UID",
+                )
+            ]
+
+        replies: list[IMAPResponse] = []
+        source_uids: list[int] = []
+        destination_uids: list[int] = []
+
+        for uid in uids:
+            moved = mailbox_view.move_by_uid(
+                uid,
+                destination_mailbox,
+            )
+
+            if moved is None:
+                return [
+                    IMAPReply.tagged(
+                        command.tag,
+                        "NO",
+                        "Message not found",
+                    )
+                ]
+
+            (
+                source_uid,
+                destination_uid,
+                sequence_number,
+            ) = moved
+
+            replies.append(
+                IMAPReply(
+                    (
+                        f"* {sequence_number} "
+                        "EXPUNGE"
+                    )
+                )
+            )
+
+            source_uids.append(source_uid)
+            destination_uids.append(
+                destination_uid
+            )
+
+        source_set = ",".join(
+            str(uid)
+            for uid in source_uids
+        )
+
+        destination_set = ",".join(
+            str(uid)
+            for uid in destination_uids
+        )
+
+        replies.append(
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                (
+                    "[COPYUID 1 "
+                    f"{source_set} "
+                    f"{destination_set}] "
+                    "UID MOVE completed"
+                ),
+            )
+        )
+
+        return replies
 
     @staticmethod
     def _parse_store_flags(
