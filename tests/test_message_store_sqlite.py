@@ -1289,3 +1289,126 @@ def test_sqlite_store_rename_moves_subscription(
 
     finally:
         backend.close()
+
+
+def test_sqlite_uid_validity_persists_after_reopen(
+    tmp_path,
+):
+    path = tmp_path / "mailboxes.db"
+
+    backend = SQLiteMessageStoreBackend(
+        path
+    )
+
+    store = MessageStore(
+        backend=backend
+    )
+
+    store.create_mailbox(
+        "test"
+    )
+
+    before = (
+        store.open_mailbox(
+            "test"
+        ).uid_validity()
+    )
+
+    backend.close()
+
+    reopened_backend = (
+        SQLiteMessageStoreBackend(
+            path
+        )
+    )
+
+    reopened_store = MessageStore(
+        backend=reopened_backend
+    )
+
+    after = (
+        reopened_store.open_mailbox(
+            "test"
+        ).uid_validity()
+    )
+
+    assert after == before
+
+    reopened_backend.close()
+
+
+def test_sqlite_uid_validity_survives_rename(
+    tmp_path,
+):
+    backend = SQLiteMessageStoreBackend(
+        tmp_path / "mailboxes.db"
+    )
+
+    store = MessageStore(
+        backend=backend
+    )
+
+    store.create_mailbox(
+        "source"
+    )
+
+    before = (
+        store.open_mailbox(
+            "source"
+        ).uid_validity()
+    )
+
+    store.rename_mailbox(
+        "source",
+        "destination",
+    )
+
+    after = (
+        store.open_mailbox(
+            "destination"
+        ).uid_validity()
+    )
+
+    assert after == before
+
+    backend.close()
+
+
+def test_sqlite_recreated_mailbox_gets_new_uid_validity(
+    tmp_path,
+):
+    backend = SQLiteMessageStoreBackend(
+        tmp_path / "mailboxes.db"
+    )
+
+    store = MessageStore(
+        backend=backend
+    )
+
+    store.create_mailbox(
+        "test"
+    )
+
+    before = (
+        store.open_mailbox(
+            "test"
+        ).uid_validity()
+    )
+
+    store.delete_mailbox(
+        "test"
+    )
+
+    store.create_mailbox(
+        "test"
+    )
+
+    after = (
+        store.open_mailbox(
+            "test"
+        ).uid_validity()
+    )
+
+    assert after != before
+
+    backend.close()

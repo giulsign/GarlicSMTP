@@ -1038,3 +1038,77 @@ def test_mailbox_view_get_by_sequence_number(
         mailbox.get_by_sequence_number(0)
         is None
     )
+
+
+def test_mailbox_uid_validity_is_stable():
+    store = MessageStore()
+
+    store.create_mailbox(
+        "test"
+    )
+
+    mailbox = store.open_mailbox(
+        "test"
+    )
+
+    first = mailbox.uid_validity()
+    second = mailbox.uid_validity()
+
+    assert first == second
+
+
+def test_mailbox_uid_validity_survives_rename():
+    store = MessageStore()
+
+    store.create_mailbox(
+        "source"
+    )
+
+    before = (
+        store.open_mailbox(
+            "source"
+        ).uid_validity()
+    )
+
+    store.rename_mailbox(
+        "source",
+        "destination",
+    )
+
+    after = (
+        store.open_mailbox(
+            "destination"
+        ).uid_validity()
+    )
+
+    assert after == before
+
+
+def test_recreated_mailbox_gets_new_uid_validity():
+    store = MessageStore()
+
+    store.create_mailbox(
+        "test"
+    )
+
+    before = (
+        store.open_mailbox(
+            "test"
+        ).uid_validity()
+    )
+
+    store.delete_mailbox(
+        "test"
+    )
+
+    store.create_mailbox(
+        "test"
+    )
+
+    after = (
+        store.open_mailbox(
+            "test"
+        ).uid_validity()
+    )
+
+    assert after != before

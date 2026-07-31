@@ -109,6 +109,14 @@ class MessageStore:
             return self.backend.count(
                 mailbox
             )
+
+    def get_uid_validity(
+        self,
+        mailbox: str,
+    ) -> int:
+        return self.backend.get_uid_validity(
+            mailbox
+        )
     
 
     def save_entry(

@@ -1051,9 +1051,6 @@ class IMAPProtocol:
             "UNSEEN": (
                 mailbox_view.unseen_count()
             ),
-            "HIGHESTMODSEQ": (
-                mailbox_view.highest_modseq()
-            ),
         }
 
     def _require_authenticated(
@@ -1125,7 +1122,6 @@ class IMAPProtocol:
             "UIDNEXT",
             "UIDVALIDITY",
             "UNSEEN",
-            "HIGHESTMODSEQ",
         }
 
         for item in requested_items:

@@ -111,6 +111,14 @@ class MessageStoreBackend(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_uid_validity(
+        self,
+        mailbox: str,
+    ) -> int:
+        """Return the UIDVALIDITY value for a mailbox."""
+        raise NotImplementedError
+    
+    @abstractmethod
     def count(self, mailbox: str) -> int:
         """Return the number of messages in a mailbox."""
         raise NotImplementedError

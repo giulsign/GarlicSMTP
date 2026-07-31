@@ -63,6 +63,8 @@ class SQLiteMessageStoreBackend(
                 """
             )
 
+            self._migrate_mailbox_schema()
+
             self.connection.execute(
                 """
                 CREATE UNIQUE INDEX IF NOT EXISTS
@@ -208,19 +210,41 @@ class SQLiteMessageStoreBackend(
         mailbox: str,
     ) -> bool:
         with self._lock:
-            cursor = self.connection.execute(
+            row = self.connection.execute(
                 """
-                INSERT OR IGNORE INTO mailboxes (
-                    name
-                )
-                VALUES (?)
+                SELECT 1
+                FROM mailboxes
+                WHERE name = ?
                 """,
-                (mailbox,),
+                (
+                    mailbox,
+                ),
+            ).fetchone()
+
+            if row is not None:
+                return False
+
+            uid_validity = (
+                self._allocate_uid_validity()
+            )
+
+            self.connection.execute(
+                """
+                INSERT INTO mailboxes (
+                    name,
+                    uid_validity
+                )
+                VALUES (?, ?)
+                """,
+                (
+                    mailbox,
+                    uid_validity,
+                ),
             )
 
             self.connection.commit()
 
-            return cursor.rowcount == 1
+            return True
 
     def delete_mailbox(
         self,
@@ -491,14 +515,36 @@ class SQLiteMessageStoreBackend(
         self,
         mailbox: str,
     ) -> None:
+        row = self.connection.execute(
+            """
+            SELECT 1
+            FROM mailboxes
+            WHERE name = ?
+            """,
+            (
+                mailbox,
+            ),
+        ).fetchone()
+
+        if row is not None:
+            return
+
+        uid_validity = (
+            self._allocate_uid_validity()
+        )
+
         self.connection.execute(
             """
-            INSERT OR IGNORE INTO mailboxes (
-                name
+            INSERT INTO mailboxes (
+                name,
+                uid_validity
             )
-            VALUES (?)
+            VALUES (?, ?)
             """,
-            (mailbox,),
+            (
+                mailbox,
+                uid_validity,
+            ),
         )
 
     def _next_uid(
@@ -878,3 +924,169 @@ class SQLiteMessageStoreBackend(
             self.connection.commit()
 
             return cursor.rowcount == 1
+
+    def get_uid_validity(
+        self,
+        mailbox: str,
+    ) -> int:
+        with self._lock:
+            row = self.connection.execute(
+                """
+                SELECT uid_validity
+                FROM mailboxes
+                WHERE name = ?
+                """,
+                (
+                    mailbox,
+                ),
+            ).fetchone()
+
+        if (
+            row is None
+            or row[0] is None
+        ):
+            raise KeyError(
+                f"Mailbox not found: {mailbox}"
+            )
+
+        return int(
+            row[0]
+        )
+
+    def _migrate_mailbox_schema(
+        self,
+    ) -> None:
+        columns = {
+            row[1]
+            for row in self.connection.execute(
+                "PRAGMA table_info(mailboxes)"
+            ).fetchall()
+        }
+
+        if "uid_validity" not in columns:
+            self.connection.execute(
+                """
+                ALTER TABLE mailboxes
+                ADD COLUMN uid_validity INTEGER
+                """
+            )
+
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS storage_metadata (
+                key TEXT PRIMARY KEY,
+                value INTEGER NOT NULL
+            )
+            """
+        )
+
+        row = self.connection.execute(
+            """
+            SELECT value
+            FROM storage_metadata
+            WHERE key = 'next_uid_validity'
+            """
+        ).fetchone()
+
+        if row is None:
+            max_row = self.connection.execute(
+                """
+                SELECT COALESCE(
+                    MAX(uid_validity),
+                    0
+                )
+                FROM mailboxes
+                """
+            ).fetchone()
+
+            next_uid_validity = (
+                int(max_row[0]) + 1
+            )
+
+            self.connection.execute(
+                """
+                INSERT INTO storage_metadata (
+                    key,
+                    value
+                )
+                VALUES (
+                    'next_uid_validity',
+                    ?
+                )
+                """,
+                (
+                    next_uid_validity,
+                ),
+            )
+
+        rows = self.connection.execute(
+            """
+            SELECT name
+            FROM mailboxes
+            WHERE uid_validity IS NULL
+            ORDER BY name
+            """
+        ).fetchall()
+
+        for (mailbox,) in rows:
+            uid_validity = (
+                self._allocate_uid_validity()
+            )
+
+            self.connection.execute(
+                """
+                UPDATE mailboxes
+                SET uid_validity = ?
+                WHERE name = ?
+                """,
+                (
+                    uid_validity,
+                    mailbox,
+                ),
+            )
+
+    def _allocate_uid_validity(
+        self,
+    ) -> int:
+        row = self.connection.execute(
+            """
+            SELECT value
+            FROM storage_metadata
+            WHERE key = 'next_uid_validity'
+            """
+        ).fetchone()
+
+        if row is None:
+            uid_validity = 1
+
+            self.connection.execute(
+                """
+                INSERT INTO storage_metadata (
+                    key,
+                    value
+                )
+                VALUES (
+                    'next_uid_validity',
+                    2
+                )
+                """
+            )
+
+            return uid_validity
+
+        uid_validity = int(
+            row[0]
+        )
+
+        self.connection.execute(
+            """
+            UPDATE storage_metadata
+            SET value = ?
+            WHERE key = 'next_uid_validity'
+            """,
+            (
+                uid_validity + 1,
+            ),
+        )
+
+        return uid_validity

@@ -21,6 +21,8 @@ class MemoryMessageStoreBackend(
         )
         self._mailbox_names = set()
         self._subscriptions: set[str] = set()
+        self._uid_validities: dict[str, int] = {}
+        self._next_uid_validity = 1
 
     def save(
         self,
@@ -38,6 +40,9 @@ class MemoryMessageStoreBackend(
         message: MailMessage,
     ) -> MessageEntry:
         self._mailbox_names.add(
+            mailbox
+        )
+        self._ensure_uid_validity(
             mailbox
         )
 
@@ -68,6 +73,9 @@ class MemoryMessageStoreBackend(
         internal_date: datetime,
     ) -> MessageEntry:
         self._mailbox_names.add(
+            mailbox
+        )
+        self._ensure_uid_validity(
             mailbox
         )
 
@@ -153,6 +161,10 @@ class MemoryMessageStoreBackend(
             mailbox
         )
 
+        self._ensure_uid_validity(
+            mailbox
+        )
+
         return True
 
     def delete_mailbox(
@@ -171,6 +183,7 @@ class MemoryMessageStoreBackend(
             None,
         )
 
+
         self._next_uids.pop(
             mailbox,
             None,
@@ -178,6 +191,11 @@ class MemoryMessageStoreBackend(
 
         self._subscriptions.discard(
             mailbox
+        )
+
+        self._uid_validities.pop(
+            mailbox,
+            None,
         )
 
         return True
@@ -218,6 +236,11 @@ class MemoryMessageStoreBackend(
 
             self._subscriptions.add(
                 destination
+            )
+
+        if source in self._uid_validities:
+            self._uid_validities[destination] = (
+                self._uid_validities.pop(source)
             )
 
         return True
@@ -418,3 +441,28 @@ class MemoryMessageStoreBackend(
             .pop(message_id, None)
             is not None
         )
+
+    def _ensure_uid_validity(
+        self,
+        mailbox: str,
+    ) -> None:
+        if mailbox in self._uid_validities:
+            return
+
+        self._uid_validities[mailbox] = (
+            self._next_uid_validity
+        )
+
+        self._next_uid_validity += 1
+
+    def get_uid_validity(
+        self,
+        mailbox: str,
+    ) -> int:
+        self._ensure_uid_validity(
+            mailbox
+        )
+
+        return self._uid_validities[
+            mailbox
+        ]

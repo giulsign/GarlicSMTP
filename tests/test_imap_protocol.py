@@ -5081,14 +5081,11 @@ def test_status_returns_uidvalidity(
     ]
 
 
-def test_status_returns_highest_modseq(
-    message,
-):
+def test_status_rejects_highestmodseq():
     store = MessageStore()
 
-    store.save_entry(
-        "Archive",
-        message,
+    store.create_mailbox(
+        "Archive"
     )
 
     protocol = IMAPProtocol(
@@ -5106,16 +5103,18 @@ def test_status_returns_highest_modseq(
 
     replies = serialize(
         protocol.execute(
-            'A002 STATUS "Archive" (HIGHESTMODSEQ)'
+            (
+                'A002 STATUS "Archive" '
+                "(HIGHESTMODSEQ)"
+            )
         )
     )
 
     assert replies == [
         (
-            '* STATUS "Archive" '
-            '(HIGHESTMODSEQ 1)\r\n'
+            "A002 BAD Unsupported STATUS item "
+            "HIGHESTMODSEQ\r\n"
         ),
-        "A002 OK STATUS completed\r\n",
     ]
 
 

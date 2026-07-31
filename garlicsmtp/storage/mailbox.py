@@ -117,12 +117,9 @@ class MailboxView:
     def uid_validity(
         self,
     ) -> int:
-        return 1
-
-    def highest_modseq(
-        self,
-    ) -> int:
-        return 1
+        return self.store.get_uid_validity(
+            self.name
+        )
 
     def first_unseen_uid(
         self,
