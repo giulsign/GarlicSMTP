@@ -105,7 +105,8 @@ def test_imap_server_real_connection(
                 "MOVE "
                 "NAMESPACE "
                 "ID "
-                "ENABLE\r\n"
+                "ENABLE "
+                "IDLE\r\n"
             )
 
             assert receive_line(client) == (
@@ -145,11 +146,23 @@ def test_imap_server_real_connection(
             )
 
             assert receive_line(client) == (
+                "* OK [PERMANENTFLAGS "
+                "(\\Seen \\Answered \\Flagged "
+                "\\Deleted \\Draft)] "
+                "Permanent flags\r\n"
+            )
+
+            assert receive_line(client) == (
                 "* 1 EXISTS\r\n"
             )
 
             assert receive_line(client) == (
                 "* 0 RECENT\r\n"
+            )
+
+            assert receive_line(client) == (
+                "* OK [UIDVALIDITY 1] "
+                "UID validity\r\n"
             )
 
             assert receive_line(client) == (

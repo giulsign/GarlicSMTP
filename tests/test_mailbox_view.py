@@ -998,3 +998,43 @@ def test_mailbox_view_copy_returns_none_for_missing_uid(
         999,
         "destination@test.onion",
     ) is None
+
+
+def test_mailbox_view_get_by_sequence_number(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    mailbox = store.open_mailbox(
+        "bob@test.onion"
+    )
+
+    assert (
+        mailbox.get_by_sequence_number(1)
+        == first
+    )
+
+    assert (
+        mailbox.get_by_sequence_number(2)
+        == second
+    )
+
+    assert (
+        mailbox.get_by_sequence_number(3)
+        is None
+    )
+
+    assert (
+        mailbox.get_by_sequence_number(0)
+        is None
+    )

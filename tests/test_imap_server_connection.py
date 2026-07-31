@@ -53,7 +53,7 @@ def test_imap_server_handles_connection():
 
     assert connection.sent == [
         "* OK GarlicSMTP IMAP ready\r\n",
-        (
+                (
             "* CAPABILITY "
             "IMAP4rev1 "
             "UIDPLUS "
@@ -61,7 +61,8 @@ def test_imap_server_handles_connection():
             "MOVE "
             "NAMESPACE "
             "ID "
-            "ENABLE\r\n"
+            "ENABLE "
+            "IDLE\r\n"
         ),
         (
             "A001 OK "

@@ -18,6 +18,12 @@ class IMAPSearchEngine:
         "UNSEEN",
         "FLAGGED",
         "UNFLAGGED",
+        "DELETED",
+        "UNDELETED",
+        "ANSWERED",
+        "UNANSWERED",
+        "DRAFT",
+        "UNDRAFT",
     }
 
     VALUE_CRITERIA = {
@@ -25,6 +31,13 @@ class IMAPSearchEngine:
         "TO",
         "SUBJECT",
         "TEXT",
+        "BODY",
+        "CC",
+        "BCC",
+    }
+
+    HEADER_CRITERIA ={
+        "HEADER",
     }
 
     def search(
@@ -56,45 +69,151 @@ class IMAPSearchEngine:
         predicates = []
         index = 0
 
-        while index < len(criteria):
-            criterion = criteria[index].upper()
+        def parse_one(
+            start_index: int,
+        ):
+            if start_index >= len(criteria):
+                raise IMAPSearchError(
+                    "Missing SEARCH criterion"
+                )
 
-            if criterion in self.FLAG_CRITERIA:
-                predicates.append(
-                    self._build_flag_predicate(
-                        criterion
+            criterion = (
+                criteria[start_index].upper()
+            )
+
+            if criterion == "OR":
+                left_predicate, next_index = (
+                    parse_one(
+                        start_index + 1
                     )
                 )
 
-                index += 1
-                continue
+                right_predicate, next_index = (
+                    parse_one(
+                        next_index
+                    )
+                )
+
+                return (
+                    lambda entry,
+                    left=left_predicate,
+                    right=right_predicate:
+                    left(entry) or right(entry),
+                    next_index,
+                )
+
+            if criterion == "NOT":
+                nested_predicate, next_index = (
+                    parse_one(
+                        start_index + 1
+                    )
+                )
+
+                return (
+                    lambda entry,
+                    predicate=nested_predicate:
+                    not predicate(entry),
+                    next_index,
+                )
+
+            if criterion in self.FLAG_CRITERIA:
+                return (
+                    self._build_flag_predicate(
+                        criterion
+                    ),
+                    start_index + 1,
+                )
 
             if criterion in self.VALUE_CRITERIA:
-                if index + 1 >= len(criteria):
+                if start_index + 1 >= len(criteria):
                     raise IMAPSearchError(
                         f"{criterion} requires a value"
                     )
 
                 value = self._normalize_value(
-                    criteria[index + 1]
+                    criteria[start_index + 1]
                 )
 
-                predicates.append(
+                return (
                     self._build_value_predicate(
                         criterion,
                         value,
-                    )
+                    ),
+                    start_index + 2,
                 )
 
-                index += 2
-                continue
+            if criterion in self.HEADER_CRITERIA:
+                if start_index + 2 >= len(criteria):
+                    raise IMAPSearchError(
+                        "HEADER requires field and value"
+                    )
+
+                field_name = self._normalize_value(
+                    criteria[start_index + 1]
+                )
+
+                value = self._normalize_value(
+                    criteria[start_index + 2]
+                )
+
+                return (
+                    self._build_header_predicate(
+                        field_name,
+                        value,
+                    ),
+                    start_index + 3,
+                )
 
             raise IMAPSearchError(
                 "Unsupported SEARCH criterion "
                 f"{criterion}"
             )
 
+        while index < len(criteria):
+            predicate, next_index = (
+                parse_one(index)
+            )
+
+            predicates.append(predicate)
+            index = next_index
+
         return predicates
+
+
+    def _build_header_predicate(
+        self,
+        field_name: str,
+        value: str,
+    ):
+        def predicate(
+            entry: MessageEntry,
+        ) -> bool:
+            for name, header_value in (
+                entry.message.headers.fields.items()
+            ):
+                if name.casefold() != field_name.casefold():
+                    continue
+
+                if isinstance(
+                    header_value,
+                    list,
+                ):
+                    return any(
+                        self._contains(
+                            str(item),
+                            value,
+                        )
+                        for item in header_value
+                    )
+
+                return self._contains(
+                    str(header_value),
+                    value,
+                )
+
+            return False
+
+        return predicate
 
     def _build_flag_predicate(
         self,
@@ -106,6 +225,12 @@ class IMAPSearchEngine:
             "UNSEEN": self._match_unseen,
             "FLAGGED": self._match_flagged,
             "UNFLAGGED": self._match_unflagged,
+            "DELETED": self._match_deleted,
+            "UNDELETED": self._match_undeleted,
+            "ANSWERED": self._match_answered,
+            "UNANSWERED": self._match_unanswered,
+            "DRAFT": self._match_draft,
+            "UNDRAFT": self._match_undraft,
         }
 
         return handlers[criterion]
@@ -139,6 +264,34 @@ class IMAPSearchEngine:
                         "",
                     )
                 ),
+                value,
+            )
+
+        if criterion == "CC":
+            return lambda entry: self._contains(
+                str(
+                    entry.message.headers.fields.get(
+                        "Cc",
+                        "",
+                    )
+                ),
+                value,
+            )
+
+        if criterion == "BCC":
+            return lambda entry: self._contains(
+                str(
+                    entry.message.headers.fields.get(
+                        "Bcc",
+                        "",
+                    )
+                ),
+                value,
+            )
+
+        if criterion == "BODY":
+            return lambda entry: self._contains(
+                entry.message.body or "",
                 value,
             )
 
@@ -251,3 +404,39 @@ class IMAPSearchEngine:
         entry: MessageEntry,
     ) -> bool:
         return "\\Flagged" not in entry.flags
+
+    @staticmethod
+    def _match_deleted(
+        entry: MessageEntry,
+    ) -> bool:
+        return "\\Deleted" in entry.flags
+
+    @staticmethod
+    def _match_undeleted(
+        entry: MessageEntry,
+    ) -> bool:
+        return "\\Deleted" not in entry.flags
+
+    @staticmethod
+    def _match_answered(
+        entry: MessageEntry,
+    ) -> bool:
+        return "\\Answered" in entry.flags
+
+    @staticmethod
+    def _match_unanswered(
+        entry: MessageEntry,
+    ) -> bool:
+        return "\\Answered" not in entry.flags
+
+    @staticmethod
+    def _match_draft(
+        entry: MessageEntry,
+    ) -> bool:
+        return "\\Draft" in entry.flags
+
+    @staticmethod
+    def _match_undraft(
+        entry: MessageEntry,
+    ) -> bool:
+        return "\\Draft" not in entry.flags

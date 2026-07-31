@@ -134,6 +134,77 @@ class IMAPProtocol:
 
         return uids
 
+    def _resolve_sequence_set(
+        self,
+        sequence_reference: str,
+        message_count: int,
+    ) -> list[int]:
+        if message_count <= 0:
+            return []
+
+        def resolve_value(
+            value: str,
+        ) -> int:
+            if value == "*":
+                return message_count
+
+            sequence_number = int(value)
+
+            if sequence_number <= 0:
+                raise ValueError
+
+            return sequence_number
+
+        sequence_numbers: list[int] = []
+
+        for part in sequence_reference.split(","):
+            if ":" in part:
+                start_text, end_text = part.split(
+                    ":",
+                    1,
+                )
+
+                start = resolve_value(
+                    start_text
+                )
+
+                end = resolve_value(
+                    end_text
+                )
+
+                lower = min(
+                    start,
+                    end,
+                )
+
+                upper = max(
+                    start,
+                    end,
+                )
+
+                sequence_numbers.extend(
+                    sequence_number
+                    for sequence_number in range(
+                        lower,
+                        upper + 1,
+                    )
+                    if sequence_number <= message_count
+                )
+
+                continue
+
+            sequence_number = resolve_value(
+                part
+            )
+
+            if sequence_number <= message_count:
+                sequence_numbers.append(
+                    sequence_number
+                )
+
+        return sequence_numbers
+
+
     def greeting(
         self,
     ) -> list[IMAPResponse]:
@@ -482,7 +553,8 @@ class IMAPProtocol:
                     "MOVE "
                     "NAMESPACE "
                     "ID "
-                    "ENABLE"
+                    "ENABLE "
+                    "IDLE"
                 )
             ),
             IMAPReply.tagged(
@@ -1145,27 +1217,58 @@ class IMAPProtocol:
             mailbox
         )
 
-        exists = mailbox_view.count()
-        next_uid = mailbox_view.next_uid()
-        unseen_uid = (
-            mailbox_view.first_unseen_uid()
-        )
-
         self.session.select(
             mailbox
         )
 
-        replies = [
+        replies = self._selection_replies(
+            mailbox_view
+        )
+
+        replies.append(
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "[READ-WRITE] SELECT completed",
+            )
+        )
+
+        return replies
+
+    def _selection_replies(
+        self,
+        mailbox_view,
+    ) -> list[IMAPResponse]:
+        exists = mailbox_view.count()
+        next_uid = mailbox_view.next_uid()
+        uid_validity = (
+            mailbox_view.uid_validity()
+        )
+        unseen_uid = (
+            mailbox_view.first_unseen_uid()
+        )
+
+        replies: list[IMAPResponse] = [
             IMAPReply(
                 "* FLAGS "
                 "(\\Seen \\Answered \\Flagged "
                 "\\Deleted \\Draft)"
             ),
             IMAPReply(
+                "* OK [PERMANENTFLAGS "
+                "(\\Seen \\Answered \\Flagged "
+                "\\Deleted \\Draft)] "
+                "Permanent flags"
+            ),
+            IMAPReply(
                 f"* {exists} EXISTS"
             ),
             IMAPReply(
                 "* 0 RECENT"
+            ),
+            IMAPReply(
+                f"* OK [UIDVALIDITY {uid_validity}] "
+                "UID validity"
             ),
             IMAPReply(
                 f"* OK [UIDNEXT {next_uid}] "
@@ -1181,16 +1284,7 @@ class IMAPProtocol:
                 )
             )
 
-        replies.append(
-            IMAPReply.tagged(
-                command.tag,
-                "OK",
-                "[READ-WRITE] SELECT completed",
-            )
-        )
-
         return replies
-
 
     def command_examine(
         self,
@@ -1229,42 +1323,14 @@ class IMAPProtocol:
             mailbox
         )
 
-        exists = mailbox_view.count()
-        next_uid = mailbox_view.next_uid()
-        unseen_uid = (
-            mailbox_view.first_unseen_uid()
-        )
-
         self.session.select(
             mailbox,
             read_only=True,
         )
 
-        replies = [
-            IMAPReply(
-                "* FLAGS "
-                "(\\Seen \\Answered \\Flagged "
-                "\\Deleted \\Draft)"
-            ),
-            IMAPReply(
-                f"* {exists} EXISTS"
-            ),
-            IMAPReply(
-                "* 0 RECENT"
-            ),
-            IMAPReply(
-                f"* OK [UIDNEXT {next_uid}] "
-                "Predicted next UID"
-            ),
-        ]
-
-        if unseen_uid is not None:
-            replies.append(
-                IMAPReply(
-                    f"* OK [UNSEEN {unseen_uid}] "
-                    "First unseen message"
-                )
-            )
+        replies = self._selection_replies(
+            mailbox_view
+        )
 
         replies.append(
             IMAPReply.tagged(
@@ -1339,6 +1405,277 @@ class IMAPProtocol:
                 ),
             )
         ]
+
+
+    def command_fetch(
+        self,
+        command,
+    ) -> list[IMAPResponse]:
+        if self.session.state is not (
+            IMAPSessionState.SELECTED
+        ):
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        if len(command.arguments) < 2:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    (
+                        "FETCH requires sequence "
+                        "number and data items"
+                    ),
+                )
+            ]
+
+        sequence_reference = (
+            command.arguments[0]
+        )
+
+        requested_items = self._parse_fetch_items(
+            command.arguments[1:]
+        )
+
+        mailbox = self.session.selected_mailbox
+
+        if mailbox is None:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        mailbox_view = self.store.open_mailbox(
+            mailbox
+        )
+
+        try:
+            sequence_numbers = (
+                self._resolve_sequence_set(
+                    sequence_reference,
+                    mailbox_view.count(),
+                )
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid sequence number",
+                )
+            ]
+
+        replies: list[IMAPResponse] = []
+
+        for sequence_number in sequence_numbers:
+            selected = (
+                mailbox_view.get_by_sequence_number(
+                    sequence_number
+                )
+            )
+
+            if selected is None:
+                continue
+
+            renderer = IMAPFetchRenderer(
+                entry=selected,
+                sequence_number=sequence_number,
+            )
+
+            try:
+                response = renderer.render(
+                    requested_items
+                )
+            except IMAPFetchError as exc:
+                return [
+                    IMAPReply.tagged(
+                        command.tag,
+                        "BAD",
+                        str(exc),
+                    )
+                ]
+
+            if (
+                renderer.mark_seen
+                and "\\Seen" not in selected.flags
+            ):
+                updated = mailbox_view.add_flags(
+                    selected.id,
+                    {
+                        "\\Seen",
+                    },
+                )
+
+                if updated:
+                    refreshed = mailbox_view.get_by_id(
+                        selected.id
+                    )
+
+                    if refreshed is not None:
+                        renderer = IMAPFetchRenderer(
+                            entry=refreshed,
+                            sequence_number=(
+                                sequence_number
+                            ),
+                        )
+
+                        response = renderer.render(
+                            requested_items
+                        )
+
+            replies.append(response)
+
+        replies.append(
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "FETCH completed",
+            )
+        )
+
+        return replies
+
+
+    def command_store(
+        self,
+        command,
+    ) -> list[IMAPResponse]:
+        if self.session.state is not (
+            IMAPSessionState.SELECTED
+        ):
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        if len(command.arguments) < 3:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    (
+                        "STORE requires sequence "
+                        "number, operation and flags"
+                    ),
+                )
+            ]
+
+        sequence_reference = (
+            command.arguments[0]
+        )
+
+        operation_text = (
+            command.arguments[1].upper()
+        )
+
+        operation_map = {
+            "FLAGS": StoreOperation.SET,
+            "FLAGS.SILENT": StoreOperation.SET,
+            "+FLAGS": StoreOperation.ADD,
+            "+FLAGS.SILENT": StoreOperation.ADD,
+            "-FLAGS": StoreOperation.REMOVE,
+            "-FLAGS.SILENT": StoreOperation.REMOVE,
+        }
+
+        operation = operation_map.get(
+            operation_text
+        )
+
+        if operation is None:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    (
+                        "Unsupported STORE operation "
+                        f"{operation_text}"
+                    ),
+                )
+            ]
+
+        if self.session.selected_mailbox_read_only:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox is read-only",
+                )
+            ]
+
+        mailbox = self.session.selected_mailbox
+
+        if mailbox is None:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        silent = operation_text.endswith(
+            ".SILENT"
+        )
+
+        flags = self._parse_store_flags(
+            command.arguments[2:]
+        )
+
+        mailbox_view = self.store.open_mailbox(
+            mailbox
+        )
+
+        try:
+            sequence_numbers = (
+                self._resolve_sequence_set(
+                    sequence_reference,
+                    mailbox_view.count(),
+                )
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid sequence number",
+                )
+            ]
+
+        uids: list[int] = []
+
+        for sequence_number in sequence_numbers:
+            entry = (
+                mailbox_view.get_by_sequence_number(
+                    sequence_number
+                )
+            )
+
+            if entry is None:
+                continue
+
+            uids.append(entry.uid)
+
+        return self._store_flags_for_uids(
+            command=command,
+            mailbox_view=mailbox_view,
+            uids=uids,
+            operation=operation,
+            flags=flags,
+            silent=silent,
+            include_uid=False,
+            completion_text="STORE completed",
+        )
     
 
     def _command_uid_fetch(
@@ -1485,11 +1822,85 @@ class IMAPProtocol:
         ):
             text = text[1:-1]
 
-        return {
+        items: list[str] = []
+        current: list[str] = []
+        bracket_depth = 0
+
+        for character in text:
+            if character == "[":
+                bracket_depth += 1
+
+            elif character == "]":
+                bracket_depth -= 1
+
+            if (
+                character.isspace()
+                and bracket_depth == 0
+            ):
+                if current:
+                    items.append(
+                        "".join(current)
+                    )
+                    current = []
+
+                continue
+
+            current.append(character)
+
+        if current:
+            items.append(
+                "".join(current)
+            )
+
+        parsed_items = {
             item.upper()
-            for item in text.split()
+            for item in items
             if item
         }
+
+        if "FAST" in parsed_items:
+            parsed_items.remove(
+                "FAST"
+            )
+
+            parsed_items.update(
+                {
+                    "FLAGS",
+                    "INTERNALDATE",
+                    "RFC822.SIZE",
+                }
+            )
+
+        if "ALL" in parsed_items:
+            parsed_items.remove(
+                "ALL"
+            )
+
+            parsed_items.update(
+                {
+                    "FLAGS",
+                    "INTERNALDATE",
+                    "RFC822.SIZE",
+                    "ENVELOPE",
+                }
+            )
+
+        if "FULL" in parsed_items:
+            parsed_items.remove(
+                "FULL"
+            )
+
+            parsed_items.update(
+                {
+                    "FLAGS",
+                    "INTERNALDATE",
+                    "RFC822.SIZE",
+                    "ENVELOPE",
+                    "BODY",
+                }
+            )
+
+        return parsed_items
     
     @staticmethod
     def _parse_status_items(
@@ -1613,6 +2024,31 @@ class IMAPProtocol:
                 )
             ]
 
+        return self._store_flags_for_uids(
+            command=command,
+            mailbox_view=mailbox_view,
+            uids=uids,
+            operation=operation,
+            flags=flags,
+            silent=silent,
+            include_uid=True,
+            completion_text=(
+                "UID STORE completed"
+            ),
+        )
+
+    def _store_flags_for_uids(
+        self,
+        *,
+        command,
+        mailbox_view,
+        uids: list[int],
+        operation: StoreOperation,
+        flags: set[str],
+        silent: bool,
+        include_uid: bool,
+        completion_text: str,
+    ) -> list[IMAPResponse]:
         replies: list[IMAPResponse] = []
 
         for uid in uids:
@@ -1630,6 +2066,15 @@ class IMAPProtocol:
             if silent:
                 continue
 
+            requested_items = {
+                "FLAGS",
+            }
+
+            if include_uid:
+                requested_items.add(
+                    "UID"
+                )
+
             renderer = IMAPFetchRenderer(
                 entry=refreshed,
                 sequence_number=sequence_number,
@@ -1637,10 +2082,7 @@ class IMAPProtocol:
 
             replies.append(
                 renderer.render(
-                    {
-                        "FLAGS",
-                        "UID",
-                    }
+                    requested_items
                 )
             )
 
@@ -1648,11 +2090,151 @@ class IMAPProtocol:
             IMAPReply.tagged(
                 command.tag,
                 "OK",
-                "UID STORE completed",
+                completion_text,
             )
         )
 
         return replies
+
+    def command_copy(
+        self,
+        command,
+    ) -> list[IMAPResponse]:
+        if self.session.state is not (
+            IMAPSessionState.SELECTED
+        ):
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        if len(command.arguments) != 2:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    (
+                        "COPY requires sequence "
+                        "set and destination mailbox"
+                    ),
+                )
+            ]
+
+        sequence_reference = (
+            command.arguments[0]
+        )
+
+        destination_mailbox = (
+            command.arguments[1].strip('"')
+        )
+
+        selected_mailbox = (
+            self.session.selected_mailbox
+        )
+
+        if selected_mailbox is None:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        if (
+            destination_mailbox
+            not in self.store.list_mailboxes()
+        ):
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Destination mailbox not found",
+                )
+            ]
+
+        mailbox_view = self.store.open_mailbox(
+            selected_mailbox
+        )
+
+        try:
+            sequence_numbers = (
+                self._resolve_sequence_set(
+                    sequence_reference,
+                    mailbox_view.count(),
+                )
+            )
+        except ValueError:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "Invalid sequence number",
+                )
+            ]
+
+        source_uids: list[int] = []
+        destination_uids: list[int] = []
+
+        for sequence_number in sequence_numbers:
+            entry = (
+                mailbox_view.get_by_sequence_number(
+                    sequence_number
+                )
+            )
+
+            if entry is None:
+                continue
+
+            copied = mailbox_view.copy_by_uid(
+                entry.uid,
+                destination_mailbox,
+            )
+
+            if copied is None:
+                continue
+
+            source_uid, destination_uid = copied
+
+            source_uids.append(source_uid)
+            destination_uids.append(
+                destination_uid
+            )
+
+        if not source_uids:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "OK",
+                    "COPY completed",
+                )
+            ]
+
+        source_set = ",".join(
+            str(uid)
+            for uid in source_uids
+        )
+
+        destination_set = ",".join(
+            str(uid)
+            for uid in destination_uids
+        )
+
+        return [
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                (
+                    "[COPYUID 1 "
+                    f"{source_set} "
+                    f"{destination_set}] "
+                    "COPY completed"
+                ),
+            )
+        ]
     
     def _command_uid_copy(
         self,
@@ -2204,7 +2786,99 @@ class IMAPProtocol:
                 "UID SEARCH completed",
             ),
         ]
-    
+
+    def command_search(
+        self,
+        command,
+    ) -> list[IMAPResponse]:
+        if self.session.state is not (
+            IMAPSessionState.SELECTED
+        ):
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        if not command.arguments:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    "SEARCH requires criteria",
+                )
+            ]
+
+        mailbox = self.session.selected_mailbox
+
+        if mailbox is None:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "NO",
+                    "Mailbox not selected",
+                )
+            ]
+
+        criteria = command.arguments
+
+        mailbox_view = self.store.open_mailbox(
+            mailbox
+        )
+
+        engine = IMAPSearchEngine(
+            entries=mailbox_view.list_entries()
+        )
+
+        try:
+            matching_uids = engine.search(
+                criteria
+            )
+        except IMAPSearchError as exc:
+            return [
+                IMAPReply.tagged(
+                    command.tag,
+                    "BAD",
+                    str(exc),
+                )
+            ]
+
+        sequence_numbers: list[int] = []
+
+        for uid in matching_uids:
+            sequence_number = (
+                mailbox_view.get_sequence_number(
+                    uid
+                )
+            )
+
+            if sequence_number is not None:
+                sequence_numbers.append(
+                    sequence_number
+                )
+
+        if sequence_numbers:
+            search_reply = (
+                "* SEARCH "
+                + " ".join(
+                    str(sequence_number)
+                    for sequence_number
+                    in sequence_numbers
+                )
+            )
+        else:
+            search_reply = "* SEARCH"
+
+        return [
+            IMAPReply(search_reply),
+            IMAPReply.tagged(
+                command.tag,
+                "OK",
+                "SEARCH completed",
+            ),
+        ]
 
     def command_expunge(
         self,

@@ -56,6 +56,21 @@ class MailboxView:
 
         return None
 
+    def get_by_sequence_number(
+        self,
+        sequence_number: int,
+    ) -> MessageEntry | None:
+        if sequence_number <= 0:
+            return None
+
+        entries = self.list_entries()
+
+        index = sequence_number - 1
+
+        if index >= len(entries):
+            return None
+
+        return entries[index]
 
     def get_by_uid(
         self,

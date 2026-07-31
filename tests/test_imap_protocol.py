@@ -66,7 +66,8 @@ def test_imap_capability():
             "MOVE "
             "NAMESPACE "
             "ID "
-            "ENABLE\r\n"
+            "ENABLE "
+            "IDLE\r\n"
         ),
         (
             "A001 OK "
@@ -503,8 +504,18 @@ def test_imap_select_mailbox(
             "(\\Seen \\Answered \\Flagged "
             "\\Deleted \\Draft)\r\n"
         ),
+        (
+            "* OK [PERMANENTFLAGS "
+            "(\\Seen \\Answered \\Flagged "
+            "\\Deleted \\Draft)] "
+            "Permanent flags\r\n"
+        ),
         "* 2 EXISTS\r\n",
         "* 0 RECENT\r\n",
+        (
+            "* OK [UIDVALIDITY 1] "
+            "UID validity\r\n"
+        ),
         (
             "* OK [UIDNEXT 3] "
             "Predicted next UID\r\n"
@@ -577,8 +588,18 @@ def test_imap_examine_mailbox(
             "(\\Seen \\Answered \\Flagged "
             "\\Deleted \\Draft)\r\n"
         ),
+        (
+            "* OK [PERMANENTFLAGS "
+            "(\\Seen \\Answered \\Flagged "
+            "\\Deleted \\Draft)] "
+            "Permanent flags\r\n"
+        ),
         "* 2 EXISTS\r\n",
         "* 0 RECENT\r\n",
+        (
+            "* OK [UIDVALIDITY 1] "
+            "UID validity\r\n"
+        ),
         (
             "* OK [UIDNEXT 3] "
             "Predicted next UID\r\n"
@@ -6964,3 +6985,4804 @@ def test_imap_uid_search_seen(
 
     assert first_stored is not None
     assert "\\Seen" not in first_stored.flags
+
+
+def test_imap_uid_search_deleted(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH DELETED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Deleted" not in first_stored.flags
+
+
+def test_imap_uid_search_combines_flag_criteria(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    protocol.execute(
+        (
+            f"A004 UID STORE {third.uid} "
+            "+FLAGS (\\Seen \\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A005 UID SEARCH SEEN DELETED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {third.uid}\r\n",
+        "A005 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Seen" not in first_stored.flags
+    assert "\\Deleted" not in first_stored.flags
+
+
+def test_imap_uid_search_undeleted(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH UNDELETED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_answered(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Answered)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH ANSWERED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Answered" not in first_stored.flags
+
+
+def test_imap_uid_search_unanswered(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Answered)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH UNANSWERED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_draft(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Draft)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH DRAFT"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Draft" not in first_stored.flags
+
+
+def test_imap_uid_search_undraft(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Draft)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH UNDRAFT"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_flagged(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Flagged)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH FLAGGED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Flagged" not in first_stored.flags
+
+
+def test_imap_uid_search_unflagged(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Flagged)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH UNFLAGGED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_body(
+    message,
+):
+    store = MessageStore()
+
+    first_message = message
+    first_message.body = (
+        "This message contains garlic."
+    )
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="garlic@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Garlic subject",
+            }
+        ),
+        metadata=Metadata(),
+        body="Nothing relevant here.",
+    )
+
+    first = store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A003 UID SEARCH BODY "garlic"'
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_header(
+    message,
+):
+    store = MessageStore()
+
+    first_message = message
+    first_message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "From": "garlic@test.onion",
+                "Subject": "Other subject",
+            }
+        ),
+        metadata=Metadata(),
+        body="garlic",
+    )
+
+    first = store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID SEARCH '
+                'HEADER Subject "garlic"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_header_name_is_case_insensitive(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID SEARCH '
+                'HEADER subject "garlic"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {entry.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_header_matches_list_value(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "X-Tag"
+    ] = [
+        "alpha",
+        "garlic",
+    ]
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID SEARCH '
+                'HEADER X-Tag "garlic"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {entry.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_cc(
+    message,
+):
+    store = MessageStore()
+
+    first_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Cc": "carol@test.onion",
+            }
+        ),
+        metadata=Metadata(),
+        body="",
+    )
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Cc": "dave@test.onion",
+            }
+        ),
+        metadata=Metadata(),
+        body="carol@test.onion",
+    )
+
+    first = store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID SEARCH '
+                'CC "carol@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_bcc(
+    message,
+):
+    store = MessageStore()
+
+    first_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Bcc": "carol@test.onion",
+            }
+        ),
+        metadata=Metadata(),
+        body="",
+    )
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Bcc": "dave@test.onion",
+            }
+        ),
+        metadata=Metadata(),
+        body="carol@test.onion",
+    )
+
+    first = store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID SEARCH '
+                'BCC "carol@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_not_seen(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH NOT SEEN"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_not_deleted(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH NOT DELETED"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {first.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_not_subject(
+    message,
+):
+    store = MessageStore()
+
+    first_message = message
+    first_message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Other subject",
+            }
+        ),
+        metadata=Metadata(),
+        body="",
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                'A003 UID SEARCH '
+                'NOT SUBJECT "garlic"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_not_header(
+    message,
+):
+    store = MessageStore()
+
+    first_message = message
+    first_message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Other subject",
+            }
+        ),
+        metadata=Metadata(),
+        body="",
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A003 UID SEARCH "
+                'NOT HEADER Subject "garlic"'
+            )
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+
+def test_imap_uid_search_or_seen_deleted(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    protocol.execute(
+        (
+            f"A004 UID STORE {third.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A005 UID SEARCH OR SEEN DELETED"
+        )
+    )
+
+    assert replies == [
+        (
+            f"* SEARCH "
+            f"{second.uid} {third.uid}\r\n"
+        ),
+        "A005 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Seen" not in first_stored.flags
+    assert "\\Deleted" not in first_stored.flags
+
+
+def test_imap_uid_search_or_seen_subject(
+    message,
+):
+    store = MessageStore()
+
+    first_message = message
+    first_message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Other subject",
+            }
+        ),
+        metadata=Metadata(),
+        body="",
+    )
+
+    third_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Nothing relevant",
+            }
+        ),
+        metadata=Metadata(),
+        body="",
+    )
+
+    first = store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        third_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A004 UID SEARCH "
+                'OR SEEN SUBJECT "garlic"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            f"* SEARCH "
+            f"{first.uid} {second.uid}\r\n"
+        ),
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_or_subject_body(
+    message,
+):
+    store = MessageStore()
+
+    first_message = message
+    first_message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    second_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Other subject",
+            }
+        ),
+        metadata=Metadata(),
+        body="Onion transport active",
+    )
+
+    third_message = MailMessage(
+        envelope=Envelope(
+            sender="alice@test.onion",
+            recipients=[
+                "bob@test.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Nothing relevant",
+            }
+        ),
+        metadata=Metadata(),
+        body="Nothing relevant here",
+    )
+
+    first = store.save_entry(
+        "bob@test.onion",
+        first_message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        second_message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        third_message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A003 UID SEARCH "
+                'OR SUBJECT "garlic" '
+                'BODY "onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            f"* SEARCH "
+            f"{first.uid} {second.uid}\r\n"
+        ),
+        "A003 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_or_not_seen_deleted(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    protocol.execute(
+        (
+            f"A004 UID STORE {third.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A005 UID SEARCH "
+                "OR NOT SEEN DELETED"
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            f"* SEARCH "
+            f"{first.uid} {third.uid}\r\n"
+        ),
+        "A005 OK UID SEARCH completed\r\n",
+    ]
+
+
+def test_imap_uid_search_double_not_seen(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A004 UID SEARCH NOT NOT SEEN"
+        )
+    )
+
+    assert replies == [
+        f"* SEARCH {second.uid}\r\n",
+        "A004 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+    assert "\\Seen" not in first_stored.flags
+
+
+def test_imap_uid_search_nested_or(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    protocol.execute(
+        (
+            f"A004 UID STORE {third.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A005 UID SEARCH "
+                "OR OR SEEN DELETED ANSWERED"
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            f"* SEARCH "
+            f"{second.uid} {third.uid}\r\n"
+        ),
+        "A005 OK UID SEARCH completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    assert first_stored is not None
+
+
+def test_imap_uid_fetch_missing_uid_returns_ok(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 UID FETCH 999 (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_body_marks_message_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[])"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_flags_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID FLAGS)"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[])"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_rfc822_marks_message_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822)"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_rfc822_peek_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822.PEEK)"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_rfc822_size_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822.SIZE)"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_internaldate_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID INTERNALDATE)"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_metadata_items_do_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID FLAGS RFC822.SIZE INTERNALDATE)"
+        )
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_updates_flags_in_response(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID FLAGS BODY[])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert "\\Seen" in fetch_reply.prefix
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_keeps_flags_in_response(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID FLAGS BODY.PEEK[])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert "\\Seen" not in fetch_reply.prefix
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_marks_multiple_messages_seen(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH "
+            f"{first.uid},{second.uid} "
+            "(UID FLAGS BODY[])"
+        )
+    )
+
+    assert len(replies) == 3
+
+    first_reply = replies[0]
+    second_reply = replies[1]
+    tagged_reply = replies[2]
+
+    assert "* 1 FETCH" in first_reply.prefix
+    assert "\\Seen" in first_reply.prefix
+
+    assert "* 2 FETCH" in second_reply.prefix
+    assert "\\Seen" in second_reply.prefix
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_uid_fetch_body_handles_already_seen_message(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {first.uid} "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    replies = protocol.execute(
+        (
+            f"A004 UID FETCH "
+            f"{first.uid},{second.uid} "
+            "(UID FLAGS BODY[])"
+        )
+    )
+
+    assert len(replies) == 3
+
+    first_reply = replies[0]
+    second_reply = replies[1]
+    tagged_reply = replies[2]
+
+    assert "\\Seen" in first_reply.prefix
+    assert "\\Seen" in second_reply.prefix
+
+    assert tagged_reply.serialize() == (
+        "A004 OK UID FETCH completed\r\n"
+    )
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_uid_fetch_rfc822_size_matches_message_size(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "hello"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH {entry.uid} "
+                "(UID RFC822.SIZE)"
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "* 1 FETCH "
+            "(UID 1 RFC822.SIZE 7)\r\n"
+        ),
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_internaldate_returns_value(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH {entry.uid} "
+                "(UID INTERNALDATE)"
+            )
+        )
+    )
+
+    assert len(replies) == 2
+    assert replies[0].startswith(
+        "* 1 FETCH (UID 1 INTERNALDATE "
+    )
+    assert replies[1] == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+
+def test_imap_uid_fetch_internaldate_format(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH {entry.uid} "
+                "(UID INTERNALDATE)"
+            )
+        )
+    )
+
+    expected_date = (
+        entry.internal_date.strftime(
+            "%d-%b-%Y %H:%M:%S %z"
+        )
+    )
+
+    assert replies == [
+        (
+            "* 1 FETCH "
+            f'(UID 1 INTERNALDATE "{expected_date}")'
+            "\r\n"
+        ),
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_rfc822_header_returns_only_headers(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822.HEADER)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"Subject: Garlic status\r\n"
+        b"\r\n"
+    )
+
+    assert b"secret body" not in (
+        fetch_reply.content
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_rfc822_text_returns_only_body(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822.TEXT)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"secret body"
+    )
+
+    assert b"Subject: Garlic status" not in (
+        fetch_reply.content
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_rfc822_returns_full_message(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert b"Subject: Garlic status\r\n" in (
+        fetch_reply.content
+    )
+
+    assert b"\r\n\r\nsecret body" in (
+        fetch_reply.content
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_rfc822_size_matches_rfc822_content(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    rfc822_replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID RFC822)"
+        )
+    )
+
+    rfc822_content = (
+        rfc822_replies[0].content
+    )
+
+    size_replies = serialize(
+        protocol.execute(
+            (
+                f"A004 UID FETCH {entry.uid} "
+                "(UID RFC822.SIZE)"
+            )
+        )
+    )
+
+    assert size_replies == [
+        (
+            "* 1 FETCH "
+            f"(UID 1 RFC822.SIZE "
+            f"{len(rfc822_content)})\r\n"
+        ),
+        "A004 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_uid_fetch_body_text_returns_only_body(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[TEXT])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"secret body"
+    )
+
+    assert b"Subject: Garlic status" not in (
+        fetch_reply.content
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_text_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[TEXT])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"secret body"
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_header_returns_only_headers(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[HEADER])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"Subject: Garlic status\r\n"
+        b"\r\n"
+    )
+
+    assert b"secret body" not in (
+        fetch_reply.content
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_header_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "secret body"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[HEADER])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"Subject: Garlic status\r\n"
+        b"\r\n"
+    )
+
+    assert b"secret body" not in (
+        fetch_reply.content
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_header_fields_returns_selected_headers(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.headers.fields[
+        "From"
+    ] = "alice@test.onion"
+
+    message.headers.fields[
+        "X-Test"
+    ] = "ignore me"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[HEADER.FIELDS "
+            "(Subject From)])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert b"Subject: Garlic status\r\n" in (
+        fetch_reply.content
+    )
+
+    assert b"From: alice@test.onion\r\n" in (
+        fetch_reply.content
+    )
+
+    assert b"X-Test: ignore me\r\n" not in (
+        fetch_reply.content
+    )
+
+    assert fetch_reply.content.endswith(
+        b"\r\n\r\n"
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_header_fields_returns_selected_headers(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.headers.fields[
+        "From"
+    ] = "alice@test.onion"
+
+    message.headers.fields[
+        "X-Test"
+    ] = "ignore me"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[HEADER.FIELDS "
+            "(Subject From)])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert b"Subject: Garlic status\r\n" in (
+        fetch_reply.content
+    )
+
+    assert b"From: alice@test.onion\r\n" in (
+        fetch_reply.content
+    )
+
+    assert b"X-Test: ignore me\r\n" not in (
+        fetch_reply.content
+    )
+
+    assert fetch_reply.content.endswith(
+        b"\r\n\r\n"
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_header_fields_not_excludes_selected_headers(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.headers.fields[
+        "From"
+    ] = "alice@test.onion"
+
+    message.headers.fields[
+        "X-Test"
+    ] = "keep me"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[HEADER.FIELDS.NOT "
+            "(Subject From)])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert b"Subject: Garlic status\r\n" not in (
+        fetch_reply.content
+    )
+
+    assert b"From: alice@test.onion\r\n" not in (
+        fetch_reply.content
+    )
+
+    assert b"X-Test: keep me\r\n" in (
+        fetch_reply.content
+    )
+
+    assert fetch_reply.content.endswith(
+        b"\r\n\r\n"
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_header_fields_not_excludes_selected_headers(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.headers.fields[
+        "From"
+    ] = "alice@test.onion"
+
+    message.headers.fields[
+        "X-Test"
+    ] = "keep me"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[HEADER.FIELDS.NOT "
+            "(Subject From)])"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert b"Subject: Garlic status\r\n" not in (
+        fetch_reply.content
+    )
+
+    assert b"From: alice@test.onion\r\n" not in (
+        fetch_reply.content
+    )
+
+    assert b"X-Test: keep me\r\n" in (
+        fetch_reply.content
+    )
+
+    assert fetch_reply.content.endswith(
+        b"\r\n\r\n"
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_partial_returns_requested_slice(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "abcdefghij"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[]<0.5>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        fetch_reply.content[:5]
+    )
+
+    assert len(fetch_reply.content) == 5
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_partial_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "abcdefghij"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[]<0.5>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert len(fetch_reply.content) == 5
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_partial_uses_offset(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "abcdefghij"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[]<3.4>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    full_content = (
+        MessageSerializer.to_rfc5322(
+            message
+        ).encode("utf-8")
+    )
+
+    assert fetch_reply.content == (
+        full_content[3:7]
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_partial_beyond_end_returns_empty(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "abc"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[]<999.5>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == b""
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_partial_zero_count_returns_empty(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "abcdefghij"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[]<3.0>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == b""
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_partial_rejects_invalid_range(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH {entry.uid} "
+                "(UID BODY[]<x.5>)"
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 BAD Invalid BODY partial\r\n",
+    ]
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_text_partial_returns_requested_slice(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.body = "abcdefghij"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY[TEXT]<3.4>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == (
+        b"defg"
+    )
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" in stored.flags
+
+
+def test_imap_uid_fetch_body_peek_text_partial_does_not_mark_seen(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "abcdefghij"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = protocol.execute(
+        (
+            f"A003 UID FETCH {entry.uid} "
+            "(UID BODY.PEEK[TEXT]<3.4>)"
+        )
+    )
+
+    assert len(replies) == 2
+
+    fetch_reply = replies[0]
+    tagged_reply = replies[1]
+
+    assert fetch_reply.content == b"defg"
+
+    assert tagged_reply.serialize() == (
+        "A003 OK UID FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_fetch_by_sequence_number(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 2 (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        (
+            "* 2 FETCH "
+            f"(UID {second.uid} FLAGS ())\r\n"
+        ),
+        "A003 OK FETCH completed\r\n",
+    ]
+
+    assert second.uid != first.uid
+
+
+def test_imap_fetch_missing_sequence_number_returns_ok(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 999 (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        "A003 OK FETCH completed\r\n",
+    ]
+
+
+def test_imap_fetch_multiple_sequence_numbers(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 1,2 (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS ())\r\n",
+        "* 2 FETCH (UID 2 FLAGS ())\r\n",
+        "A003 OK FETCH completed\r\n",
+    ]
+
+
+def test_imap_fetch_accepts_sequence_range(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 1:2 (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (UID 1 FLAGS ())\r\n",
+        "* 2 FETCH (UID 2 FLAGS ())\r\n",
+        "A003 OK FETCH completed\r\n",
+    ]
+
+
+def test_imap_fetch_accepts_star_sequence(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH * (UID FLAGS)"
+        )
+    )
+
+    assert replies == [
+        (
+            "* 2 FETCH "
+            f"(UID {second.uid} FLAGS ())\r\n"
+        ),
+        "A003 OK FETCH completed\r\n",
+    ]
+
+
+def test_imap_store_adds_flag_by_sequence_number(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 STORE 2 +FLAGS (\\Seen)"
+        )
+    )
+
+    assert replies == [
+        (
+            "* 2 FETCH "
+            f"(FLAGS (\\Seen))\r\n"
+        ),
+        "A003 OK STORE completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" not in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_store_multiple_sequence_numbers(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 STORE 1,2 +FLAGS (\\Seen)"
+        )
+    )
+
+    assert replies == [
+        "* 1 FETCH (FLAGS (\\Seen))\r\n",
+        "* 2 FETCH (FLAGS (\\Seen))\r\n",
+        "A003 OK STORE completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_store_range_silent_updates_without_fetch_replies(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A003 STORE 1:2 "
+                "+FLAGS.SILENT (\\Seen)"
+            )
+        )
+    )
+
+    assert replies == [
+        "A003 OK STORE completed\r\n",
+    ]
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_store_accepts_star_sequence(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            "A003 STORE * "
+            "+FLAGS (\\Seen)"
+        )
+    )
+
+    first_stored = store.get_entry(
+        "bob@test.onion",
+        first.id,
+    )
+
+    second_stored = store.get_entry(
+        "bob@test.onion",
+        second.id,
+    )
+
+    assert first_stored is not None
+    assert second_stored is not None
+
+    assert "\\Seen" not in first_stored.flags
+    assert "\\Seen" in second_stored.flags
+
+
+def test_imap_search_all_returns_sequence_numbers(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 SEARCH ALL"
+        )
+    )
+
+    assert replies == [
+        "* SEARCH 1 2\r\n",
+        "A003 OK SEARCH completed\r\n",
+    ]
+
+
+def test_imap_search_returns_updated_sequence_numbers_after_expunge(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    third = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    protocol.execute(
+        (
+            f"A003 UID STORE {second.uid} "
+            "+FLAGS (\\Deleted)"
+        )
+    )
+
+    protocol.execute(
+        "A004 EXPUNGE"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A005 SEARCH ALL"
+        )
+    )
+
+    assert replies == [
+        "* SEARCH 1 2\r\n",
+        "A005 OK SEARCH completed\r\n",
+    ]
+
+    assert first.uid == 1
+    assert third.uid == 3
+
+
+def test_imap_copy_by_sequence_number(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A003 COPY 2 "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 2 1] "
+            "COPY completed\r\n"
+        ),
+    ]
+
+    source = store.list_entries(
+        "bob@test.onion"
+    )
+
+    destination = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(source) == 2
+    assert len(destination) == 1
+
+    assert destination[0].uid == 1
+    assert source[0].id == first.id
+    assert source[1].id == second.id
+
+
+def test_imap_copy_multiple_sequence_numbers_returns_copyuid(
+    message,
+):
+    store = MessageStore()
+
+    first = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "archive@test.onion"
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                "A003 COPY 1,2 "
+                '"archive@test.onion"'
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "A003 OK [COPYUID 1 "
+            f"{first.uid},{second.uid} "
+            "1,2] COPY completed\r\n"
+        ),
+    ]
+
+    copied = store.list_entries(
+        "archive@test.onion"
+    )
+
+    assert len(copied) == 2
+    assert [
+        entry.uid
+        for entry in copied
+    ] == [1, 2]
+
+
+def test_imap_select_reports_uidvalidity_and_permanentflags(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 SELECT "bob@test.onion"'
+        )
+    )
+
+    assert (
+        "* OK [UIDVALIDITY 1] "
+        "UID validity\r\n"
+    ) in replies
+
+    assert (
+        "* OK [PERMANENTFLAGS "
+        "(\\Seen \\Answered \\Flagged "
+        "\\Deleted \\Draft)] "
+        "Permanent flags\r\n"
+    ) in replies
+
+    assert replies[-1] == (
+        "A002 OK [READ-WRITE] "
+        "SELECT completed\r\n"
+    )
+
+
+def test_imap_examine_reports_uidvalidity_and_permanentflags(
+    message,
+):
+    store = MessageStore()
+
+    store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    replies = serialize(
+        protocol.execute(
+            'A002 EXAMINE "bob@test.onion"'
+        )
+    )
+
+    assert (
+        "* OK [UIDVALIDITY 1] "
+        "UID validity\r\n"
+    ) in replies
+
+    assert (
+        "* OK [PERMANENTFLAGS "
+        "(\\Seen \\Answered \\Flagged "
+        "\\Deleted \\Draft)] "
+        "Permanent flags\r\n"
+    ) in replies
+
+    assert replies[-1] == (
+        "A002 OK [READ-ONLY] "
+        "EXAMINE completed\r\n"
+    )
+
+
+def test_imap_fetch_fast_macro(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 1 FAST"
+        )
+    )
+
+    assert len(replies) == 2
+
+    assert replies[0].startswith(
+        "* 1 FETCH ("
+    )
+
+    assert "FLAGS " in replies[0]
+    assert "INTERNALDATE " in replies[0]
+    assert "RFC822.SIZE " in replies[0]
+
+    assert replies[1] == (
+        "A003 OK FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_fetch_all_macro(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 1 ALL"
+        )
+    )
+
+    assert len(replies) == 2
+
+    assert replies[0].startswith(
+        "* 1 FETCH ("
+    )
+
+    assert "FLAGS " in replies[0]
+    assert "INTERNALDATE " in replies[0]
+    assert "RFC822.SIZE " in replies[0]
+    assert "ENVELOPE " in replies[0]
+
+    assert replies[1] == (
+        "A003 OK FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_envelope_returns_message_metadata(
+    message,
+):
+    store = MessageStore()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Garlic status"
+
+    message.headers.fields[
+        "From"
+    ] = "Alice <alice@test.onion>"
+
+    message.headers.fields[
+        "To"
+    ] = "Bob <bob@test.onion>"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH {entry.uid} "
+                "(UID ENVELOPE)"
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "* 1 FETCH "
+            "(UID 1 ENVELOPE "
+            '(NIL "Garlic status" '
+            '(("Alice" NIL "alice" "test.onion")) '
+            '(("Alice" NIL "alice" "test.onion")) '
+            '(("Alice" NIL "alice" "test.onion")) '
+            '(("Bob" NIL "bob" "test.onion")) '
+            "NIL NIL NIL NIL))\r\n"
+        ),
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+
+def test_imap_fetch_full_macro(
+    message,
+):
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            "A003 FETCH 1 FULL"
+        )
+    )
+
+    assert len(replies) == 2
+
+    assert replies[0].startswith(
+        "* 1 FETCH ("
+    )
+
+    assert "FLAGS " in replies[0]
+    assert "INTERNALDATE " in replies[0]
+    assert "RFC822.SIZE " in replies[0]
+    assert "ENVELOPE " in replies[0]
+    assert "BODY " in replies[0]
+
+    assert replies[1] == (
+        "A003 OK FETCH completed\r\n"
+    )
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_uid_fetch_body_returns_singlepart_structure(
+    message,
+):
+    store = MessageStore()
+
+    message.body = "hello"
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    protocol = IMAPProtocol(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    protocol.execute(
+        "A001 LOGIN alice secret"
+    )
+
+    protocol.execute(
+        'A002 SELECT "bob@test.onion"'
+    )
+
+    replies = serialize(
+        protocol.execute(
+            (
+                f"A003 UID FETCH {entry.uid} "
+                "(UID BODY)"
+            )
+        )
+    )
+
+    assert replies == [
+        (
+            "* 1 FETCH "
+            '(UID 1 BODY '
+            '("TEXT" "PLAIN" '
+            '("CHARSET" "US-ASCII") '
+            'NIL NIL "7BIT" 5 1))\r\n'
+        ),
+        "A003 OK UID FETCH completed\r\n",
+    ]
+
+    stored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert stored is not None
+    assert "\\Seen" not in stored.flags
+
+
+def test_imap_capability_advertises_idle():
+    protocol = IMAPProtocol()
+
+    replies = serialize(
+        protocol.execute(
+            "A001 CAPABILITY"
+        )
+    )
+
+    assert "IDLE" in replies[0]
