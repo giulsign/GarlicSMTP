@@ -1,18 +1,20 @@
+from datetime import datetime
+from typing import TYPE_CHECKING
+
 from garlicsmtp.models import MailMessage
 from garlicsmtp.storage.backend import (
     MessageStoreBackend,
 )
+from garlicsmtp.storage.entry import MessageEntry
+from garlicsmtp.storage.event_sink import (
+    StoreEventSink,
+)
 from garlicsmtp.storage.memory.backend import (
     MemoryMessageStoreBackend,
-)   
-from garlicsmtp.storage.entry import MessageEntry
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from garlicsmtp.storage.mailbox import (
-        MailboxView,
-    )
-from datetime import datetime
+)
+from garlicsmtp.storage.null_event_sink import (
+    NullStoreEventSink,
+)
 
 
 class MessageStore:
@@ -20,10 +22,16 @@ class MessageStore:
     def __init__(
         self,
         backend: MessageStoreBackend | None = None,
+        event_sink: StoreEventSink | None = None,
     ):
         self.backend = (
             backend
             or MemoryMessageStoreBackend()
+        )
+
+        self.event_sink = (
+            event_sink
+            or NullStoreEventSink()
         )
 
     def save(
@@ -31,10 +39,10 @@ class MessageStore:
         mailbox: str,
         message: MailMessage,
     ) -> str:
-        return self.backend.save(
+        return self.save_entry(
             mailbox,
             message,
-        )
+        ).id
 
     def list_messages(
         self,
@@ -124,24 +132,36 @@ class MessageStore:
         mailbox: str,
         message: MailMessage,
     ) -> MessageEntry:
-        return self.backend.save_entry(
+        entry = self.backend.save_entry(
             mailbox,
             message,
         )
+
+        self.event_sink.message_added(
+            mailbox
+        )
+
+        return entry
     
-    def append_entry(
+    def append_entry(   
         self,
         mailbox: str,
         message: MailMessage,
         flags: set[str],
         internal_date: datetime,
     ) -> MessageEntry:
-        return self.backend.append_entry(
+        entry = self.backend.append_entry(
             mailbox,
             message,
             flags,
             internal_date,
         )
+
+        self.event_sink.message_added(
+            mailbox
+        )
+
+        return entry
 
 
     def get_entry(
@@ -170,11 +190,18 @@ class MessageStore:
         message_id: str,
         flags: set[str],
     ) -> bool:
-        return self.backend.set_flags(
+        updated = self.backend.set_flags(
             mailbox,
             message_id,
             flags,
         )
+
+        if updated:
+            self.event_sink.flags_changed(
+                mailbox
+            )
+
+        return updated
     
 
     def add_flags(
@@ -183,11 +210,18 @@ class MessageStore:
         message_id: str,
         flags: set[str],
     ) -> bool:
-        return self.backend.add_flags(
+        updated = self.backend.add_flags(
             mailbox,
             message_id,
             flags,
         )
+
+        if updated:
+            self.event_sink.flags_changed(
+                mailbox
+            )
+
+        return updated
 
 
     def remove_flags(
@@ -196,11 +230,18 @@ class MessageStore:
         message_id: str,
         flags: set[str],
     ) -> bool:
-        return self.backend.remove_flags(
+        updated = self.backend.remove_flags(
             mailbox,
             message_id,
             flags,
         )
+
+        if updated:
+            self.event_sink.flags_changed(
+                mailbox
+            )
+
+        return updated
     
 
     def open_mailbox(
@@ -222,11 +263,20 @@ class MessageStore:
         message_id: str,
         destination_mailbox: str,
     ) -> MessageEntry | None:
-        return self.backend.copy_entry(
+        copied = self.backend.copy_entry(
             source_mailbox,
             message_id,
             destination_mailbox,
         )
+
+        if copied is None:
+            return None
+
+        self.event_sink.message_added(
+            destination_mailbox
+        )
+
+        return copied
 
     def delete_entry(
         self,

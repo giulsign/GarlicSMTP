@@ -1,10 +1,19 @@
-from garlicsmtp.smtp.server import SMTPServer
 import threading
+
+from garlicsmtp.core.pipeline import Pipeline
+from garlicsmtp.smtp.server import SMTPServer
+
+
+def build_pipeline() -> Pipeline:
+    return Pipeline()
 
 
 def test_smtp_server_start_stop():
-
-    server = SMTPServer(host="127.0.0.1", port=0)
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        pipeline=build_pipeline(),
+    )
 
     server.start()
 
@@ -18,8 +27,11 @@ def test_smtp_server_start_stop():
 
 
 def test_smtp_server_tick_without_connection():
-
-    server = SMTPServer(host="127.0.0.1", port=0)
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        pipeline=build_pipeline(),
+    )
 
     server.start()
 
@@ -36,35 +48,44 @@ class SpyLogger:
         self.messages = []
 
     def info(self, message):
-        self.messages.append(message)
+        self.messages.append(
+            message
+        )
 
     def warning(self, message):
-        self.messages.append(message)
+        self.messages.append(
+            message
+        )
 
     def error(self, message):
-        self.messages.append(message)
+        self.messages.append(
+            message
+        )
 
 
 def test_smtp_server_uses_logger():
-
     logger = SpyLogger()
 
     server = SMTPServer(
         host="127.0.0.1",
         port=2530,
         logger=logger,
+        pipeline=build_pipeline(),
     )
 
     server.start()
 
     try:
-        assert "SMTP Server listening on 127.0.0.1:2530" in logger.messages
+        assert (
+            "SMTP Server listening on "
+            "127.0.0.1:2530"
+            in logger.messages
+        )
     finally:
         server.stop()
 
 
 def test_smtp_server_handles_connection_in_thread():
-
     entered = threading.Event()
     release = threading.Event()
 
@@ -99,6 +120,7 @@ def test_smtp_server_handles_connection_in_thread():
     server = SMTPServer(
         host="127.0.0.1",
         port=2531,
+        pipeline=build_pipeline(),
     )
 
     server.server = FakeTCPServer()
@@ -109,7 +131,9 @@ def test_smtp_server_handles_connection_in_thread():
         address,
     ):
         entered.set()
-        release.wait(timeout=2)
+        release.wait(
+            timeout=2
+        )
 
     server.handle_connection = (
         fake_handle_connection
@@ -117,20 +141,36 @@ def test_smtp_server_handles_connection_in_thread():
 
     server.tick()
 
-    assert entered.wait(timeout=1)
-    assert server.active_connections == 1
+    assert entered.wait(
+        timeout=1
+    )
 
-    # Il tick deve essere già terminato,
-    # mentre la connessione continua nel thread.
+    assert (
+        server.active_connections
+        == 1
+    )
+
     assert server.running is True
 
     release.set()
 
     for _ in range(100):
-        if server.active_connections == 0:
+        if (
+            server.active_connections
+            == 0
+        ):
             break
 
-        threading.Event().wait(0.01)
+        threading.Event().wait(
+            0.01
+        )
 
-    assert server.active_connections == 0
-    assert server.server.client.closed is True
+    assert (
+        server.active_connections
+        == 0
+    )
+
+    assert (
+        server.server.client.closed
+        is True
+    )

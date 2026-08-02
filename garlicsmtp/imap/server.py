@@ -12,7 +12,7 @@ from garlicsmtp.imap.reply import IMAPReply
 from garlicsmtp.imap.session import IMAPSessionState
 from garlicsmtp.network.server import TCPServer
 from garlicsmtp.network.text import TextConnection
-from garlicsmtp.security.auth import (
+from garlicsmtp.security.auth import (  
     Authenticator,
     RejectingAuthenticator,
 )
@@ -20,11 +20,11 @@ from garlicsmtp.storage.store import MessageStore
 from garlicsmtp.imap.idle import (
     IMAPIdleSession,
 )
-from garlicsmtp.imap.notification_sink import (
-    IMAPNotificationSink,
+from garlicsmtp.imap.store_event_adapter import (
+    IMAPStoreEventAdapter,
 )
-from garlicsmtp.imap.null_notification_sink import (
-    NullIMAPNotificationSink,
+from garlicsmtp.storage.composite_event_sink import (
+    CompositeStoreEventSink,
 )
 from dataclasses import dataclass
 
@@ -35,6 +35,7 @@ class IMAPConnectionContext:
     connection: TextConnection
     protocol: IMAPProtocol
     idle: IMAPIdleSession
+    store_event_adapter: IMAPStoreEventAdapter
 
 
 class IMAPServer:
@@ -66,7 +67,26 @@ class IMAPServer:
             or RejectingAuthenticator()
         )
         self.store = store or MessageStore()
-        self._imap_notification_sink = (NullIMAPNotificationSink())
+        existing_sink = self.store.event_sink
+
+        if isinstance(
+            existing_sink,
+            CompositeStoreEventSink,
+        ):
+            self.store_event_sink = existing_sink
+        else:
+            self.store_event_sink = (
+                CompositeStoreEventSink()
+            )
+
+            self.store_event_sink.add(
+                existing_sink
+            )
+
+            self.store.event_sink = (
+                self.store_event_sink
+            )
+
 
     def start(self) -> None:
         self.server.start()
@@ -170,8 +190,8 @@ class IMAPServer:
                     break
 
         finally:
-            self._set_notification_sink(
-                NullIMAPNotificationSink()
+            self.store_event_sink.remove(   
+                context.store_event_adapter
             )
 
             connection.close()
@@ -206,18 +226,6 @@ class IMAPServer:
             connected_socket=client_socket,
         )
 
-    def _notification_sink(
-        self,
-    ) -> IMAPNotificationSink:
-        return self._imap_notification_sink
-
-
-    def _set_notification_sink(
-        self,
-        sink: IMAPNotificationSink,
-    ) -> None:
-        self._imap_notification_sink = sink
-
 
     def _create_protocol(
         self,
@@ -236,12 +244,39 @@ class IMAPServer:
         self,
         client_socket,
     ) -> IMAPConnectionContext:
-        return IMAPConnectionContext(
-            connection=self._create_connection(
-                client_socket,
+        connection = self._create_connection(
+            client_socket
+        )
+
+        protocol = self._create_protocol()
+
+        idle = self._create_idle_session()
+
+        adapter = IMAPStoreEventAdapter(
+            notification_sink=idle,
+            selected_mailbox=(
+                lambda: (
+                    protocol.session.selected_mailbox
+                    if idle.active
+                    else None
+                )
             ),
-            protocol=self._create_protocol(),
-            idle=self._create_idle_session(),
+            mailbox_count=(
+                lambda mailbox: self.store.count(
+                    mailbox
+                )
+            ),
+        )
+
+        self.store_event_sink.add(
+            adapter
+        )
+
+        return IMAPConnectionContext(
+            connection=connection,
+            protocol=protocol,
+            idle=idle,
+            store_event_adapter=adapter,
         )
     
 
@@ -333,11 +368,6 @@ class IMAPConnectionHandler:
             replies,
         )
 
-        if not idle.active:
-            self._server._set_notification_sink(
-                NullIMAPNotificationSink(),
-            )
-
         return True
 
 
@@ -355,17 +385,12 @@ class IMAPConnectionHandler:
         ):
             return
 
-        replies = idle.enter(
+        idle.enter(
             self._append_tag(line),
         )
 
-        self._server._send_replies(
-            connection,
-            replies,
-        )
-
-        self._server._set_notification_sink(
-            idle,
+        connection.send(
+            "+ idling\r\n"
         )
 
 
@@ -374,12 +399,13 @@ class IMAPConnectionHandler:
         self,
     ) -> None:
         connection = self._context.connection
-        sink = self._server._notification_sink()
-        if not sink.has_notifications():
+        idle = self._context.idle
+
+        if not idle.has_notifications():
             return
 
         for notification in (
-            sink.drain_notifications()
+            idle.drain_notifications()
         ):
             connection.send(
                 f"{notification}\r\n"

@@ -1,24 +1,31 @@
+import threading
 from socket import socket
 
-from garlicsmtp.network.server import TCPServer
-from garlicsmtp.smtp.connection import SMTPConnection
-from garlicsmtp.smtp.protocol import SMTPProtocol
+from garlicsmtp.core.pipeline import Pipeline
 from garlicsmtp.core.service import Service
 from garlicsmtp.core.tickable import Tickable
 from garlicsmtp.logger import Logger
-import threading
+from garlicsmtp.network.server import TCPServer
+from garlicsmtp.smtp.connection import SMTPConnection
+from garlicsmtp.smtp.protocol import SMTPProtocol
 
 
 class SMTPServer(Service, Tickable):
+
     def __init__(
         self,
+        *,
+        pipeline: Pipeline,
         host: str = "127.0.0.1",
         port: int = 2525,
         hostname: str = "localhost",
         logger=None,
-        pipeline=None,
     ):
-        self.server = TCPServer(host, port)
+        self.server = TCPServer(
+            host,
+            port,
+        )
+
         self.hostname = hostname
         self.running = False
         self.host = host
@@ -30,22 +37,27 @@ class SMTPServer(Service, Tickable):
 
     def start(self) -> None:
         self.server.start()
-        self.logger.info(f"SMTP Server listening on {self.host}:{self.port}")
-        self.running = True
 
+        self.logger.info(
+            f"SMTP Server listening on "
+            f"{self.host}:{self.port}"
+        )
+
+        self.running = True
 
     def stop(self) -> None:
         self.running = False
         self.server.stop()
+
         with self._threads_lock:
             threads = list(
                 self._connection_threads
             )
 
         for thread in threads:
-            thread.join(timeout=2)
-
-
+            thread.join(
+                timeout=2
+            )
 
     def handle_connection(
         self,
@@ -65,13 +77,13 @@ class SMTPServer(Service, Tickable):
 
         protocol.serve()
 
-    
     def tick(self) -> None:
         if not self.running:
             return
 
         try:
             accepted = self.server.accept_once()
+
         except OSError:
             if not self.running:
                 return
@@ -85,18 +97,24 @@ class SMTPServer(Service, Tickable):
 
         thread = threading.Thread(
             target=self._serve_connection,
-            args=(client, address),
+            args=(
+                client,
+                address,
+            ),
             daemon=True,
-            name=f"smtp-{address[0]}:{address[1]}",
+            name=(
+                f"smtp-{address[0]}:"
+                f"{address[1]}"
+            ),
         )
 
         with self._threads_lock:
-            self._connection_threads.add(thread)
+            self._connection_threads.add(
+                thread
+            )
 
         thread.start()
 
-
-    
     def _serve_connection(
         self,
         client,
@@ -109,11 +127,14 @@ class SMTPServer(Service, Tickable):
                 client,
                 address,
             )
+
         except Exception as exc:
             self.logger.error(
                 f"SMTP connection error from "
-                f"{address[0]}:{address[1]}: {exc}"
+                f"{address[0]}:{address[1]}: "
+                f"{exc}"
             )
+
         finally:
             try:
                 client.close()
@@ -125,7 +146,6 @@ class SMTPServer(Service, Tickable):
                     current
                 )
 
-    
     @property
     def active_connections(self) -> int:
         with self._threads_lock:

@@ -10,32 +10,32 @@ from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.queue.stage import QueueStage
 
 
+
+
 class SMTPProtocol:
     """
     Gestisce il dialogo SMTP di una singola connessione.
     """
 
     def __init__(
-                self,
-                connection: SMTPConnection,
-                hostname: str = "localhost",
-                pipeline: Pipeline | None = None,
-            ):
-                self.connection = connection
-                self.hostname = hostname
-                self.session = SMTPSession(connection.ip)
-                self.dispatcher = create_dispatcher()
-                self.engine = SMTPEngine()
+        self,
+        connection: SMTPConnection,
+        hostname: str = "localhost",
+        pipeline: Pipeline | None = None,
+    ):
+        if pipeline is None:
+            raise ValueError(
+                "SMTPProtocol requires a delivery pipeline"
+            )
 
-                if pipeline is None:
-                    self.queue = QueueManager()
-
-                    self.pipeline = Pipeline()
-                    self.pipeline.add(LoggerStage())
-                    self.pipeline.add(QueueStage(self.queue))
-                else:
-                    self.queue = None
-                    self.pipeline = pipeline
+        self.connection = connection
+        self.hostname = hostname
+        self.session = SMTPSession(
+            connection.ip
+        )
+        self.dispatcher = create_dispatcher()
+        self.engine = SMTPEngine()
+        self.pipeline = pipeline
 
     def send_greeting(self) -> None:
         reply = ReplyFactory.greeting(self.hostname)

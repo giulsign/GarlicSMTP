@@ -205,6 +205,12 @@ class MailboxView:
                 expunged_sequence_numbers.append(
                     sequence_number
                 )
+
+                self.store.event_sink.message_removed(
+                    self.name,
+                    sequence_number,
+                )
+
                 deleted_count += 1
 
         return expunged_sequence_numbers
@@ -359,6 +365,11 @@ class MailboxView:
             )
 
             return None
+
+        self.store.event_sink.message_removed(
+            self.name,
+            sequence_number,
+        )
 
         return (
             source.uid,

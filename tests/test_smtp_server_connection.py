@@ -1,4 +1,5 @@
 from garlicsmtp.smtp.server import SMTPServer
+from garlicsmtp.core.pipeline import Pipeline
 
 
 class FakeSocket:
@@ -21,7 +22,10 @@ class FakeSocket:
 
 
 def test_smtp_server_handles_connection():
-    server = SMTPServer(hostname="garlicsmtp.onion")
+    server = SMTPServer(
+        hostname="garlicsmtp.onion",
+        pipeline=Pipeline(),
+    )
     client = FakeSocket()
 
     server.handle_connection(

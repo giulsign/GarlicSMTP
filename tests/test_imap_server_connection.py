@@ -1,6 +1,9 @@
-from garlicsmtp.imap.server import IMAPServer
 from garlicsmtp.storage.store import MessageStore
 from garlicsmtp.security.auth import MemoryAuthenticator
+from garlicsmtp.imap.server import (
+    IMAPConnectionHandler,
+    IMAPServer,
+)
 
 
 class FakeConnection:
@@ -459,4 +462,63 @@ def test_imap_server_handles_multiappend_mixed_literal_modes(
         )
         in sent
         for sent in connection.sent
+    )
+
+
+def test_imap_idle_receives_store_exists_notification(
+    message,
+):
+    store = MessageStore()
+
+    store.create_mailbox(
+        "bob@test.onion"
+    )
+
+    connection = FakeConnection()
+
+    connection.lines = [
+        "A001 LOGIN alice secret",
+        'A002 SELECT "bob@test.onion"',
+        "A003 IDLE",
+    ]
+
+    server = IMAPServer(
+        authenticator=MemoryAuthenticator(
+            {
+                "alice": "secret",
+            }
+        ),
+        store=store,
+    )
+
+    server.connection_factory = (
+        lambda connected_socket: connection
+    )
+
+    context = server._create_connection_context(
+        object()
+    )
+
+    handler = IMAPConnectionHandler(
+        server,
+        context,
+    )
+
+    assert handler.process_iteration() is True
+    assert handler.process_iteration() is True
+    assert handler.process_iteration() is True
+
+    store.save(
+        "bob@test.onion",
+        message,
+    )
+
+    handler._send_idle_notifications()
+
+    assert connection.sent[-1] == (
+        "* 1 EXISTS\r\n"
+    )
+
+    server.store_event_sink.remove(
+        context.store_event_adapter
     )
