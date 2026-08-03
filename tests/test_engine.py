@@ -1,8 +1,13 @@
 from garlicsmtp.core.engine import GarlicSMTP
-from garlicsmtp.queue.manager import QueueManager
-from garlicsmtp.transport.dummy import DummyTransport
-from garlicsmtp.transport.manager import TransportManager
-from garlicsmtp.core.engine import GarlicSMTP
+from pathlib import Path
+
+from garlicsmtp.application import (
+    ApplicationBuilder,
+)
+from garlicsmtp.configuration import (
+    ApplicationPaths,
+    ApplicationSettings,
+)
 
 
 class FakeRuntime:
@@ -29,3 +34,24 @@ def test_engine_start_stop():
 
     app.stop()
     assert runtime.stopped is True
+
+
+def test_application_uses_context_runtime(
+    tmp_path,
+):
+    context = ApplicationBuilder(
+        paths=ApplicationPaths(
+            root_dir=tmp_path / "garlicsmtp"
+        ),
+        settings=ApplicationSettings(),
+    ).build()
+
+    app = GarlicSMTP(
+        context
+    )
+
+    assert app.context is context
+    assert app.runtime is context.runtime
+
+    context.queue.backend.close()
+    context.store.backend.close()

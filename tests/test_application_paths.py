@@ -1,0 +1,87 @@
+from pathlib import Path
+
+from garlicsmtp.configuration import (
+    ApplicationPaths,
+)
+
+def test_application_paths_derive_directories():
+    paths = ApplicationPaths(
+        root_dir=Path("/tmp/garlicsmtp")
+    )
+
+    assert paths.config_dir == Path(
+        "/tmp/garlicsmtp/config"
+    )
+
+    assert paths.data_dir == Path(
+        "/tmp/garlicsmtp/data"
+    )
+
+    assert paths.state_dir == Path(
+        "/tmp/garlicsmtp/state"
+    )
+
+    assert paths.cache_dir == Path(
+        "/tmp/garlicsmtp/cache"
+    )
+
+    assert paths.log_dir == Path(
+        "/tmp/garlicsmtp/state/logs"
+    )
+
+
+def test_application_paths_derive_files():
+    paths = ApplicationPaths(
+        root_dir=Path("/tmp/garlicsmtp")
+    )
+
+    assert paths.settings_file == Path(
+        "/tmp/garlicsmtp/config/settings.toml"
+    )
+
+    assert paths.mailbox_database == Path(
+        "/tmp/garlicsmtp/data/mailboxes.db"
+    )
+
+    assert paths.queue_database == Path(
+        "/tmp/garlicsmtp/state/queue.db"
+    )
+
+
+def test_application_paths_for_user():
+    paths = ApplicationPaths.for_user(
+        home=Path("/home/alice")
+    )
+
+    assert paths.root_dir == Path(
+        "/home/alice/.local/share/garlicsmtp"
+    )
+
+
+def test_application_paths_create_directories(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    paths.create_directories()
+
+    assert paths.config_dir.is_dir()
+    assert paths.data_dir.is_dir()
+    assert paths.state_dir.is_dir()
+    assert paths.cache_dir.is_dir()
+    assert paths.log_dir.is_dir()
+
+
+def test_create_directories_is_idempotent(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    paths.create_directories()
+    paths.create_directories()
+
+    assert paths.root_dir.is_dir()

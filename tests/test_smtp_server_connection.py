@@ -19,7 +19,7 @@ class FakeSocket:
 
     def close(self):
         pass
-
+        
 
 def test_smtp_server_handles_connection():
     server = SMTPServer(

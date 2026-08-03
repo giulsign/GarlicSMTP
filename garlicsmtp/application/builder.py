@@ -1,0 +1,363 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from garlicsmtp.core.engine.runtime import (
+        Runtime,
+    )
+
+
+from garlicsmtp.application.context import (
+    ApplicationContext,
+)
+from garlicsmtp.configuration import (
+    ApplicationPaths,
+    ApplicationSettings,
+    ConfigurationLoader,
+)
+from garlicsmtp.core.pipeline import (
+    LoggerStage,
+    Pipeline,
+)
+from garlicsmtp.queue.manager import (
+    QueueManager,
+)
+from garlicsmtp.queue.sqlite import (
+    SQLiteQueueBackend,
+)
+from garlicsmtp.queue.stage import (
+    QueueStage,
+)
+from garlicsmtp.storage.delivery_stage import (
+    DeliveryStage,
+)
+from garlicsmtp.storage.sqlite import (
+    SQLiteMessageStoreBackend,
+)
+from garlicsmtp.storage.store import (
+    MessageStore,
+)
+from garlicsmtp.transport.manager import (
+    TransportManager,
+)
+from garlicsmtp.transport.onion.transport import (
+    OnionTransport,
+)
+from garlicsmtp.imap.server import (
+    IMAPServer,
+)
+from garlicsmtp.logger import (
+    Logger,
+)
+from garlicsmtp.queue.worker import (
+    QueueWorker,
+)
+from garlicsmtp.smtp.server import (
+    SMTPServer,
+)
+from garlicsmtp.logger import Logger
+from garlicsmtp.storage.backend import (
+    MessageStoreBackend,
+)
+from garlicsmtp.transport.base import Transport
+from garlicsmtp.application.tor_monitor_service import (
+    TorMonitorService,
+)
+from garlicsmtp.application.tor_status_provider import (
+    TorStatusProvider,
+)
+from garlicsmtp.application.event_hub import (
+    ApplicationEventHub,
+)
+
+
+class ApplicationBuilder:
+
+    def __init__(
+        self,
+        *,
+        paths: ApplicationPaths | None = None,
+        settings: ApplicationSettings | None = None,
+        configuration_loader: ConfigurationLoader | None = None,
+        default_transport: Transport | None = None,
+        queue_backend=None,
+        message_store_backend: MessageStoreBackend | None = None,
+        logger: Logger | None = None,
+    ) -> None:
+        self.paths = (
+            paths
+            or ApplicationPaths.for_user()
+        )
+
+        self.configuration_loader = (
+            configuration_loader
+            or ConfigurationLoader()
+        )
+
+        self.settings = settings
+        self.default_transport = default_transport
+        self.queue_backend = queue_backend
+        self.message_store_backend = (
+            message_store_backend
+        )
+        self.logger = logger
+
+    def build(
+        self,
+    ) -> ApplicationContext:
+        self.paths.create_directories()
+
+        settings = (
+            self.settings
+            or self.configuration_loader.load(
+                self.paths.settings_file
+            )
+        )
+
+        logger = self._build_logger()
+        event_hub = self._build_event_hub()
+
+        store = self._build_store()
+        queue = self._build_queue()
+
+        transport = self._build_transport(
+            settings
+        )
+
+        pipeline = self._build_pipeline(
+            settings=settings,
+            store=store,
+            queue=queue,
+        )
+
+        smtp_server = self._build_smtp_server(
+            settings=settings,
+            pipeline=pipeline,
+            logger=logger,
+        )
+
+        imap_server = self._build_imap_server(
+            settings=settings,
+            store=store,
+        )
+
+        queue_worker = self._build_queue_worker(
+            queue=queue,
+            transport=transport,
+            logger=logger,
+        )
+
+        tor_status_provider = (
+            self._build_tor_status_provider(
+                settings
+            )
+        )
+
+        tor_monitor = self._build_tor_monitor(
+            provider=tor_status_provider,
+            event_hub=event_hub,
+        )
+
+        runtime = self._build_runtime(
+            smtp_server=smtp_server,
+            imap_server=imap_server,
+            queue_worker=queue_worker,
+            tor_monitor=tor_monitor,
+            logger=logger,
+        )
+        return ApplicationContext(
+            paths=self.paths,
+            settings=settings,
+            logger=logger,
+            event_hub=event_hub,
+            store=store,
+            queue=queue,
+            transport=transport,
+            pipeline=pipeline,
+            smtp_server=smtp_server,
+            imap_server=imap_server,
+            queue_worker=queue_worker,
+            tor_monitor=tor_monitor,
+            runtime=runtime,
+        )
+
+    def _build_store(
+        self,
+    ) -> MessageStore:
+        backend = (
+            self.message_store_backend
+            or SQLiteMessageStoreBackend(
+                self.paths.mailbox_database
+            )
+        )
+
+        return MessageStore(
+            backend=backend
+        )
+    
+    def _build_queue(
+        self,
+    ) -> QueueManager:
+        backend = (
+            self.queue_backend
+            or SQLiteQueueBackend(
+                self.paths.queue_database
+            )
+        )
+
+        return QueueManager(
+            backend=backend
+        )
+
+    def _build_transport(
+        self,
+        settings: ApplicationSettings,
+    ) -> TransportManager:
+        default_transport = (
+            self.default_transport
+            or OnionTransport(
+                socks_host=(
+                    settings.tor.socks_host
+                ),
+                socks_port=(
+                    settings.tor.socks_port
+                ),
+                hostname=settings.hostname,
+            )
+        )
+
+        return TransportManager(
+            default_transport=default_transport
+        )
+
+    @staticmethod
+    def _build_pipeline(
+        *,
+        settings: ApplicationSettings,
+        store: MessageStore,
+        queue: QueueManager,
+    ) -> Pipeline:
+        queue_stage = QueueStage(
+            queue
+        )
+
+        pipeline = Pipeline()
+
+        pipeline.add(
+            LoggerStage()
+        )
+
+        pipeline.add(
+            DeliveryStage(
+                store=store,
+                queue_stage=queue_stage,
+                local_domains={
+                    settings.local_domain,
+                    settings.hostname,
+                },
+            )
+        )
+
+        return pipeline
+
+    def _build_logger(
+        self,
+    ) -> Logger:
+        return self.logger or Logger()
+
+    @staticmethod
+    def _build_smtp_server(
+        *,
+        settings: ApplicationSettings,
+        pipeline: Pipeline,
+        logger: Logger,
+    ) -> SMTPServer:
+        return SMTPServer(
+            pipeline=pipeline,
+            host=settings.smtp.host,
+            port=settings.smtp.port,
+            hostname=settings.hostname,
+            logger=logger,
+    )
+
+    @staticmethod
+    def _build_imap_server(
+        *,
+        settings: ApplicationSettings,
+        store: MessageStore,
+    ) -> IMAPServer:
+        return IMAPServer(
+            host=settings.imap.host,
+            port=settings.imap.port,
+            hostname=settings.hostname,
+            store=store,
+        )
+
+    @staticmethod
+    def _build_queue_worker(
+        *,
+        queue: QueueManager,
+        transport: TransportManager,
+        logger: Logger,
+    ) -> QueueWorker:
+        return QueueWorker(
+            queue=queue,
+            transport=transport,
+            logger=logger,
+        )
+
+    @staticmethod
+    def _build_runtime(
+        *,
+        smtp_server: SMTPServer,
+        imap_server: IMAPServer,
+        queue_worker: QueueWorker,
+        tor_monitor: TorMonitorService,
+        logger: Logger,
+    ) -> Runtime:
+        from garlicsmtp.core.engine.runtime import (
+            Runtime,
+        )
+
+        return Runtime(
+            services=[
+                smtp_server,
+                imap_server,
+                queue_worker,
+                tor_monitor,
+            ],
+            tasks=[
+                smtp_server,
+                imap_server,
+                queue_worker,
+                tor_monitor,
+            ],
+            logger=logger,
+        )
+
+
+    @staticmethod
+    def _build_tor_status_provider(
+        settings: ApplicationSettings,
+    ) -> TorStatusProvider:
+        return TorStatusProvider(
+            settings.tor
+        )
+
+
+    @staticmethod
+    def _build_tor_monitor(
+        *,
+        provider: TorStatusProvider,
+        event_hub: ApplicationEventHub,
+    ) -> TorMonitorService:
+        return TorMonitorService(
+            provider=provider,
+            event_hub=event_hub,
+            interval_seconds=10.0,
+        )
+
+    @staticmethod
+    def _build_event_hub(
+    ) -> ApplicationEventHub:
+        return ApplicationEventHub()

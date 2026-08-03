@@ -1,18 +1,26 @@
+from pathlib import Path
+
+from garlicsmtp.application.builder import (
+    ApplicationBuilder,
+)
+from garlicsmtp.configuration import (
+    ApplicationPaths,
+    ApplicationSettings,
+    IMAPSettings,
+    SMTPSettings,
+    TorSettings,
+)
 from garlicsmtp.core.engine.app import GarlicSMTP
-from garlicsmtp.core.engine.config import GarlicSMTPConfig
-from garlicsmtp.core.engine.runtime import Runtime
-from garlicsmtp.queue.manager import QueueManager
-from garlicsmtp.queue.worker import QueueWorker
-from garlicsmtp.smtp.server import SMTPServer
-from garlicsmtp.transport.manager import TransportManager
-from garlicsmtp.transport.onion.transport import OnionTransport
+from garlicsmtp.core.engine.config import (
+    GarlicSMTPConfig,
+)
 from garlicsmtp.logger import Logger
-from garlicsmtp.core.pipeline import LoggerStage
-from garlicsmtp.core.pipeline import Pipeline
-from garlicsmtp.queue.stage import QueueStage
-from garlicsmtp.storage.delivery_stage import DeliveryStage
-from garlicsmtp.storage.store import MessageStore
-from garlicsmtp.storage.sqlite import (SQLiteMessageStoreBackend,)
+from garlicsmtp.storage.sqlite import (
+    SQLiteMessageStoreBackend,
+)
+from garlicsmtp.transport.onion.transport import (
+    OnionTransport,
+)
 
 
 class Bootstrap:
@@ -23,136 +31,152 @@ class Bootstrap:
         default_transport=None,
         queue_backend=None,
     ):
-        self.config = config or GarlicSMTPConfig()
-        self.default_transport = default_transport
-
-        self._logger = None
-        self._queue = None
-        self._transport = None
-        self._onion_transport = None
-        self._worker = None
-        self._server = None
-        self._runtime = None
-        self._pipeline = None
-        self.queue_backend = queue_backend
-        self._message_store = None
-        
-
-
-    def build(self) -> GarlicSMTP:
-        return GarlicSMTP(
-            runtime=self.build_runtime(),
+        self.config = (
+            config
+            or GarlicSMTPConfig()
         )
-    
 
-    def build_runtime(self) -> Runtime:
-        if self._runtime is None:
-            server = self.build_server()
-            worker = self.build_worker()
+        self.default_transport = (
+            default_transport
+        )
 
-            self._runtime = Runtime(
-                services=[
-                    server,
-                    worker,
-                ],
-                tasks=[
-                    server,
-                    worker,
-                ],
-                logger=self.build_logger(),
-            )
+        self.queue_backend = (
+            queue_backend
+        )
 
-        return self._runtime
+        self._context = None
+        self._application = None
+        self._onion_transport = None
+        self._logger = None
 
-    def build_server(self) -> SMTPServer:
-        if self._server is None:
-            self._server = SMTPServer(
+    def _build_settings(
+        self,
+    ) -> ApplicationSettings:
+        return ApplicationSettings(
+            hostname=self.config.hostname,
+            local_domain=self.config.hostname,
+            smtp=SMTPSettings(
                 host=self.config.listen_host,
                 port=self.config.listen_port,
-                hostname=self.config.hostname,
-                logger=self.build_logger(),
-                pipeline=self.build_pipeline(),
-            )
-
-        return self._server
-
-    def build_worker(self) -> QueueWorker:
-        if self._worker is None:
-            self._worker = QueueWorker(
-                queue=self.build_queue(),
-                transport=self.build_transport(),
-                logger=self.build_logger(),
-            )
-
-        return self._worker
-
-    def build_queue(self) -> QueueManager:
-        if self._queue is None:
-            self._queue = QueueManager(backend=self.queue_backend)
-
-        return self._queue
-
-    def build_transport(self) -> TransportManager:
-        if self._transport is None:
-            self._transport = TransportManager(
-                default_transport=(
-                    self.default_transport
-                    or self.build_onion_transport()
+            ),
+            imap=IMAPSettings(),
+            tor=TorSettings(
+                enabled=True,
+                socks_host=(
+                    self.config.socks_host
                 ),
+                socks_port=(
+                    self.config.socks_port
+                ),
+            ),
+        )
+
+    def _build_paths(
+        self,
+    ) -> ApplicationPaths:
+        mailbox_path = Path(
+            self.config.mailbox_db
+        )
+
+        if mailbox_path.parent == Path("."):
+            root_dir = (
+                ApplicationPaths.for_user()
+                .root_dir
+            )
+        else:
+            root_dir = (
+                mailbox_path.parent
+                / ".garlicsmtp-runtime"
             )
 
-        return self._transport
+        return ApplicationPaths(
+            root_dir=root_dir
+        )
 
-    def build_onion_transport(self) -> OnionTransport:
-        if self._onion_transport is None:
-            self._onion_transport = OnionTransport(
-                socks_host=self.config.socks_host,
-                socks_port=self.config.socks_port,
-                hostname=self.config.hostname,
+    def build_context(
+        self,
+    ):
+        if self._context is None:
+            message_store_backend = (
+                SQLiteMessageStoreBackend(
+                    self.config.mailbox_db
+                )
             )
 
-        return self._onion_transport
-    
+            self._context = (
+                ApplicationBuilder(
+                    paths=self._build_paths(),
+                    settings=(
+                        self._build_settings()
+                    ),
+                    default_transport=(
+                        self.default_transport
+                    ),
+                    queue_backend=(
+                        self.queue_backend
+                    ),
+                    message_store_backend=(
+                        message_store_backend
+                    ),
+                    logger=self.build_logger(),
+                ).build()
+            )
+
+        return self._context
+
+    def build(
+        self,
+    ) -> GarlicSMTP:
+        if self._application is None:
+            self._application = GarlicSMTP(
+                self.build_context()
+            )
+
+        return self._application
+
+    def build_runtime(self):
+        return self.build_context().runtime
+
+    def build_server(self):
+        return self.build_context().smtp_server
+
+    def build_worker(self):
+        return self.build_context().queue_worker
+
+    def build_queue(self):
+        return self.build_context().queue
+
+    def build_transport(self):
+        return self.build_context().transport
+
+    def build_pipeline(self):
+        return self.build_context().pipeline
+
+    def build_message_store(self):
+        return self.build_context().store
+
     def build_logger(self) -> Logger:
         if self._logger is None:
             self._logger = Logger()
 
         return self._logger
-    
 
-    def build_pipeline(self) -> Pipeline:
-        if self._pipeline is None:
-            queue_stage = QueueStage(
-                self.build_queue()
-            )
-
-            self._pipeline = Pipeline()
-
-            self._pipeline.add(
-                LoggerStage()
-            )
-
-            self._pipeline.add(
-                DeliveryStage(
-                    store=self.build_message_store(),
-                    queue_stage=queue_stage,
-                    local_domains={
-                        self.config.hostname,
-                    },
+    def build_onion_transport(
+        self,
+    ) -> OnionTransport:
+        if self._onion_transport is None:
+            self._onion_transport = (
+                OnionTransport(
+                    socks_host=(
+                        self.config.socks_host
+                    ),
+                    socks_port=(
+                        self.config.socks_port
+                    ),
+                    hostname=(
+                        self.config.hostname
+                    ),
                 )
             )
 
-        return self._pipeline
-    
-
-    def build_message_store(self) -> MessageStore:
-        if self._message_store is None:
-            backend = SQLiteMessageStoreBackend(
-                self.config.mailbox_db
-            )
-
-            self._message_store = MessageStore(
-                backend=backend,
-            )
-
-        return self._message_store
+        return self._onion_transport

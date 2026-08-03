@@ -7,3 +7,12 @@ name = "GarlicSMTP"
 version = "0.1.0-alpha"
 description = "SMTP over Tor Onion Services"
 requires-python = ">=3.13"
+
+[tor]
+control_enabled = true
+control_host = "127.0.0.1"
+control_port = 9051
+cookie_file = "/run/tor/control.authcookie"
+require_safecookie = true
+allow_new_circuits = false
+onion_smtp_port = 25
