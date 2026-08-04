@@ -17,6 +17,12 @@ class ApplicationStatus:
     imap_running: bool
     queue_worker_running: bool
 
+    smtp_host: str
+    smtp_port: int
+
+    imap_host: str
+    imap_port: int
+
     smtp_connections: int
     imap_connections: int
 

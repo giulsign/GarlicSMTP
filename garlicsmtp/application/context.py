@@ -29,6 +29,12 @@ from garlicsmtp.application.tor_monitor_service import (
 from garlicsmtp.application.event_hub import (
     ApplicationEventHub,
 )
+from garlicsmtp.application.event_log import (
+    ApplicationEventLog,
+)
+from garlicsmtp.application.event_service import (
+    ApplicationEventService,
+)
 
 
 @dataclass(slots=True)
@@ -39,6 +45,9 @@ class ApplicationContext:
 
     logger: Logger
     event_hub: ApplicationEventHub
+
+    event_log: ApplicationEventLog
+    event_service: ApplicationEventService
 
     store: MessageStore
     queue: QueueManager

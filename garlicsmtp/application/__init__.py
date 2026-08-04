@@ -29,6 +29,21 @@ from garlicsmtp.application.tor_monitor_service import (
 from garlicsmtp.application.event_hub import (
     ApplicationEventHub,
 )
+from garlicsmtp.application.event import (
+    ApplicationEvent,
+    ApplicationEventLevel,
+    ApplicationEventSource,
+)
+from garlicsmtp.application.event_log import (
+    ApplicationEventLog,
+)
+from garlicsmtp.application.event_service import (
+    ApplicationEventService,
+)
+from garlicsmtp.application.activity import (
+    ApplicationActivityEntry,
+    ApplicationActivityFormatter,
+)
 
 __all__ = [
     "ApplicationBuilder",
@@ -42,4 +57,11 @@ __all__ = [
     "TorStatusProvider",
     "TorMonitorService",
     "ApplicationEventHub",
+    "ApplicationEvent",
+    "ApplicationEventLevel",
+    "ApplicationEventLog",
+    "ApplicationEventService",
+    "ApplicationEventSource",
+    "ApplicationActivityEntry",
+    "ApplicationActivityFormatter",
 ]

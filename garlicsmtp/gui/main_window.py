@@ -1,13 +1,18 @@
-from PySide6.QtCore import QTimer
+from collections.abc import Callable
+
+from PySide6.QtCore import (
+    QObject,
+    Signal,
+)
 from PySide6.QtWidgets import (
-    QFormLayout,
-    QGroupBox,
+    QGridLayout,
     QHBoxLayout,
     QLabel,
     QListWidget,
     QMainWindow,
     QMessageBox,
     QPushButton,
+    QScrollArea,
     QVBoxLayout,
     QWidget,
 )
@@ -15,6 +20,27 @@ from PySide6.QtWidgets import (
 from garlicsmtp.application import (
     ApplicationViewModel,
 )
+from garlicsmtp.gui.dashboard_widgets import (
+    DashboardCard,
+    MetricValue,
+    StatusBadge,
+)
+from garlicsmtp.gui.sections import (
+    ActivitySection,
+    ApplicationSection,
+    ServicesSection,
+    TorSection,
+)
+
+
+class ViewModelEventBridge(QObject):
+
+    refresh_requested = Signal()
+
+    def request_refresh(
+        self,
+    ) -> None:
+        self.refresh_requested.emit()
 
 
 class MainWindow(QMainWindow):
@@ -28,31 +54,29 @@ class MainWindow(QMainWindow):
         self.view_model = view_model
 
         self.setWindowTitle(
-            "GarlicSMTP"
+            "GarlicSMTP Monitor"
         )
 
         self.resize(
-            620,
-            560,
+            980,
+            720,
+        )
+
+        self.event_bridge = (
+            ViewModelEventBridge()
+        )
+
+        self.event_bridge.refresh_requested.connect(
+            self.refresh_view
+        )
+
+        self.view_model.subscribe(
+            self.event_bridge.request_refresh
         )
 
         self._build_ui()
         self._connect_actions()
         self.refresh_view()
-
-        self.refresh_timer = QTimer(
-            self
-        )
-
-        self.refresh_timer.setInterval(
-            1000
-        )
-
-        self.refresh_timer.timeout.connect(
-            self.refresh
-        )
-
-        self.refresh_timer.start()
 
     def _build_ui(
         self,
@@ -65,20 +89,70 @@ class MainWindow(QMainWindow):
             central_widget
         )
 
-        root_layout.addWidget(
-            self._build_runtime_group()
+        root_layout.setContentsMargins(
+            18,
+            18,
+            18,
+            18,
+        )
+
+        root_layout.setSpacing(
+            14
         )
 
         root_layout.addWidget(
-            self._build_identity_group()
+            self._build_header()
+        )
+
+        scroll_area = QScrollArea(
+            self
+        )
+
+        scroll_area.setWidgetResizable(
+            True
+        )
+
+        scroll_content = QWidget()
+
+        self.dashboard_layout = QGridLayout(
+            scroll_content
+        )
+
+        self.dashboard_layout.setSpacing(
+            14
+        )
+
+        self._build_dashboard_sections()
+        self._add_dashboard_sections()
+
+        self.dashboard_layout.addWidget(
+            self._build_mail_card(),
+            3,
+            0,
+        )
+
+        self.dashboard_layout.addWidget(
+            self._build_mailbox_card(),
+            3,
+            1,
+        )
+
+        self.dashboard_layout.setColumnStretch(
+            0,
+            1,
+        )
+
+        self.dashboard_layout.setColumnStretch(
+            1,
+            1,
+        )
+
+        scroll_area.setWidget(
+            scroll_content
         )
 
         root_layout.addWidget(
-            self._build_activity_group()
-        )
-
-        root_layout.addWidget(
-            self._build_mailbox_group()
+            scroll_area
         )
 
         root_layout.addLayout(
@@ -89,126 +163,342 @@ class MainWindow(QMainWindow):
             central_widget
         )
 
-    def _build_runtime_group(
+    def _build_dashboard_sections(
         self,
-    ) -> QGroupBox:
-        group = QGroupBox(
-            "Services"
+    ) -> None:
+        self.application_section = (
+            ApplicationSection(
+                view_model=self.view_model,
+            )
         )
 
-        layout = QFormLayout(
-            group
+        self.services_section = (
+            ServicesSection(
+                view_model=self.view_model,
+            )
         )
 
-        self.runtime_value = QLabel()
-        self.smtp_value = QLabel()
-        self.imap_value = QLabel()
-        self.worker_value = QLabel()
-
-        layout.addRow(
-            "Runtime:",
-            self.runtime_value,
+        self.tor_section = TorSection(
+            view_model=self.view_model,
         )
 
-        layout.addRow(
-            "SMTP Server:",
-            self.smtp_value,
+        self.activity_section = (
+            ActivitySection(
+                view_model=self.view_model,
+            )
         )
 
-        layout.addRow(
-            "IMAP Server:",
-            self.imap_value,
-        )
+        self._install_compatibility_aliases()
 
-        layout.addRow(
-            "Queue Worker:",
-            self.worker_value,
-        )
-
-        return group
-
-    def _build_identity_group(
+    def _add_dashboard_sections(
         self,
-    ) -> QGroupBox:
-        group = QGroupBox(
-            "Identity"
+    ) -> None:
+        self.dashboard_layout.addWidget(
+            self.application_section,
+            0,
+            0,
         )
 
-        layout = QFormLayout(
-            group
+        self.dashboard_layout.addWidget(
+            self.services_section,
+            0,
+            1,
         )
 
-        self.hostname_value = QLabel()
-        self.domain_value = QLabel()
-
-        layout.addRow(
-            "Hostname:",
-            self.hostname_value,
+        self.dashboard_layout.addWidget(
+            self.tor_section,
+            1,
+            0,
+            1,
+            2,
         )
 
-        layout.addRow(
-            "Local domain:",
-            self.domain_value,
+        self.dashboard_layout.addWidget(
+            self.activity_section,
+            2,
+            0,
+            1,
+            2,
         )
 
-        return group
-
-    def _build_activity_group(
+    def _install_compatibility_aliases(
         self,
-    ) -> QGroupBox:
-        group = QGroupBox(
-            "Activity"
+    ) -> None:
+        self.runtime_value = (
+            self.application_section
+            .runtime_value
         )
 
-        layout = QFormLayout(
-            group
+        self.hostname_value = (
+            self.application_section
+            .hostname_value
         )
 
-        self.queue_value = QLabel()
-        self.mailbox_count_value = QLabel()
-        self.smtp_connections_value = QLabel()
-        self.imap_connections_value = QLabel()
-
-        layout.addRow(
-            "Queue:",
-            self.queue_value,
+        self.domain_value = (
+            self.application_section
+            .domain_value
         )
 
-        layout.addRow(
-            "Mailboxes:",
-            self.mailbox_count_value,
+        self.smtp_value = (
+            self.services_section
+            .smtp_value
         )
 
-        layout.addRow(
-            "SMTP connections:",
-            self.smtp_connections_value,
+        self.imap_value = (
+            self.services_section
+            .imap_value
         )
 
-        layout.addRow(
-            "IMAP connections:",
-            self.imap_connections_value,
+        self.worker_value = (
+            self.services_section
+            .worker_value
         )
 
-        return group
+        self.smtp_endpoint_value = (
+            self.services_section
+            .smtp_endpoint_value
+        )
 
-    def _build_mailbox_group(
+        self.imap_endpoint_value = (
+            self.services_section
+            .imap_endpoint_value
+        )
+
+        self.tor_status_value = (
+            self.tor_section
+            .status_value
+        )
+
+        self.tor_socks_value = (
+            self.tor_section
+            .socks_value
+        )
+
+        self.tor_control_value = (
+            self.tor_section
+            .control_value
+        )
+
+        self.tor_version_value = (
+            self.tor_section
+            .version_value
+        )
+
+        self.tor_bootstrap_value = (
+            self.tor_section
+            .bootstrap_value
+        )
+
+        self.tor_circuits_value = (
+            self.tor_section
+            .circuits_value
+        )
+
+        self.tor_streams_value = (
+            self.tor_section
+            .streams_value
+        )
+
+        self.tor_onion_smtp_value = (
+            self.tor_section
+            .onion_smtp_value
+        )
+
+        self.tor_error_value = (
+            self.tor_section
+            .error_value
+        )
+
+        self.activity_list = (
+            self.activity_section
+            .activity_list
+        )
+
+        self.activity_clear_button = (
+            self.activity_section
+            .clear_button
+        )
+
+    def _build_header(
         self,
-    ) -> QGroupBox:
-        group = QGroupBox(
-            "Mailbox list"
+    ) -> QWidget:
+        widget = QWidget()
+
+        layout = QHBoxLayout(
+            widget
         )
 
-        layout = QVBoxLayout(
-            group
+        layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        title = QLabel(
+            "GarlicSMTP"
+        )
+
+        title.setStyleSheet(
+            """
+            QLabel {
+                font-size: 26px;
+                font-weight: 700;
+            }
+            """
+        )
+
+        subtitle = QLabel(
+            "Private mail infrastructure monitor"
+        )
+
+        subtitle.setStyleSheet(
+            """
+            QLabel {
+                color: #777777;
+                font-size: 12px;
+            }
+            """
+        )
+
+        title_layout = QVBoxLayout()
+
+        title_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        title_layout.addWidget(
+            title
+        )
+
+        title_layout.addWidget(
+            subtitle
+        )
+
+        self.runtime_badge = StatusBadge()
+
+        layout.addLayout(
+            title_layout
+        )
+
+        layout.addStretch()
+
+        layout.addWidget(
+            self.runtime_badge
+        )
+
+        return widget
+
+    def _build_mail_card(
+        self,
+    ) -> DashboardCard:
+        card = DashboardCard(
+            "Mail activity"
+        )
+
+        self.queue_metric = MetricValue(
+            "Queue"
+        )
+
+        self.mailbox_metric = MetricValue(
+            "Mailboxes"
+        )
+
+        self.smtp_connections_metric = (
+            MetricValue(
+                "SMTP connections"
+            )
+        )
+
+        self.imap_connections_metric = (
+            MetricValue(
+                "IMAP connections"
+            )
+        )
+
+        # Alias temporanei per i test esistenti.
+        self.queue_value = (
+            self.queue_metric.value_label
+        )
+
+        self.mailbox_count_value = (
+            self.mailbox_metric.value_label
+        )
+
+        self.smtp_connections_value = (
+            self.smtp_connections_metric
+            .value_label
+        )
+
+        self.imap_connections_value = (
+            self.imap_connections_metric
+            .value_label
+        )
+
+        metrics = QWidget()
+
+        layout = QGridLayout(
+            metrics
+        )
+
+        layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        layout.addWidget(
+            self.queue_metric,
+            0,
+            0,
+        )
+
+        layout.addWidget(
+            self.mailbox_metric,
+            0,
+            1,
+        )
+
+        layout.addWidget(
+            self.smtp_connections_metric,
+            1,
+            0,
+        )
+
+        layout.addWidget(
+            self.imap_connections_metric,
+            1,
+            1,
+        )
+
+        card.add_widget(
+            metrics
+        )
+
+        return card
+
+    def _build_mailbox_card(
+        self,
+    ) -> DashboardCard:
+        card = DashboardCard(
+            "Mailboxes"
         )
 
         self.mailbox_list = QListWidget()
 
-        layout.addWidget(
+        self.mailbox_list.setMinimumHeight(
+            160
+        )
+
+        card.add_widget(
             self.mailbox_list
         )
 
-        return group
+        return card
 
     def _build_action_layout(
         self,
@@ -300,7 +590,7 @@ class MainWindow(QMainWindow):
 
     def _execute_action(
         self,
-        action,
+        action: Callable[[], object],
     ) -> None:
         try:
             action()
@@ -314,51 +604,48 @@ class MainWindow(QMainWindow):
 
         self.refresh_view()
 
+    def _refresh_sections(
+        self,
+    ) -> None:
+        sections = (
+            self.application_section,
+            self.services_section,
+            self.tor_section,
+            self.activity_section,
+        )
+
+        for section in sections:
+            section.refresh_view()
+
     def refresh_view(
         self,
     ) -> None:
-        self.runtime_value.setText(
-            self.view_model.runtime_text
+        self._refresh_sections()
+
+        self.runtime_badge.set_status(
+            text=self.view_model.runtime_text,
+            status_key=(
+                self.view_model
+                .runtime_status_key
+            ),
         )
 
-        self.smtp_value.setText(
-            self.view_model.smtp.status_text
-        )
-
-        self.imap_value.setText(
-            self.view_model.imap.status_text
-        )
-
-        self.worker_value.setText(
-            self.view_model
-            .queue_worker
-            .status_text
-        )
-
-        self.hostname_value.setText(
-            self.view_model.hostname
-        )
-
-        self.domain_value.setText(
-            self.view_model.local_domain
-        )
-
-        self.queue_value.setText(
+        self.queue_metric.setText(
             self.view_model
             .pending_messages_text
         )
 
-        self.mailbox_count_value.setText(
+        self.mailbox_metric.setText(
             self.view_model
             .mailbox_count_text
         )
 
-        self.smtp_connections_value.setText(
+        self.smtp_connections_metric.setText(
             self.view_model
             .smtp_connections_text
         )
 
-        self.imap_connections_value.setText(
+        self.imap_connections_metric.setText(
             self.view_model
             .imap_connections_text
         )
@@ -387,9 +674,13 @@ class MainWindow(QMainWindow):
         self,
         event,
     ) -> None:
-        self.refresh_timer.stop()
+        self.view_model.unsubscribe(
+            self.event_bridge.request_refresh
+        )
 
         if self.view_model.is_running:
             self.view_model.stop()
+
+        self.view_model.close()
 
         event.accept()

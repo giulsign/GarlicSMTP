@@ -20,6 +20,15 @@ from garlicsmtp.gui.main_window import (
 from tests.support import (
     make_application_status,
 )
+from tests.support import (
+    make_application_status,
+    make_tor_status,
+)
+from garlicsmtp.application import (
+    ApplicationEventLevel,
+    ApplicationEventLog,
+    ApplicationEventSource,
+)
 
 
 
@@ -101,8 +110,6 @@ def test_main_window_displays_status():
         view_model
     )
 
-    window.refresh_timer.stop()
-
     assert window.runtime_value.text() == (
         "Stopped"
     )
@@ -138,8 +145,6 @@ def test_main_window_starts_application():
         view_model
     )
 
-    window.refresh_timer.stop()
-
     window.start()
 
     assert window.runtime_value.text() == (
@@ -154,4 +159,205 @@ def test_main_window_starts_application():
     assert window.stop_button.isEnabled()
 
     window.stop()
+    window.close()
+
+
+def test_main_window_displays_tor_status():
+    get_application()
+
+    controller = FakeController()
+
+    controller.current_status = (
+        make_application_status(
+            tor=make_tor_status(
+                control_enabled=True,
+                control_available=True,
+                authenticated=True,
+                authentication_method=(
+                    "SAFECOOKIE"
+                ),
+                socks_available=True,
+                version="0.4.8.12",
+                bootstrap_progress=100,
+                bootstrap_summary="Done",
+                built_circuits=3,
+                active_streams=1,
+                last_error=None,
+                socks_listeners=(
+                    "127.0.0.1:9050",
+                ),
+                control_listeners=(
+                    "127.0.0.1:9051",
+                ),
+            )
+        )
+    )
+
+    view_model = ApplicationViewModel(
+        controller
+    )
+
+    window = MainWindow(
+        view_model
+    )
+
+    assert (
+        window.tor_status_value.text()
+        == "Ready"
+    )
+
+    assert (
+        window.tor_socks_value.text()
+        == "127.0.0.1:9050"
+    )
+
+    assert (
+        window.tor_control_value.text()
+        == "127.0.0.1:9051"
+    )
+
+    assert (
+        window.tor_version_value.text()
+        == "0.4.8.12"
+    )
+
+    assert (
+        window.tor_bootstrap_value.text()
+        == "100% — Done"
+    )
+
+    assert (
+        window.tor_circuits_value.text()
+        == "3 built circuits"
+    )
+
+    assert (
+        window.tor_streams_value.text()
+        == "1 active stream"
+    )
+
+    window.close()
+
+
+def test_main_window_displays_activity():
+    get_application()
+
+    controller = FakeController()
+
+    controller.context = type(
+        "Context",
+        (),
+        {
+            "event_log": (
+                ApplicationEventLog()
+            )
+        },
+    )()
+
+    controller.context.event_log.record(
+        source=(
+            ApplicationEventSource.TOR
+        ),
+        level=(
+            ApplicationEventLevel.INFO
+        ),
+        message="Tor became ready",
+    )
+
+    window = MainWindow(
+        ApplicationViewModel(
+            controller
+        )
+    )
+
+    assert (
+        window.activity_list.count()
+        == 1
+    )
+
+    assert "Tor became ready" in (
+        window.activity_list
+        .item(0)
+        .text()
+    )
+
+    window.close()
+
+
+def test_main_window_builds_dashboard_sections():
+    get_application()
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController()
+        )
+    )
+
+    assert (
+        window.application_section
+        is not None
+    )
+
+    assert (
+        window.services_section
+        is not None
+    )
+
+    assert (
+        window.tor_section
+        is not None
+    )
+
+    assert (
+        window.activity_section
+        is not None
+    )
+
+    window.close()
+
+
+def test_main_window_refreshes_all_sections():
+    get_application()
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController()
+        )
+    )
+
+    calls = []
+
+    window.application_section.refresh_view = (
+        lambda: calls.append(
+            "application"
+        )
+    )
+
+    window.services_section.refresh_view = (
+        lambda: calls.append(
+            "services"
+        )
+    )
+
+    window.tor_section.refresh_view = (
+        lambda: calls.append(
+            "tor"
+        )
+    )
+
+    window.activity_section.refresh_view = (
+        lambda: calls.append(
+            "activity"
+        )
+    )
+
+    window.refresh_view()
+
+    assert calls == [
+        "application",
+        "services",
+        "tor",
+        "activity",
+    ]
+
     window.close()

@@ -9,6 +9,9 @@ from garlicsmtp.application.status import (
 from garlicsmtp.core.engine.state import (
     RuntimeState,
 )
+from garlicsmtp.application.activity import (
+    ApplicationActivityFormatter,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +55,21 @@ class ApplicationViewModel:
         self._status = (
             self.controller.status()
         )
+        self._listeners = []
+        self.activity_formatter = (
+            ApplicationActivityFormatter()
+        )
+
+        subscribe = getattr(
+            self.controller,
+            "subscribe",
+            None,
+        )
+
+        if subscribe is not None:
+            subscribe(
+                self._handle_application_event
+            )
 
     @property
     def status(
@@ -434,4 +452,154 @@ class ApplicationViewModel:
         return (
             self._status.tor.last_error
             or "None"
+        )
+
+    def subscribe(
+        self,
+        listener,
+    ) -> None:
+        if listener not in self._listeners:
+            self._listeners.append(
+                listener
+            )
+
+
+    def unsubscribe(
+        self,
+        listener,
+    ) -> None:
+        if listener in self._listeners:
+            self._listeners.remove(
+                listener
+            )
+
+
+    def close(
+        self,
+    ) -> None:
+        unsubscribe = getattr(
+            self.controller,
+            "unsubscribe",
+            None,
+        )
+
+        if unsubscribe is not None:
+            unsubscribe(
+                self._handle_application_event
+            )
+
+        self._listeners.clear()
+
+
+    def _handle_application_event(
+        self,
+    ) -> None:
+        self._status = (
+            self.controller.status()
+        )
+
+        for listener in tuple(
+            self._listeners
+        ):
+            listener()
+
+    @property
+    def smtp_endpoint_text(
+        self,
+    ) -> str:
+        return (
+            f"{self._status.smtp_host}:"
+            f"{self._status.smtp_port}"
+        )
+
+
+    @property
+    def imap_endpoint_text(
+        self,
+    ) -> str:
+        return (
+            f"{self._status.imap_host}:"
+            f"{self._status.imap_port}"
+        )
+
+    @property
+    def events(
+        self,
+    ):
+        context = getattr(
+            self.controller,
+            "context",
+            None,
+        )
+
+        if context is None:
+            return ()
+
+        event_log = getattr(
+            context,
+            "event_log",
+            None,
+        )
+
+        if event_log is None:
+            return ()
+
+        return event_log.snapshot(
+            newest_first=True
+        )
+
+    @property
+    def activity_entries(
+        self,
+    ):
+        return (
+            self.activity_formatter
+            .format_many(
+                self.events
+            )
+        )
+
+    @property
+    def tor_authentication_text(    
+        self,
+    ) -> str:
+        return (
+            self._status.tor
+            .authentication_method
+        )
+
+    def clear_activity(
+        self,
+    ) -> None:
+        context = getattr(
+            self.controller,
+            "context",
+            None,
+        )
+
+        if context is None:
+            return
+
+        event_log = getattr(
+            context,
+            "event_log",
+            None,
+        )
+
+        if event_log is None:
+            return
+
+        event_log.clear()
+
+        for listener in tuple(
+            self._listeners
+        ):
+            listener()
+
+    @property
+    def activity_count(
+        self,
+    ) -> int:
+        return len(
+            self.activity_entries
         )

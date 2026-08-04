@@ -28,6 +28,12 @@ from garlicsmtp.application.event_hub import (
 from garlicsmtp.application.tor_status import (
     TorStatus,
 )
+from garlicsmtp.application.event_log import (
+    ApplicationEventLog,
+)
+from garlicsmtp.application.event_service import (
+    ApplicationEventService,
+)
 
 
 class FakeServer:
@@ -99,6 +105,12 @@ def build_context() -> ApplicationContext:
     settings = ApplicationSettings()
     logger = Logger()
     event_hub = ApplicationEventHub()
+    event_log = ApplicationEventLog()
+
+    event_service = ApplicationEventService(
+        event_log=event_log,
+        event_hub=event_hub,
+    )
     store = MessageStore()
     queue = QueueManager()
 
@@ -142,6 +154,8 @@ def build_context() -> ApplicationContext:
         settings=settings,
         logger=logger,
         event_hub=event_hub,
+        event_log=event_log,
+        event_service=event_service,
         store=store,
         queue=queue,
         transport=transport,
@@ -213,3 +227,60 @@ def test_application_controller_returns_status():
     assert status.hostname == (
         "garlicsmtp.local"
     )
+
+
+def test_application_controller_records_start_event():
+    context = build_context()
+
+    controller = ApplicationController(
+        context
+    )
+
+    controller.start()
+
+    events = context.event_log.snapshot()
+
+    assert len(events) == 1
+    assert events[0].message == (
+        "Application started"
+    )
+
+
+def test_application_controller_records_stop_event():
+    context = build_context()
+
+    controller = ApplicationController(
+        context
+    )
+
+    controller.start()
+    controller.stop()
+
+    assert [
+        event.message
+        for event in (
+            context.event_log.snapshot()
+        )
+    ] == [
+        "Application started",
+        "Application stopped",
+    ]
+
+
+def test_application_controller_records_restart_event():
+    context = build_context()
+
+    controller = ApplicationController(
+        context
+    )
+
+    controller.restart()
+
+    assert [
+        event.message
+        for event in (
+            context.event_log.snapshot()
+        )
+    ] == [
+        "Application restarted",
+    ]

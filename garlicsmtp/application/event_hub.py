@@ -1,9 +1,14 @@
+import inspect
 import threading
 from collections.abc import Callable
 
+from garlicsmtp.application.event import (
+    ApplicationEvent,
+)
+
 
 ApplicationEventListener = Callable[
-    [],
+    ...,
     None,
 ]
 
@@ -41,6 +46,7 @@ class ApplicationEventHub:
 
     def publish(
         self,
+        event: ApplicationEvent | None = None,
     ) -> None:
         with self._lock:
             listeners = tuple(
@@ -48,4 +54,45 @@ class ApplicationEventHub:
             )
 
         for listener in listeners:
+            self._notify(
+                listener,
+                event,
+            )
+
+    @staticmethod
+    def _notify(
+        listener: ApplicationEventListener,
+        event: ApplicationEvent | None,
+    ) -> None:
+        try:
+            signature = inspect.signature(
+                listener
+            )
+        except (
+            TypeError,
+            ValueError,
+        ):
+            listener()
+            return
+
+        accepts_event = any(
+            parameter.kind
+            in {
+                inspect.Parameter
+                .POSITIONAL_ONLY,
+                inspect.Parameter
+                .POSITIONAL_OR_KEYWORD,
+                inspect.Parameter
+                .VAR_POSITIONAL,
+            }
+            for parameter in (
+                signature.parameters.values()
+            )
+        )
+
+        if accepts_event:
+            listener(
+                event
+            )
+        else:
             listener()

@@ -9,6 +9,12 @@ from garlicsmtp.application.tor_monitor_service import (
 from garlicsmtp.application.tor_status import (
     TorStatus,
 )
+from garlicsmtp.application.event_log import (
+    ApplicationEventLog,
+)
+from garlicsmtp.application.event_service import (
+    ApplicationEventService,
+)
 
 
 def make_status(
@@ -205,3 +211,36 @@ def test_tor_monitor_does_not_tick_when_stopped():
     service.tick()
 
     assert provider.calls == 0
+
+
+def test_tor_monitor_records_ready_event():
+    provider = FakeProvider()
+    hub = ApplicationEventHub()
+    event_log = ApplicationEventLog()
+
+    event_service = ApplicationEventService(
+        event_log=event_log,
+        event_hub=hub,
+    )
+
+    service = TorMonitorService(
+        provider=provider,
+        event_hub=hub,
+        event_service=event_service,
+    )
+
+    service.start()
+    service.refresh()
+
+    provider.current = make_status(
+        authenticated=True
+    )
+
+    service.refresh()
+
+    assert [
+        event.message
+        for event in event_log.snapshot()
+    ] == [
+        "Tor became ready",
+    ]

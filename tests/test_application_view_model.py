@@ -7,6 +7,11 @@ from garlicsmtp.core.engine.state import (
 from tests.support import (
     make_application_status,
 )
+from garlicsmtp.application import (
+    ApplicationEventLevel,
+    ApplicationEventLog,
+    ApplicationEventSource,
+)
 
 class FakeApplicationController:
 
@@ -253,3 +258,103 @@ def test_application_view_model_refreshes_status():
         "bob@test.onion",
     )
 
+
+def test_application_view_model_formats_endpoints():
+    view_model = ApplicationViewModel(
+        FakeApplicationController()
+    )
+
+    assert (
+        view_model.smtp_endpoint_text
+        == "127.0.0.1:2525"
+    )
+
+    assert (
+        view_model.imap_endpoint_text
+        == "127.0.0.1:1143"
+    )
+
+
+def test_application_view_model_formats_activity():
+    controller = (
+        FakeApplicationController()
+    )
+
+    controller.context = type(
+        "Context",
+        (),
+        {
+            "event_log": (
+                ApplicationEventLog()
+            )
+        },
+    )()
+
+    controller.context.event_log.record(
+        source=(
+            ApplicationEventSource.TOR
+        ),
+        level=(
+            ApplicationEventLevel.INFO
+        ),
+        message="Tor became ready",
+    )
+
+    view_model = ApplicationViewModel(
+        controller
+    )
+
+    entries = (
+        view_model.activity_entries
+    )
+
+    assert len(entries) == 1
+    assert entries[0].source_text == "Tor"
+    assert entries[0].short_text == (
+        "Tor became ready"
+    )
+
+
+def test_application_view_model_clears_activity():
+    controller = (
+        FakeApplicationController()
+    )
+
+    controller.context = type(
+        "Context",
+        (),
+        {
+            "event_log": (
+                ApplicationEventLog()
+            )
+        },
+    )()
+
+    controller.context.event_log.record(
+        source=(
+            ApplicationEventSource.TOR
+        ),
+        level=(
+            ApplicationEventLevel.INFO
+        ),
+        message="Tor became ready",
+    )
+
+    view_model = ApplicationViewModel(
+        controller
+    )
+
+    notifications = []
+
+    view_model.subscribe(
+        lambda: notifications.append(
+            "changed"
+        )
+    )
+
+    view_model.clear_activity()
+
+    assert view_model.events == ()
+    assert notifications == [
+        "changed",
+    ]

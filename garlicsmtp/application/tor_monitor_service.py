@@ -12,6 +12,12 @@ from garlicsmtp.application.tor_status_provider import (
 )
 from garlicsmtp.core.service import Service
 from garlicsmtp.core.tickable import Tickable
+from garlicsmtp.application.event import (
+    ApplicationEventSource,
+)
+from garlicsmtp.application.event_service import (
+    ApplicationEventService,
+)
 
 
 Clock = Callable[[], float]
@@ -29,6 +35,7 @@ class TorMonitorService(
         event_hub: ApplicationEventHub,
         interval_seconds: float = 10.0,
         clock: Clock | None = None,
+        event_service: ApplicationEventService | None = None,
     ) -> None:
         if interval_seconds <= 0:
             raise ValueError(
@@ -57,6 +64,7 @@ class TorMonitorService(
         self._last_refresh: float | None = (
             None
         )
+        self.event_service = event_service
 
     @property
     def status(
@@ -116,7 +124,13 @@ class TorMonitorService(
         self._last_refresh = refreshed_at
 
         if current != previous:
-            self.event_hub.publish()
+            self._record_status_change(
+                previous,
+                current,
+            )
+
+            if self.event_service is None:
+                self.event_hub.publish()
 
         return current
 
@@ -130,4 +144,62 @@ class TorMonitorService(
         return (
             now - self._last_refresh
             >= self.interval_seconds
+        )
+
+    def _record_status_change(
+        self,
+        previous: TorStatus,
+        current: TorStatus,
+    ) -> None:
+        if self.event_service is None:
+            return
+
+        if (
+            current.ready
+            and not previous.ready
+        ):
+            self.event_service.info(
+                ApplicationEventSource.TOR,
+                "Tor became ready",
+            )
+
+            return
+
+        if (
+            previous.ready
+            and not current.ready
+        ):
+            self.event_service.warning(
+                ApplicationEventSource.TOR,
+                "Tor became unavailable",
+            )
+
+            return
+
+        if (
+            current.authenticated
+            and not previous.authenticated
+        ):
+            self.event_service.info(
+                ApplicationEventSource.TOR,
+                "Tor Control authenticated with SAFECOOKIE",
+            )
+
+            return
+
+        if (
+            current.last_error
+            != previous.last_error
+            and current.last_error
+        ):
+            self.event_service.warning(
+                ApplicationEventSource.TOR,
+                "Tor status changed",
+            )
+
+            return
+
+        self.event_service.info(
+            ApplicationEventSource.TOR,
+            "Tor status updated",
         )

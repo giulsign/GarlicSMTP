@@ -69,6 +69,12 @@ from garlicsmtp.application.tor_status_provider import (
 from garlicsmtp.application.event_hub import (
     ApplicationEventHub,
 )
+from garlicsmtp.application.event_log import (
+    ApplicationEventLog,
+)
+from garlicsmtp.application.event_service import (
+    ApplicationEventService,
+)
 
 
 class ApplicationBuilder:
@@ -117,6 +123,13 @@ class ApplicationBuilder:
         logger = self._build_logger()
         event_hub = self._build_event_hub()
 
+        event_log = self._build_event_log()
+
+        event_service = self._build_event_service(
+            event_log=event_log,
+            event_hub=event_hub,
+        )
+
         store = self._build_store()
         queue = self._build_queue()
 
@@ -156,6 +169,7 @@ class ApplicationBuilder:
         tor_monitor = self._build_tor_monitor(
             provider=tor_status_provider,
             event_hub=event_hub,
+            event_service=event_service,
         )
 
         runtime = self._build_runtime(
@@ -170,6 +184,8 @@ class ApplicationBuilder:
             settings=settings,
             logger=logger,
             event_hub=event_hub,
+            event_log=event_log,
+            event_service=event_service,
             store=store,
             queue=queue,
             transport=transport,
@@ -350,10 +366,12 @@ class ApplicationBuilder:
         *,
         provider: TorStatusProvider,
         event_hub: ApplicationEventHub,
+        event_service: ApplicationEventService,
     ) -> TorMonitorService:
         return TorMonitorService(
             provider=provider,
             event_hub=event_hub,
+            event_service=event_service,
             interval_seconds=10.0,
         )
 
@@ -361,3 +379,22 @@ class ApplicationBuilder:
     def _build_event_hub(
     ) -> ApplicationEventHub:
         return ApplicationEventHub()
+
+    @staticmethod
+    def _build_event_log(
+    ) -> ApplicationEventLog:
+        return ApplicationEventLog(
+            capacity=500
+        )
+
+
+    @staticmethod
+    def _build_event_service(
+        *,
+        event_log: ApplicationEventLog,
+        event_hub: ApplicationEventHub,
+    ) -> ApplicationEventService:
+        return ApplicationEventService(
+            event_log=event_log,
+            event_hub=event_hub,
+        )

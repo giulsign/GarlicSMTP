@@ -74,6 +74,10 @@ def make_application_status(
     pending_messages: int = 0,
     mailboxes: tuple[str, ...] = (),
     tor: TorStatus | None = None,
+    smtp_host: str = "127.0.0.1",
+    smtp_port: int = 2525,
+    imap_host: str = "127.0.0.1",
+    imap_port: int = 1143,
 ) -> ApplicationStatus:
     return ApplicationStatus(
         runtime_state=runtime_state,
@@ -101,4 +105,8 @@ def make_application_status(
             if tor is not None
             else make_tor_status()
         ),
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        imap_host=imap_host,
+        imap_port=imap_port,
     )

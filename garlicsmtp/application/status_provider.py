@@ -30,6 +30,18 @@ class ApplicationStatusProvider:
             queue_worker_running=(
                 self.context.queue_worker.running
             ),
+            smtp_host=(
+                self.context.settings.smtp.host
+            ),
+            smtp_port=(
+                self.context.settings.smtp.port
+            ),
+            imap_host=(
+                self.context.settings.imap.host
+            ),
+            imap_port=(
+                self.context.settings.imap.port
+            ),
             smtp_connections=(
                 self.context.smtp_server
                 .active_connections
