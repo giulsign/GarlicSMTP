@@ -10,10 +10,18 @@ from garlicsmtp.gui.sections.tor_section import (
 from garlicsmtp.gui.sections.activity_section import (
     ActivitySection,
 )
+from garlicsmtp.gui.sections.mail_metrics_section import (
+    MailMetricsSection,
+)
+from garlicsmtp.gui.sections.mailbox_list_section import (
+    MailboxListSection,
+)
 
 __all__ = [
     "ApplicationSection",
     "ServicesSection",
     "TorSection",
     "ActivitySection",
+    "MailMetricsSection",
+    "MailboxListSection",
 ]

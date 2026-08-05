@@ -12,6 +12,9 @@ from garlicsmtp.core.engine.state import (
 from garlicsmtp.application.activity import (
     ApplicationActivityFormatter,
 )
+from garlicsmtp.application.mailbox_view_model import (
+    MailboxItemViewModel,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -603,3 +606,52 @@ class ApplicationViewModel:
         return len(
             self.activity_entries
         )
+
+    @property
+    def mailbox_items(
+        self,
+    ) -> tuple[
+        MailboxItemViewModel,
+        ...
+    ]:
+        summaries = (
+            self._status.mailbox_summaries
+        )
+
+        if not summaries:
+            return tuple(
+                MailboxItemViewModel(
+                    address=address,
+                    message_count=0,
+                )
+                for address in self._status.mailboxes
+            )
+
+        return tuple(
+            MailboxItemViewModel.from_summary(
+                summary
+            )
+            for summary in summaries
+        )
+
+
+    @property
+    def stored_message_count(
+        self,
+    ) -> int:
+        return (
+            self._status
+            .total_stored_messages
+        )
+
+
+    @property
+    def stored_message_count_text(
+        self,
+    ) -> str:
+        count = self.stored_message_count
+
+        if count == 1:
+            return "1 stored message"
+
+        return f"{count} stored messages"

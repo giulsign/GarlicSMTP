@@ -22,12 +22,30 @@ from garlicsmtp.application import (
 )
 from garlicsmtp.gui.dashboard_widgets import (
     DashboardCard,
-    MetricValue,
     StatusBadge,
 )
 from garlicsmtp.gui.sections import (
     ActivitySection,
     ApplicationSection,
+    ServicesSection,
+    TorSection,
+)
+from garlicsmtp.gui.sections import (
+    ActivitySection,
+    ApplicationSection,
+    MailMetricsSection,
+    ServicesSection,
+    TorSection,
+)
+from garlicsmtp.gui.dashboard_widgets import (
+    DashboardCard,
+    StatusBadge,
+)
+from garlicsmtp.gui.sections import (
+    ActivitySection,
+    ApplicationSection,
+    MailboxListSection,
+    MailMetricsSection,
     ServicesSection,
     TorSection,
 )
@@ -126,13 +144,13 @@ class MainWindow(QMainWindow):
         self._add_dashboard_sections()
 
         self.dashboard_layout.addWidget(
-            self._build_mail_card(),
+            self.mail_metrics_section,
             3,
             0,
         )
 
         self.dashboard_layout.addWidget(
-            self._build_mailbox_card(),
+            self.mailbox_section,
             3,
             1,
         )
@@ -166,6 +184,12 @@ class MainWindow(QMainWindow):
     def _build_dashboard_sections(
         self,
     ) -> None:
+        self.mailbox_section = (
+            MailboxListSection(
+                view_model=self.view_model,
+            )
+        )
+        
         self.application_section = (
             ApplicationSection(
                 view_model=self.view_model,
@@ -184,6 +208,12 @@ class MainWindow(QMainWindow):
 
         self.activity_section = (
             ActivitySection(
+                view_model=self.view_model,
+            )
+        )
+
+        self.mail_metrics_section = (
+            MailMetricsSection(
                 view_model=self.view_model,
             )
         )
@@ -224,6 +254,10 @@ class MainWindow(QMainWindow):
     def _install_compatibility_aliases(
         self,
     ) -> None:
+        self.mailbox_list = (
+            self.mailbox_section.mailbox_list
+        )
+        
         self.runtime_value = (
             self.application_section
             .runtime_value
@@ -319,6 +353,46 @@ class MainWindow(QMainWindow):
             .clear_button
         )
 
+        self.queue_metric = (
+            self.mail_metrics_section
+            .queue_metric
+        )
+
+        self.mailbox_metric = (
+            self.mail_metrics_section
+            .mailbox_metric
+        )
+
+        self.smtp_connections_metric = (
+            self.mail_metrics_section
+            .smtp_connections_metric
+        )
+
+        self.imap_connections_metric = (
+            self.mail_metrics_section
+            .imap_connections_metric
+        )
+
+        self.queue_value = (
+            self.mail_metrics_section
+            .queue_value
+        )
+
+        self.mailbox_count_value = (
+            self.mail_metrics_section
+            .mailbox_count_value
+        )
+
+        self.smtp_connections_value = (
+            self.mail_metrics_section
+            .smtp_connections_value
+        )
+
+        self.imap_connections_value = (
+            self.mail_metrics_section
+            .imap_connections_value
+        )
+
     def _build_header(
         self,
     ) -> QWidget:
@@ -391,114 +465,6 @@ class MainWindow(QMainWindow):
         )
 
         return widget
-
-    def _build_mail_card(
-        self,
-    ) -> DashboardCard:
-        card = DashboardCard(
-            "Mail activity"
-        )
-
-        self.queue_metric = MetricValue(
-            "Queue"
-        )
-
-        self.mailbox_metric = MetricValue(
-            "Mailboxes"
-        )
-
-        self.smtp_connections_metric = (
-            MetricValue(
-                "SMTP connections"
-            )
-        )
-
-        self.imap_connections_metric = (
-            MetricValue(
-                "IMAP connections"
-            )
-        )
-
-        # Alias temporanei per i test esistenti.
-        self.queue_value = (
-            self.queue_metric.value_label
-        )
-
-        self.mailbox_count_value = (
-            self.mailbox_metric.value_label
-        )
-
-        self.smtp_connections_value = (
-            self.smtp_connections_metric
-            .value_label
-        )
-
-        self.imap_connections_value = (
-            self.imap_connections_metric
-            .value_label
-        )
-
-        metrics = QWidget()
-
-        layout = QGridLayout(
-            metrics
-        )
-
-        layout.setContentsMargins(
-            0,
-            0,
-            0,
-            0,
-        )
-
-        layout.addWidget(
-            self.queue_metric,
-            0,
-            0,
-        )
-
-        layout.addWidget(
-            self.mailbox_metric,
-            0,
-            1,
-        )
-
-        layout.addWidget(
-            self.smtp_connections_metric,
-            1,
-            0,
-        )
-
-        layout.addWidget(
-            self.imap_connections_metric,
-            1,
-            1,
-        )
-
-        card.add_widget(
-            metrics
-        )
-
-        return card
-
-    def _build_mailbox_card(
-        self,
-    ) -> DashboardCard:
-        card = DashboardCard(
-            "Mailboxes"
-        )
-
-        self.mailbox_list = QListWidget()
-
-        self.mailbox_list.setMinimumHeight(
-            160
-        )
-
-        card.add_widget(
-            self.mailbox_list
-        )
-
-        return card
 
     def _build_action_layout(
         self,
@@ -612,8 +578,9 @@ class MainWindow(QMainWindow):
             self.services_section,
             self.tor_section,
             self.activity_section,
+            self.mail_metrics_section,
+            self.mailbox_section,
         )
-
         for section in sections:
             section.refresh_view()
 
@@ -628,34 +595,6 @@ class MainWindow(QMainWindow):
                 self.view_model
                 .runtime_status_key
             ),
-        )
-
-        self.queue_metric.setText(
-            self.view_model
-            .pending_messages_text
-        )
-
-        self.mailbox_metric.setText(
-            self.view_model
-            .mailbox_count_text
-        )
-
-        self.smtp_connections_metric.setText(
-            self.view_model
-            .smtp_connections_text
-        )
-
-        self.imap_connections_metric.setText(
-            self.view_model
-            .imap_connections_text
-        )
-
-        self.mailbox_list.clear()
-
-        self.mailbox_list.addItems(
-            list(
-                self.view_model.mailbox_names
-            )
         )
 
         self.start_button.setEnabled(
@@ -684,3 +623,19 @@ class MainWindow(QMainWindow):
         self.view_model.close()
 
         event.accept()
+
+
+    def _refresh_sections(
+        self,
+    ) -> None:
+        sections = (
+            self.application_section,
+            self.services_section,
+            self.tor_section,
+            self.activity_section,
+            self.mail_metrics_section,
+            self.mailbox_section,
+        )
+
+        for section in sections:
+            section.refresh_view()

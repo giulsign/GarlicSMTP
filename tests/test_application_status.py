@@ -127,3 +127,37 @@ def test_application_status_is_a_fresh_snapshot(
 
     context.queue.backend.close()
     context.store.backend.close()
+
+
+def test_status_provider_builds_mailbox_summaries(
+    context,
+    message,
+):
+    mailbox = "alice@test.onion"
+
+    message.envelope.recipients = [
+        mailbox
+    ]
+
+    context.store.store(
+        mailbox,
+        message,
+    )
+
+    status = (
+        ApplicationStatusProvider(
+            context
+        )
+        .snapshot()
+    )
+
+    assert len(
+        status.mailbox_summaries
+    ) == 1
+
+    summary = (
+        status.mailbox_summaries[0]
+    )
+
+    assert summary.address == mailbox
+    assert summary.message_count == 1

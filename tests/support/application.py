@@ -1,3 +1,6 @@
+from garlicsmtp.application.mailbox_summary import (
+    MailboxSummary,
+)
 from garlicsmtp.application.status import (
     ApplicationStatus,
 )
@@ -69,16 +72,32 @@ def make_application_status(
     smtp_running: bool = False,
     imap_running: bool = False,
     queue_worker_running: bool = False,
-    smtp_connections: int = 0,
-    imap_connections: int = 0,
-    pending_messages: int = 0,
-    mailboxes: tuple[str, ...] = (),
-    tor: TorStatus | None = None,
     smtp_host: str = "127.0.0.1",
     smtp_port: int = 2525,
     imap_host: str = "127.0.0.1",
     imap_port: int = 1143,
+    smtp_connections: int = 0,
+    imap_connections: int = 0,
+    pending_messages: int = 0,
+    mailboxes: tuple[str, ...] = (),
+    mailbox_summaries: tuple[
+        MailboxSummary,
+        ...
+    ] | None = None,
+    tor: TorStatus | None = None,
 ) -> ApplicationStatus:
+    resolved_mailbox_summaries = (
+        mailbox_summaries
+        if mailbox_summaries is not None
+        else tuple(
+            MailboxSummary(
+                address=address,
+                message_count=0,
+            )
+            for address in mailboxes
+        )
+    )
+
     return ApplicationStatus(
         runtime_state=runtime_state,
         smtp_running=smtp_running,
@@ -86,6 +105,10 @@ def make_application_status(
         queue_worker_running=(
             queue_worker_running
         ),
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        imap_host=imap_host,
+        imap_port=imap_port,
         smtp_connections=(
             smtp_connections
         ),
@@ -105,8 +128,7 @@ def make_application_status(
             if tor is not None
             else make_tor_status()
         ),
-        smtp_host=smtp_host,
-        smtp_port=smtp_port,
-        imap_host=imap_host,
-        imap_port=imap_port,
+        mailbox_summaries=(
+            resolved_mailbox_summaries
+        ),
     )

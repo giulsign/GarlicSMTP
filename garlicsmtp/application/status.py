@@ -6,6 +6,9 @@ from garlicsmtp.core.engine.state import (
 from garlicsmtp.application.tor_status import (
     TorStatus,
 )
+from garlicsmtp.application.mailbox_summary import (
+    MailboxSummary,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -34,6 +37,10 @@ class ApplicationStatus:
     local_domain: str
 
     tor: TorStatus  
+    mailbox_summaries: tuple[
+        MailboxSummary,
+        ...
+    ] = ()
 
     @property
     def mailbox_count(
@@ -50,4 +57,13 @@ class ApplicationStatus:
         return (
             self.runtime_state
             is RuntimeState.RUNNING
+        )
+
+    @property
+    def total_stored_messages(
+        self,
+    ) -> int:
+        return sum(
+            mailbox.message_count
+            for mailbox in self.mailbox_summaries
         )

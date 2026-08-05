@@ -4,6 +4,9 @@ from garlicsmtp.application.context import (
 from garlicsmtp.application.status import (
     ApplicationStatus,
 )
+from garlicsmtp.application.mailbox_summary import (
+    MailboxSummary,
+)
 
 
 class ApplicationStatusProvider:
@@ -17,6 +20,22 @@ class ApplicationStatusProvider:
     def snapshot(
         self,
     ) -> ApplicationStatus:
+        mailboxes = tuple(
+            self.context.store.list_mailboxes()
+        )
+
+        mailbox_summaries = tuple(
+            MailboxSummary(
+                address=mailbox,
+                message_count=len(
+                    self.context.store.list_messages(
+                        mailbox
+                    )
+                ),
+            )
+            for mailbox in mailboxes
+        )
+
         return ApplicationStatus(
             runtime_state=(
                 self.context.runtime.state
@@ -53,9 +72,7 @@ class ApplicationStatusProvider:
             pending_messages=(
                 self.context.queue.size()
             ),
-            mailboxes=tuple(
-                self.context.store.list_mailboxes()
-            ),
+            mailboxes=mailboxes,
             hostname=(
                 self.context.settings.hostname
             ),
@@ -63,4 +80,7 @@ class ApplicationStatusProvider:
                 self.context.settings.local_domain
             ),
             tor=self.context.tor_monitor.status,
+            mailbox_summaries=(
+                mailbox_summaries
+            ),
         )

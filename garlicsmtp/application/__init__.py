@@ -44,6 +44,12 @@ from garlicsmtp.application.activity import (
     ApplicationActivityEntry,
     ApplicationActivityFormatter,
 )
+from garlicsmtp.application.mailbox_summary import (
+    MailboxSummary,
+)
+from garlicsmtp.application.mailbox_view_model import (
+    MailboxItemViewModel,
+)
 
 __all__ = [
     "ApplicationBuilder",
@@ -64,4 +70,6 @@ __all__ = [
     "ApplicationEventSource",
     "ApplicationActivityEntry",
     "ApplicationActivityFormatter",
+    "MailboxSummary",
+    "MailboxItemViewModel",
 ]
