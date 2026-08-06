@@ -6,6 +6,7 @@ from pathlib import Path
 class ApplicationPaths:
 
     root_dir: Path
+    configuration_file: Path | None = None
 
     @classmethod
     def for_user(
@@ -24,7 +25,42 @@ class ApplicationPaths:
                 / ".local"
                 / "share"
                 / "garlicsmtp"
-            )
+            ),
+        )
+
+    @classmethod
+    def for_development(
+        cls,
+        *,
+        project_root: Path | None = None,
+        home: Path | None = None,
+    ) -> "ApplicationPaths":
+        resolved_project_root = (
+            project_root.resolve()
+            if project_root is not None
+            else cls._discover_project_root()
+        )
+
+        user_paths = cls.for_user(
+            home=home
+        )
+
+        return cls(
+            root_dir=user_paths.root_dir,
+            configuration_file=(
+                resolved_project_root
+                / "config"
+                / "default.toml"
+            ),
+        )
+
+    @staticmethod
+    def _discover_project_root(
+    ) -> Path:
+        return (
+            Path(__file__)
+            .resolve()
+            .parents[2]
         )
 
     @property
@@ -49,6 +85,9 @@ class ApplicationPaths:
 
     @property
     def settings_file(self) -> Path:
+        if self.configuration_file is not None:
+            return self.configuration_file
+
         return self.config_dir / "settings.toml"
 
     @property

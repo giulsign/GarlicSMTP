@@ -146,3 +146,45 @@ def test_application_builder_connects_runtime_services(
 
     context.queue.backend.close()
     context.store.backend.close()
+
+def test_application_builder_uses_development_paths():
+    builder = ApplicationBuilder()
+
+    assert (
+        builder.paths.settings_file.name
+        == "default.toml"
+    )
+
+    assert (
+        builder.paths.settings_file
+        .parent
+        .name
+        == "config"
+    )
+
+    assert (
+        builder.paths.settings_file
+        .exists()
+    )
+
+
+def test_application_builder_preserves_explicit_paths(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    builder = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    )
+
+    assert builder.paths is paths
+
+    assert builder.paths.settings_file == (
+        tmp_path
+        / "garlicsmtp"
+        / "config"
+        / "settings.toml"
+    )

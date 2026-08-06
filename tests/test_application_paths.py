@@ -85,3 +85,51 @@ def test_create_directories_is_idempotent(
     paths.create_directories()
 
     assert paths.root_dir.is_dir()
+
+
+def test_application_paths_for_development(
+    tmp_path,
+):
+    project_root = (
+        tmp_path
+        / "GarlicSMTP"
+    )
+
+    paths = (
+        ApplicationPaths
+        .for_development(
+            project_root=project_root,
+            home=tmp_path / "home",
+        )
+    )
+
+    assert paths.settings_file == (
+        project_root
+        / "config"
+        / "default.toml"
+    )
+
+    assert paths.root_dir == (
+        tmp_path
+        / "home"
+        / ".local"
+        / "share"
+        / "garlicsmtp"
+    )
+
+
+def test_application_paths_for_user_uses_runtime_settings(
+    tmp_path,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path
+    )
+
+    assert paths.settings_file == (
+        tmp_path
+        / ".local"
+        / "share"
+        / "garlicsmtp"
+        / "config"
+        / "settings.toml"
+    )

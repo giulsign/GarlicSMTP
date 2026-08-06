@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
+
 if TYPE_CHECKING:
     from garlicsmtp.core.engine.runtime import (
         Runtime,
@@ -92,7 +93,8 @@ class ApplicationBuilder:
     ) -> None:
         self.paths = (
             paths
-            or ApplicationPaths.for_user()
+            if paths is not None
+            else ApplicationPaths.for_development()
         )
 
         self.configuration_loader = (

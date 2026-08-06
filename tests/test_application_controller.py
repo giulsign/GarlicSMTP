@@ -284,3 +284,26 @@ def test_application_controller_records_restart_event():
     ] == [
         "Application restarted",
     ]
+
+def test_application_controller_runs_runtime_loop():
+    context = build_context()
+
+    controller = ApplicationController(
+        context
+    )
+
+    controller.start()
+
+    assert (
+        controller._runtime_thread
+        is not None
+    )
+
+    assert (
+        controller._runtime_thread
+        .is_alive()
+    )
+
+    controller.stop()
+
+    assert controller._runtime_thread is None

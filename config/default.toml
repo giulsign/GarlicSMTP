@@ -1,32 +1,24 @@
-[general]
-hostname = ""
-daemon = true
-loglevel = "INFO"
-
-[transport]
-backend = "onion"
-
-[tor]
-host = "127.0.0.1"
-port = 9050
-control_port = 9051
-password = ""
+hostname = "garlicsmtp.local"
+local_domain = "garlicsmtp.local"
 
 [smtp]
-listen = "0.0.0.0"
-port = 25
-max_message_size = 52428800
-timeout = 300
+host = "127.0.0.1"
+port = 2525
 
-[queue]
-directory = "./queue"
-retry_interval = 300
-max_retry = 48
+[imap]
+host = "127.0.0.1"
+port = 1143
 
-[logging]
-directory = "./logs"
-file = "garlicsmtp.log"
+[tor]
+enabled = true
+socks_host = "127.0.0.1"
+socks_port = 9050
+onion_smtp_port = 25
 
-[security]
-allow_plain_auth = false
-require_tls = false
+control_enabled = true
+control_host = "127.0.0.1"
+control_port = 9051
+
+require_safecookie = true
+cookie_file = "/run/tor/control.authcookie"
+allow_new_circuits = false

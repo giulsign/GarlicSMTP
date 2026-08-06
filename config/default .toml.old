@@ -1,15 +1,6 @@
-[build-system]
-requires = ["setuptools>=69"]
-build-backend = "setuptools.build_meta"
-
-[project]
-name = "GarlicSMTP"
-version = "0.1.0-alpha"
-description = "SMTP over Tor Onion Services"
-requires-python = ">=3.13"
-
 [general]
-hostname = ""
+hostname = "garlicsmtp.local"
+local_domain = "garlicsmtp.local"
 daemon = true
 loglevel = "INFO"
 
@@ -18,7 +9,6 @@ backend = "onion"
 
 [tor]
 enabled = true
-
 socks_host = "127.0.0.1"
 socks_port = 9050
 
