@@ -4,9 +4,17 @@ os.environ.setdefault(
     "QT_QPA_PLATFORM",
     "offscreen",
 )
-
+from garlicsmtp.models import (
+    Envelope,
+    MailHeaders,
+    MailMessage,
+    Metadata,
+)
 from PySide6.QtWidgets import (
     QApplication,
+)
+from garlicsmtp.storage.entry import (
+    MessageEntry,
 )
 from garlicsmtp.application.view_model import (
     ApplicationViewModel,
@@ -29,8 +37,114 @@ from garlicsmtp.application import (
     ApplicationEventLog,
     ApplicationEventSource,
 )
+from datetime import UTC, datetime
+
+from garlicsmtp.application import (
+    MessageListViewModel,
+    MessageSummary,
+    MessagePreviewViewModel,
+)
+
+class FakePreviewExplorer:
+
+    def list_messages(
+        self,
+        mailbox,
+    ):
+        if mailbox != "bob@test.onion":
+            return ()
+
+        return (
+            MessageSummary(
+                id="message-1",
+                uid=1,
+                sender="alice@test.onion",
+                subject="Preview integration",
+                internal_date=datetime(
+                    2026,
+                    8,
+                    7,
+                    9,
+                    30,
+                    tzinfo=UTC,
+                ),
+                size=128,
+                flags=(),
+            ),
+        )
+
+    def get_message(
+        self,
+        mailbox,
+        message_id,
+    ):
+        if (
+            mailbox != "bob@test.onion"
+            or message_id != "message-1"
+        ):
+            return None
+
+        headers = MailHeaders()
+
+        headers.add(
+            "Subject",
+            "Preview integration",
+        )
+
+        return MessageEntry(
+            id="message-1",
+            mailbox=mailbox,
+            uid=1,
+            message=MailMessage(
+                envelope=Envelope(
+                    sender="alice@test.onion",
+                    recipients=[
+                        "bob@test.onion",
+                    ],
+                ),
+                headers=headers,
+                metadata=Metadata(),
+                body="Preview body",
+            ),
+            internal_date=datetime(
+                2026,
+                8,
+                7,
+                9,
+                30,
+                tzinfo=UTC,
+            ),
+            flags=set(),
+        )
 
 
+class FakeMessageExplorer:
+
+    def list_messages(
+        self,
+        mailbox,
+    ):
+        if mailbox != "bob@test.onion":
+            return ()
+
+        return (
+            MessageSummary(
+                id="message-1",
+                uid=1,
+                sender="alice@test.onion",
+                subject="GarlicSMTP message",
+                internal_date=datetime(
+                    2026,
+                    8,
+                    6,
+                    10,
+                    30,
+                    tzinfo=UTC,
+                ),
+                size=128,
+                flags=(),
+            ),
+        )
 
 class FakeController:
 
@@ -359,5 +473,104 @@ def test_main_window_refreshes_all_sections():
         "tor",
         "activity",
     ]
+
+    window.close()
+
+
+def test_main_window_loads_selected_mailbox_messages():
+    get_application()
+
+    controller = FakeController()
+
+    message_list = MessageListViewModel(
+        FakeMessageExplorer()
+    )
+
+    view_model = ApplicationViewModel(
+        controller,
+        message_list=message_list,
+    )
+
+    window = MainWindow(
+        view_model
+    )
+
+    assert window.mailbox_section.select_mailbox(
+        "bob@test.onion"
+    ) is True
+
+    assert (
+        window.message_list_section
+        .table
+        .rowCount()
+        == 1
+    )
+
+    assert (
+        window.message_list_section
+        .table
+        .item(
+            0,
+            window.message_list_section
+            .COLUMN_SUBJECT,
+        )
+        .text()
+        == "GarlicSMTP message"
+    )
+
+    assert (
+        view_model.message_list
+        .selected_mailbox
+        == "bob@test.onion"
+    )
+
+    window.close()
+
+
+def test_main_window_displays_selected_message_preview():
+    get_application()
+
+    controller = FakeController()
+    explorer = FakePreviewExplorer()
+
+    message_list = MessageListViewModel(
+        explorer
+    )
+
+    message_preview = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model = ApplicationViewModel(
+        controller,
+        message_list=message_list,
+        message_preview=message_preview,
+    )
+
+    window = MainWindow(
+        view_model
+    )
+
+    assert window.mailbox_section.select_mailbox(
+        "bob@test.onion"
+    ) is True
+
+    assert window.message_list_section.select_message(
+        "message-1"
+    ) is True
+
+    assert (
+        window.message_preview_section
+        .subject_value
+        .text()
+        == "Preview integration"
+    )
+
+    assert (
+        window.message_preview_section
+        .body_value
+        .toPlainText()
+        == "Preview body"
+    )
 
     window.close()

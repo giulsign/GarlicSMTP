@@ -1,5 +1,6 @@
 import json
 from dataclasses import asdict
+from datetime import datetime
 
 from garlicsmtp.models import (
     Envelope,
@@ -15,7 +16,13 @@ class MessageSerializer:
     def to_dict(
         message: MailMessage,
     ) -> dict:
-        return asdict(message)
+        data = asdict(message)
+
+        data["metadata"]["received"] = (
+            message.metadata.received.isoformat()
+        )
+
+        return data
 
     @staticmethod
     def to_json(
@@ -31,6 +38,24 @@ class MessageSerializer:
     def from_dict(
         data: dict,
     ) -> MailMessage:
+        metadata_data = dict(
+            data["metadata"]
+        )
+
+        received = metadata_data.get(
+            "received"
+        )
+
+        if isinstance(
+            received,
+            str,
+        ):
+            metadata_data["received"] = (
+                datetime.fromisoformat(
+                    received
+                )
+            )
+
         return MailMessage(
             envelope=Envelope(
                 **data["envelope"]
@@ -39,7 +64,7 @@ class MessageSerializer:
                 **data["headers"]
             ),
             metadata=Metadata(
-                **data["metadata"]
+                **metadata_data
             ),
             body=data["body"],
         )
@@ -51,7 +76,6 @@ class MessageSerializer:
         return MessageSerializer.from_dict(
             json.loads(text)
         )
-    
 
     @staticmethod
     def to_rfc5322(

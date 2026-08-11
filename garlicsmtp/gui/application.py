@@ -12,6 +12,21 @@ from garlicsmtp.application import (
 from garlicsmtp.gui.main_window import (
     MainWindow,
 )
+from garlicsmtp.application import (
+    ApplicationBuilder,
+    ApplicationController,
+    ApplicationViewModel,
+    MessageExplorerService,
+    MessageListViewModel,
+)
+from garlicsmtp.application import (
+    ApplicationBuilder,
+    ApplicationController,
+    ApplicationViewModel,
+    MessageExplorerService,
+    MessageListViewModel,
+    MessagePreviewViewModel,
+)
 
 
 def build_view_model(
@@ -22,8 +37,26 @@ def build_view_model(
         context
     )
 
+    message_explorer = (
+        MessageExplorerService(
+            context.store
+        )
+    )
+
+    message_list = MessageListViewModel(
+        message_explorer
+    )
+
+    message_preview = (
+        MessagePreviewViewModel(
+            message_explorer
+        )
+    )
+
     return ApplicationViewModel(
-        controller
+        controller,
+        message_list=message_list,
+        message_preview=message_preview,
     )
 
 

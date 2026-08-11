@@ -16,6 +16,12 @@ from garlicsmtp.gui.sections.mail_metrics_section import (
 from garlicsmtp.gui.sections.mailbox_list_section import (
     MailboxListSection,
 )
+from garlicsmtp.gui.sections.message_list_section import (
+    MessageListSection,
+)
+from garlicsmtp.gui.sections.message_preview_section import (
+    MessagePreviewSection,
+)
 
 __all__ = [
     "ApplicationSection",
@@ -24,4 +30,6 @@ __all__ = [
     "ActivitySection",
     "MailMetricsSection",
     "MailboxListSection",
+    "MessageListSection",
+    "MessagePreviewSection",
 ]

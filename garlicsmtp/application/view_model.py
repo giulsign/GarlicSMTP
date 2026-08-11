@@ -15,7 +15,23 @@ from garlicsmtp.application.activity import (
 from garlicsmtp.application.mailbox_view_model import (
     MailboxItemViewModel,
 )
+from garlicsmtp.application.message_list_view_model import (
+    MessageListViewModel,
+)
+from garlicsmtp.application.message_preview_view_model import (
+    MessagePreviewViewModel,
+)
 
+class EmptyMessagePreviewExplorer:
+
+    def get_message(
+        self,
+        mailbox: str,
+        message_id: str,
+    ):
+        del mailbox
+        del message_id
+        return None
 
 @dataclass(frozen=True, slots=True)
 class ServiceViewModel:
@@ -47,16 +63,40 @@ class ServiceViewModel:
             ),
         )
 
+class EmptyMessageExplorer:
+
+    def list_messages(
+        self,
+        mailbox: str,
+    ):
+        del mailbox
+        return ()
 
 class ApplicationViewModel:
 
     def __init__(
         self,
-        controller: ApplicationController,
+        controller,
+        message_list: MessageListViewModel | None = None,
+        message_preview: MessagePreviewViewModel | None = None,
     ) -> None:
+        self.message_preview = (
+            message_preview
+            if message_preview is not None
+            else MessagePreviewViewModel(
+                EmptyMessagePreviewExplorer()
+            )
+        )
         self.controller = controller
         self._status = (
             self.controller.status()
+        )
+        self.message_list = (
+            message_list
+            if message_list is not None
+            else MessageListViewModel(
+                EmptyMessageExplorer()
+            )
         )
         self._listeners = []
         self.activity_formatter = (
@@ -78,7 +118,7 @@ class ApplicationViewModel:
     def status(
         self,
     ) -> ApplicationStatus:
-        return self._status
+        return self._status 
 
     def refresh(
         self,
@@ -86,6 +126,16 @@ class ApplicationViewModel:
         self._status = (
             self.controller.status()
         )
+
+        if self.message_preview.message_id is not None:
+            self.message_preview.refresh()
+
+        if (
+            self.message_list
+            .selected_mailbox
+            is not None
+        ):
+            self.message_list.refresh()
 
         return self._status
 
@@ -500,6 +550,16 @@ class ApplicationViewModel:
         self._status = (
             self.controller.status()
         )
+
+        if self.message_preview.message_id is not None:
+            self.message_preview.refresh()
+
+        if (
+            self.message_list
+            .selected_mailbox
+            is not None
+        ):
+            self.message_list.refresh()
 
         for listener in tuple(
             self._listeners

@@ -49,6 +49,25 @@ from garlicsmtp.gui.sections import (
     ServicesSection,
     TorSection,
 )
+from garlicsmtp.gui.sections import (
+    ActivitySection,
+    ApplicationSection,
+    MailboxListSection,
+    MailMetricsSection,
+    MessageListSection,
+    ServicesSection,
+    TorSection,
+)
+from garlicsmtp.gui.sections import (
+    ActivitySection,
+    ApplicationSection,
+    MailboxListSection,
+    MailMetricsSection,
+    MessageListSection,
+    MessagePreviewSection,
+    ServicesSection,
+    TorSection,
+)   
 
 
 class ViewModelEventBridge(QObject):
@@ -184,6 +203,36 @@ class MainWindow(QMainWindow):
     def _build_dashboard_sections(
         self,
     ) -> None:
+        self.message_list_section = (
+            MessageListSection( 
+                view_model=(
+                    self.view_model
+                    .message_list
+                ),
+            )
+        )
+
+        self.message_preview_section = (
+            MessagePreviewSection(
+                view_model=(
+                    self.view_model
+                    .message_preview
+                ),
+            )
+        )
+
+        self.dashboard_layout.addWidget(
+            self.message_list_section,
+            4,
+            0,
+        )
+
+        self.dashboard_layout.addWidget(
+            self.message_preview_section,
+            4,
+            1,
+        )
+        
         self.mailbox_section = (
             MailboxListSection(
                 view_model=self.view_model,
@@ -251,9 +300,21 @@ class MainWindow(QMainWindow):
             2,
         )
 
+        self.dashboard_layout.addWidget(
+            self.message_list_section,
+            4,
+            0,
+            1,
+            2,
+        )
+
     def _install_compatibility_aliases(
         self,
     ) -> None:
+        self.message_table = (
+            self.message_list_section.table
+        )
+        
         self.mailbox_list = (
             self.mailbox_section.mailbox_list
         )
@@ -510,6 +571,11 @@ class MainWindow(QMainWindow):
     def _connect_actions(
         self,
     ) -> None:
+
+        self.message_list_section.message_selected.connect(
+            self._select_message
+        )
+        
         self.start_button.clicked.connect(
             self.start
         )
@@ -524,6 +590,10 @@ class MainWindow(QMainWindow):
 
         self.refresh_button.clicked.connect(
             self.refresh
+        )
+
+        self.mailbox_section.mailbox_selected.connect(
+            self._select_mailbox
         )
 
     def start(
@@ -580,7 +650,10 @@ class MainWindow(QMainWindow):
             self.activity_section,
             self.mail_metrics_section,
             self.mailbox_section,
+            self.message_list_section,
+            self.message_preview_section,
         )
+
         for section in sections:
             section.refresh_view()
 
@@ -639,3 +712,36 @@ class MainWindow(QMainWindow):
 
         for section in sections:
             section.refresh_view()
+
+    def _select_mailbox(
+        self,
+        mailbox: str,
+    ) -> None:
+        self.view_model.message_list.select_mailbox(
+            mailbox
+        )
+
+        self.view_model.message_preview.select_message(
+            mailbox=mailbox,
+            message_id=None,
+        )
+
+        self.message_list_section.refresh_view()
+        self.message_preview_section.refresh_view()
+
+    def _select_message(
+        self,
+        message_id: str,
+    ) -> None:
+        mailbox = (
+            self.view_model
+            .message_list
+            .selected_mailbox
+        )
+
+        self.view_model.message_preview.select_message(
+            mailbox=mailbox,
+            message_id=message_id,
+        )
+
+        self.message_preview_section.refresh_view()

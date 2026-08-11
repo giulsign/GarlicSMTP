@@ -11,7 +11,17 @@ from garlicsmtp.application import (
     ApplicationEventLevel,
     ApplicationEventLog,
     ApplicationEventSource,
+    MessageListViewModel,
 )
+
+class FakeMessageExplorer:
+
+    def list_messages(
+        self,
+        mailbox,
+    ):
+        del mailbox
+        return ()
 
 class FakeApplicationController:
 
@@ -358,3 +368,18 @@ def test_application_view_model_clears_activity():
     assert notifications == [
         "changed",
     ]
+
+
+def test_application_view_model_exposes_message_list():
+    message_list = MessageListViewModel(
+        FakeMessageExplorer()
+    )
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        message_list=message_list,
+    )
+
+    assert view_model.message_list is (
+        message_list
+    )
