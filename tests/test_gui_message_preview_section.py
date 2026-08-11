@@ -273,3 +273,208 @@ def test_message_preview_section_has_complete_header():
     )
 
     section.close()
+
+def test_message_preview_section_separates_header_and_body():
+    get_application()
+
+    view_model = (
+        MessagePreviewViewModel(
+            FakeExplorer()
+        )
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    section = MessagePreviewSection(
+        view_model=view_model
+    )
+
+    assert hasattr(
+        section,
+        "header_widget",
+    )
+
+    assert hasattr(
+        section,
+        "body_value",
+    )
+
+    assert (
+        section.header_widget
+        is not section.body_value
+    )
+
+    details_layout = (
+        section.details_widget.layout()
+    )
+
+    assert (
+        details_layout.itemAt(0).widget()
+        is section.header_widget
+    )
+
+    assert (
+        details_layout.itemAt(1).widget()
+        is section.header_separator
+    )
+
+    assert (
+        details_layout.itemAt(2).widget()
+        is section.body_value
+    )
+
+    assert (
+        section.body_value.isReadOnly()
+        is True
+    )
+
+    section.close()
+
+
+def test_message_preview_section_has_header_separator():
+    get_application()
+
+    view_model = (
+        MessagePreviewViewModel(
+            FakeExplorer()
+        )
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    section = MessagePreviewSection(
+        view_model=view_model
+    )
+
+    assert hasattr(
+        section,
+        "header_separator",
+    )
+
+    details_layout = (
+        section.details_widget.layout()
+    )
+
+    assert (
+        details_layout.itemAt(0).widget()
+        is section.header_widget
+    )
+
+    assert (
+        details_layout.itemAt(1).widget()
+        is section.header_separator
+    )
+
+    assert (
+        details_layout.itemAt(2).widget()
+        is section.body_value
+    )
+
+    section.close()
+
+
+def test_message_preview_section_header_labels_are_identifiable():
+    get_application()
+
+    view_model = (
+        MessagePreviewViewModel(
+            FakeExplorer()
+        )
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    section = MessagePreviewSection(
+        view_model=view_model
+    )
+
+    header_layout = (
+        section.header_widget.layout()
+    )
+
+    expected_labels = [
+        section.sender_value,
+        section.recipients_value,
+        section.subject_value,
+        section.size_value,
+        section.date_value,
+        section.uid_value,
+        section.flags_value,
+    ]
+
+    for value_widget in expected_labels:
+        row = header_layout.getWidgetPosition(
+            value_widget
+        )[0]
+
+        label_widget = (
+            header_layout.itemAt(
+                row,
+                QFormLayout.LabelRole,
+            ).widget()
+        )
+
+        assert label_widget is not None
+        assert label_widget.objectName() == (
+            "message_preview_field_label"
+        )
+
+    section.close()
+
+
+def test_message_preview_section_header_labels_are_bold():
+    get_application()
+
+    view_model = (
+        MessagePreviewViewModel(
+            FakeExplorer()
+        )
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    section = MessagePreviewSection(
+        view_model=view_model
+    )
+
+    header_layout = (
+        section.header_widget.layout()
+    )
+
+    value_widgets = [
+        section.sender_value,
+        section.recipients_value,
+        section.subject_value,
+        section.size_value,
+        section.date_value,
+        section.uid_value,
+        section.flags_value,
+    ]
+
+    for value_widget in value_widgets:
+        row = header_layout.getWidgetPosition(
+            value_widget
+        )[0]
+
+        label_widget = (
+            header_layout.itemAt(
+                row,
+                QFormLayout.LabelRole,
+            ).widget()
+        )
+
+        assert label_widget.font().bold() is True
+
+    section.close()

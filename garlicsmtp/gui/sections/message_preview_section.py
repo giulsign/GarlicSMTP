@@ -12,6 +12,14 @@ from garlicsmtp.application import (
 from garlicsmtp.gui.dashboard_widgets import (
     DashboardCard,
 )
+from PySide6.QtWidgets import (
+    QFormLayout,
+    QFrame,
+    QLabel,
+    QPlainTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
 
 
 class MessagePreviewSection(DashboardCard):
@@ -54,12 +62,12 @@ class MessagePreviewSection(DashboardCard):
             10
         )
 
-        header_widget = QWidget(
+        self.header_widget = QWidget(
             self.details_widget
         )
 
         header_layout = QFormLayout(
-            header_widget
+            self.header_widget
         )
 
         header_layout.setContentsMargins(
@@ -90,38 +98,50 @@ class MessagePreviewSection(DashboardCard):
             )
 
         header_layout.addRow(
-            "From",
+            self._make_field_label("From"),
             self.sender_value,
         )
 
         header_layout.addRow(
-            "To",
+            self._make_field_label("To"),
             self.recipients_value,
         )
 
         header_layout.addRow(
-            "Subject",
+            self._make_field_label("Subject"),
             self.subject_value,
         )
 
         header_layout.addRow(
-            "Size",
+            self._make_field_label("Size"),
             self.size_value,
         )
 
         header_layout.addRow(
-            "Date",
+            self._make_field_label("Date"),
             self.date_value,
         )
 
         header_layout.addRow(
-            "UID",
+            self._make_field_label("UID"),
             self.uid_value,
         )
 
         header_layout.addRow(
-            "Flags",
+            self._make_field_label("Flags"),
             self.flags_value,
+        )
+
+        self.header_separator = QFrame(
+            self.details_widget
+        )
+
+        self.header_separator.setFrameShape(
+            QFrame.Shape.HLine
+        )
+
+        self.header_separator.setFrameShadow(
+            QFrame.Shadow.Sunken
         )
 
         self.body_value = QPlainTextEdit(
@@ -137,7 +157,11 @@ class MessagePreviewSection(DashboardCard):
         )
 
         details_layout.addWidget(
-            header_widget
+            self.header_widget
+        )
+
+        details_layout.addWidget(
+            self.header_separator
         )
 
         details_layout.addWidget(
@@ -217,3 +241,19 @@ class MessagePreviewSection(DashboardCard):
         self.uid_value.clear()
         self.flags_value.clear()
         self.body_value.clear()
+
+    @staticmethod
+    def _make_field_label(
+        text: str,
+    ) -> QLabel:
+        label = QLabel(text)
+
+        label.setObjectName(
+            "message_preview_field_label"
+        )
+
+        font = label.font()
+        font.setBold(True)
+        label.setFont(font)
+
+        return label
