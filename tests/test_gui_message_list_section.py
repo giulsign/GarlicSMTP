@@ -13,6 +13,8 @@ from tests.test_gui_main_window import (
 from garlicsmtp.application import (
     MessageFormatter,
 )
+from PySide6.QtCore import Qt
+from PySide6.QtTest import QTest
 
 
 def make_summary(
@@ -269,6 +271,126 @@ def test_message_list_section_uses_formatter():
             section.COLUMN_SUBJECT,
         ).text()
         == "Formatted subject"
+    )
+
+    section.close()
+
+
+def test_message_list_section_navigates_with_keyboard():
+    section, view_model = build_section()
+
+    selected = []
+
+    section.message_selected.connect(
+        selected.append
+    )
+
+    assert section.select_message(
+        "message-1"
+    ) is True
+
+    section.table.setFocus()
+
+    QTest.keyClick(
+        section.table,
+        Qt.Key.Key_Down,
+    )
+
+    assert (
+        section.selected_message_id
+        == "message-2"
+    )
+
+    assert (
+        view_model.selected_message_id
+        == "message-2"
+    )
+
+    assert selected[-1] == "message-2"
+
+    section.close()
+
+
+def test_message_list_section_has_refresh_button():
+    section, _ = build_section()
+
+    assert hasattr(
+        section,
+        "refresh_button",
+    )
+
+    assert (
+        section.refresh_button.text()
+        == "Refresh"
+    )
+
+    section.close()
+
+
+def test_message_list_section_refresh_button_updates_messages():
+    get_application()
+
+    class MutableExplorer:
+
+        def __init__(
+            self,
+        ):
+            self.messages = (
+                make_summary(
+                    message_id="message-1",
+                    uid=1,
+                    subject="First",
+                ),
+            )
+
+        def list_messages(
+            self,
+            mailbox,
+        ):
+            del mailbox
+            return self.messages
+
+    explorer = MutableExplorer()
+
+    view_model = MessageListViewModel(
+        explorer
+    )
+
+    view_model.select_mailbox(
+        "bob@test.onion"
+    )
+
+    section = MessageListSection(
+        view_model=view_model
+    )
+
+    section.refresh_view()
+
+    assert section.table.rowCount() == 1
+
+    explorer.messages = (
+        make_summary(
+            message_id="message-1",
+            uid=1,
+            subject="First",
+        ),
+        make_summary(
+            message_id="message-2",
+            uid=2,
+            subject="Second",
+        ),
+    )
+
+    section.refresh_button.click()
+
+    assert section.table.rowCount() == 2
+
+    assert (
+        section.table.item(
+            1,
+            section.COLUMN_SUBJECT,
+        ).text()
+        == "Second"
     )
 
     section.close()

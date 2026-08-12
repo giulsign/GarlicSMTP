@@ -429,3 +429,78 @@ def test_message_preview_view_model_formats_size_in_megabytes():
 
     assert view_model.size_text == "2.0 MB"
 
+
+def test_message_preview_view_model_recognizes_html_content():
+    explorer = FakeExplorer()
+
+    entry = make_entry()
+
+    entry.message.headers.add(
+        "Content-Type",
+        "text/html; charset=utf-8",
+    )
+
+    entry.message.body = (
+        "<p>Hello from <strong>GarlicSMTP</strong></p>"
+    )
+
+    explorer.entries[
+        (
+            "bob@test.onion",
+            "message-1",
+        )
+    ] = entry
+
+    view_model = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    assert view_model.content_type == "text/html"
+
+    assert view_model.is_html is True
+
+    assert view_model.body == (
+        "<p>Hello from "
+        "<strong>GarlicSMTP</strong></p>"
+    )
+
+
+def test_message_preview_view_model_exposes_safe_html_fallback():
+    explorer = FakeExplorer()
+
+    entry = make_entry()
+
+    entry.message.headers.add(
+        "Content-Type",
+        "text/html; charset=utf-8",
+    )
+
+    entry.message.body = (
+        "<p>Hello from "
+        "<strong>GarlicSMTP</strong></p>"
+    )
+
+    explorer.entries[
+        (
+            "bob@test.onion",
+            "message-1",
+        )
+    ] = entry
+
+    view_model = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    assert view_model.display_body == (
+        "Hello from GarlicSMTP"
+    )

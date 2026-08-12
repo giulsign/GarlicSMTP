@@ -478,3 +478,58 @@ def test_message_preview_section_header_labels_are_bold():
         assert label_widget.font().bold() is True
 
     section.close()
+
+
+def test_message_preview_section_displays_safe_html_fallback():
+    get_application()
+
+    class HtmlExplorer:
+        def get_message(
+            self,
+            mailbox,
+            message_id,
+        ):
+            if (
+                mailbox == "bob@test.onion"
+                and message_id == "message-1"
+            ):
+                entry = make_entry()
+
+                entry.message.headers.add(
+                    "Content-Type",
+                    "text/html; charset=utf-8",
+                )
+
+                entry.message.body = (
+                    "<p>Hello from "
+                    "<strong>GarlicSMTP</strong></p>"
+                )
+
+                return entry
+
+            return None
+
+    view_model = (
+        MessagePreviewViewModel(
+            HtmlExplorer()
+        )
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    section = MessagePreviewSection(
+        view_model=view_model
+    )
+
+    section.refresh_view()
+
+    assert (
+        section.body_value
+        .toPlainText()
+        == "Hello from GarlicSMTP"
+    )
+
+    section.close()

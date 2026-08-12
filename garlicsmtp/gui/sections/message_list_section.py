@@ -7,6 +7,7 @@ from PySide6.QtWidgets import (
     QHeaderView,
     QTableWidget,
     QTableWidgetItem,
+    QPushButton,
     QWidget,
 )
 
@@ -48,6 +49,16 @@ class MessageListSection(DashboardCard):
             "Messages",
             parent=parent,
         )
+
+        self.refresh_button = QPushButton(
+            "Refresh",
+            self,
+        )
+
+        self.refresh_button.clicked.connect(
+            self._refresh_messages
+        )
+
         self.formatter = (
             formatter
             or MessageFormatter()
@@ -145,6 +156,10 @@ class MessageListSection(DashboardCard):
 
         self.table.currentCellChanged.connect(
             self._on_current_cell_changed
+        )
+
+        self.add_widget(
+            self.refresh_button
         )
 
         self.add_widget(
@@ -448,5 +463,11 @@ class MessageListSection(DashboardCard):
             self.message_selected.emit(
                 message_id
             )
+
+    def _refresh_messages(
+        self,
+    ) -> None:
+        self.view_model.refresh()
+        self.refresh_view()
 
     

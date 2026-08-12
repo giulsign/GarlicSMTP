@@ -92,6 +92,56 @@ class MessageExplorerService:
             entry
         )
 
+    def mark_read(
+        self,
+        mailbox: str,
+        message_id: str,
+    ) -> bool:
+        normalized_mailbox = (
+            self._validate_mailbox(
+                mailbox
+            )
+        )
+
+        normalized_message_id = (
+            self._validate_message_id(
+                message_id
+            )
+        )
+
+        return self.store.add_flags(
+            normalized_mailbox,
+            normalized_message_id,
+            {
+                "\\Seen",
+            },
+        )
+
+    def mark_unread(
+        self,
+        mailbox: str,
+        message_id: str,
+    ) -> bool:
+        normalized_mailbox = (
+            self._validate_mailbox(
+                mailbox
+            )
+        )
+
+        normalized_message_id = (
+            self._validate_message_id(
+                message_id
+            )
+        )
+
+        return self.store.remove_flags(
+            normalized_mailbox,
+            normalized_message_id,
+            {
+                "\\Seen",
+            },
+        )
+
     @classmethod
     def _build_summary(
         cls,

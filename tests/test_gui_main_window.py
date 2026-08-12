@@ -574,3 +574,34 @@ def test_main_window_displays_selected_message_preview():
     )
 
     window.close()
+
+
+def test_main_window_refreshes_message_explorer_sections():
+    get_application()
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController()
+        )
+    )
+
+    calls = []
+
+    window.message_list_section.refresh_view = (
+        lambda: calls.append(
+            "message_list"
+        )
+    )
+
+    window.message_preview_section.refresh_view = (
+        lambda: calls.append(
+            "message_preview"
+        )
+    )
+
+    window.refresh_view()
+
+    assert "message_list" in calls
+    assert "message_preview" in calls
+
+    window.close()

@@ -274,3 +274,66 @@ def test_message_explorer_rejects_empty_message_id():
             "bob@test.onion",
             " ",
         )
+
+
+def test_message_explorer_marks_message_as_read():
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        make_message(),
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    explorer.mark_read(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    restored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert restored is not None
+    assert "\\Seen" in restored.flags
+
+
+def test_message_explorer_marks_message_as_unread():
+    store = MessageStore()
+
+    entry = store.append_entry(
+        "bob@test.onion",
+        make_message(),
+        flags={
+            "\\Seen",
+        },
+        internal_date=datetime(
+            2026,
+            8,
+            6,
+            10,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    explorer.mark_unread(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    restored = store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert restored is not None
+    assert "\\Seen" not in restored.flags

@@ -697,22 +697,6 @@ class MainWindow(QMainWindow):
 
         event.accept()
 
-
-    def _refresh_sections(
-        self,
-    ) -> None:
-        sections = (
-            self.application_section,
-            self.services_section,
-            self.tor_section,
-            self.activity_section,
-            self.mail_metrics_section,
-            self.mailbox_section,
-        )
-
-        for section in sections:
-            section.refresh_view()
-
     def _select_mailbox(
         self,
         mailbox: str,

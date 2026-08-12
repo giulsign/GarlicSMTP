@@ -1,6 +1,7 @@
 from garlicsmtp.smtp.headerparser import HeaderParser
 from garlicsmtp.smtp.rfc5322 import RFC5322Parser
 from garlicsmtp.smtp.state import SMTPState
+from garlicsmtp.smtp.mime import MimeDecoder
 
 
 class SMTPEngine:
@@ -25,7 +26,60 @@ class SMTPEngine:
                     value,
                 )
 
-            session.message.body = "\n".join(body_lines)
+            raw_body = "\n".join(
+                body_lines
+            )
+
+            content_type = (
+                session.message.headers.get(
+                    "Content-Type",
+                    "",
+                )
+            )
+
+            encoding = (
+                session.message.headers.get(
+                    "Content-Transfer-Encoding",
+                    "",
+                )
+            )
+
+            body = MimeDecoder.decode(
+                raw_body,
+                encoding,
+            )
+
+            if content_type.lower().startswith(
+                "multipart/alternative"
+            ):
+                boundary = ""
+
+                for parameter in content_type.split(";")[1:]:
+                    name, separator, value = (
+                        parameter.partition("=")
+                    )
+
+                    if (
+                        separator
+                        and name.strip().lower()
+                        == "boundary"
+                    ):
+                        boundary = (
+                            value.strip()
+                            .strip('"')
+                        )
+                        break
+
+                if boundary:
+                    body = (
+                        MimeDecoder
+                        .extract_multipart_alternative(
+                            raw_body,
+                            boundary,
+                        )
+                    )
+
+            session.message.body = body
 
             session.state = SMTPState.WAIT_MAIL
 

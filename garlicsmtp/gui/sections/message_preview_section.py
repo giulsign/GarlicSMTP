@@ -227,7 +227,7 @@ class MessagePreviewSection(DashboardCard):
         )
 
         self.body_value.setPlainText(
-            self.view_model.body
+            self.view_model.display_body
         )
 
     def _clear_fields(

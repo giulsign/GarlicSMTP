@@ -3,12 +3,38 @@ from collections.abc import Callable
 from garlicsmtp.application.message_explorer import (
     MessageExplorerService,
 )
+from html.parser import HTMLParser
 
 
 MessagePreviewListener = Callable[
     [],
     None,
 ]
+
+
+class _HTMLTextExtractor(HTMLParser):
+
+    def __init__(
+        self,
+    ) -> None:
+        super().__init__()
+
+        self.parts: list[str] = []
+
+    def handle_data(
+        self,
+        data: str,
+    ) -> None:
+        self.parts.append(
+            data
+        )
+
+    def text(
+        self,
+    ) -> str:
+        return "".join(
+            self.parts
+        ).strip()
 
 
 class MessagePreviewViewModel:
@@ -216,6 +242,46 @@ class MessagePreviewViewModel:
         )
 
     @property
+    def content_type(
+        self,
+    ) -> str:
+        if self._entry is None:
+            return ""
+
+        content_type = (
+            self._entry
+            .message
+            .headers
+            .get(
+                "Content-Type",
+                ""
+            )
+        )
+
+        if not content_type:
+            return ""
+
+        return (
+            content_type
+            .split(
+                ";",
+                1,
+            )[0]
+            .strip()
+            .lower()
+        )
+
+
+    @property
+    def is_html(
+        self,
+    ) -> bool:
+        return (
+            self.content_type
+            == "text/html"
+        )
+
+    @property
     def placeholder_text(
         self,
     ) -> str:
@@ -373,3 +439,21 @@ class MessagePreviewViewModel:
             return None
 
         return normalized
+
+    @property
+    def display_body(
+        self,
+    ) -> str:
+        if not self.body:
+            return ""
+
+        if not self.is_html:
+            return self.body
+
+        parser = _HTMLTextExtractor()
+
+        parser.feed(
+            self.body
+        )
+
+        return parser.text()
