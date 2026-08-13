@@ -337,3 +337,28 @@ def test_message_explorer_marks_message_as_unread():
 
     assert restored is not None
     assert "\\Seen" not in restored.flags
+
+
+def test_message_explorer_deletes_message():
+    store = MessageStore()
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        make_message(),
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    result = explorer.delete_message(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert result is True
+
+    assert store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    ) is None

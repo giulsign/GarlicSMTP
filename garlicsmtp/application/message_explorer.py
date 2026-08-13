@@ -142,6 +142,28 @@ class MessageExplorerService:
             },
         )
 
+    def delete_message(
+        self,
+        mailbox: str,
+        message_id: str,
+    ) -> bool:
+        normalized_mailbox = (
+            self._validate_mailbox(
+                mailbox
+            )
+        )
+
+        normalized_message_id = (
+            self._validate_message_id(
+                message_id
+            )
+        )
+
+        return self.store.delete_entry(
+            normalized_mailbox,
+            normalized_message_id,
+        )
+
     @classmethod
     def _build_summary(
         cls,

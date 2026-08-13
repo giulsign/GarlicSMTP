@@ -48,6 +48,9 @@ class FakeMessageExplorer:
             ),
             "empty@test.onion": (),
         }
+        self.mark_read_calls = []
+        self.mark_unread_calls = []
+        self.delete_calls = []
 
         self.calls = []
 
@@ -63,6 +66,59 @@ class FakeMessageExplorer:
             mailbox,
             (),
         )
+
+    def mark_read(
+        self,
+        mailbox: str,
+        message_id: str,
+    ):
+        self.mark_read_calls.append(
+            (
+                mailbox,
+                message_id,
+            )
+        )
+
+        return True
+
+    def mark_unread(
+        self,
+        mailbox: str,
+        message_id: str,
+    ):
+        self.mark_unread_calls.append(
+            (
+                mailbox,
+                message_id,
+            )
+        )
+
+        return True
+
+    def delete_message(
+        self,
+        mailbox: str,
+        message_id: str,
+    ):
+        self.delete_calls.append(
+            (
+                mailbox,
+                message_id,
+            )
+        )
+
+        messages = self.mailboxes.get(
+            mailbox,
+            (),
+        )
+
+        self.mailboxes[mailbox] = tuple(
+            message
+            for message in messages
+            if message.id != message_id
+        )
+
+        return True
 
 
 
@@ -280,4 +336,103 @@ def test_message_list_view_model_notifies_listeners():
     assert notifications == [
         "changed",
         "changed",
+    ]
+
+
+def test_message_list_view_model_marks_selected_message_as_read():
+    explorer = FakeMessageExplorer()
+
+    view_model = MessageListViewModel(
+        explorer
+    )
+
+    view_model.select_mailbox(
+        "alice@test.onion"
+    )
+
+    view_model.select_message(
+        "message-1"
+    )
+
+    result = (
+        view_model.mark_selected_read()
+    )
+
+    assert result is True
+
+    assert explorer.mark_read_calls == [
+        (
+            "alice@test.onion",
+            "message-1",
+        ),
+    ]
+
+
+def test_message_list_view_model_marks_selected_message_as_unread():
+    explorer = FakeMessageExplorer()
+
+    view_model = MessageListViewModel(
+        explorer
+    )
+
+    view_model.select_mailbox(
+        "alice@test.onion"
+    )
+
+    view_model.select_message(
+        "message-2"
+    )
+
+    result = (
+        view_model.mark_selected_unread()
+    )
+
+    assert result is True
+
+    assert explorer.mark_unread_calls == [
+        (
+            "alice@test.onion",
+            "message-2",
+        ),
+    ]
+
+
+def test_message_list_view_model_deletes_selected_message():
+    explorer = FakeMessageExplorer()
+
+    view_model = MessageListViewModel(
+        explorer
+    )
+
+    view_model.select_mailbox(
+        "alice@test.onion"
+    )
+
+    view_model.select_message(
+        "message-1"
+    )
+
+    result = (
+        view_model.delete_selected()
+    )
+
+    assert result is True
+
+    assert explorer.delete_calls == [
+        (
+            "alice@test.onion",
+            "message-1",
+        ),
+    ]
+
+    assert (
+        view_model.selected_message_id
+        is None
+    )
+
+    assert [
+        message.id
+        for message in view_model.messages
+    ] == [
+        "message-2",
     ]

@@ -15,7 +15,9 @@ from garlicsmtp.application import (
 )
 from PySide6.QtCore import Qt
 from PySide6.QtTest import QTest
-
+from PySide6.QtWidgets import (
+    QMessageBox,
+)
 
 def make_summary(
     *,
@@ -392,5 +394,167 @@ def test_message_list_section_refresh_button_updates_messages():
         ).text()
         == "Second"
     )
+
+    section.close()
+
+
+def test_message_list_section_has_mark_read_button():
+    section, _ = build_section()
+
+    assert hasattr(
+        section,
+        "mark_read_button",
+    )
+
+    assert (
+        section.mark_read_button.text()
+        == "Mark read"
+    )
+
+    section.close()
+
+
+def test_message_list_section_mark_read_button_marks_selected_message():
+    section, view_model = build_section()
+
+    section.select_message(
+        "message-1"
+    )
+
+    calls = []
+
+    view_model.mark_selected_read = (
+        lambda: calls.append(
+            "mark_read"
+        ) or True
+    )
+
+    section.mark_read_button.click()
+
+    assert calls == [
+        "mark_read",
+    ]
+
+    section.close()
+
+
+def test_message_list_section_has_mark_unread_button():
+    section, _ = build_section()
+
+    assert hasattr(
+        section,
+        "mark_unread_button",
+    )
+
+    assert (
+        section.mark_unread_button.text()
+        == "Mark unread"
+    )
+
+    section.close()
+
+
+def test_message_list_section_mark_unread_button_marks_selected_message():
+    section, view_model = build_section()
+
+    section.select_message(
+        "message-2"
+    )
+
+    calls = []
+
+    view_model.mark_selected_unread = (
+        lambda: calls.append(
+            "mark_unread"
+        ) or True
+    )
+
+    section.mark_unread_button.click()
+
+    assert calls == [
+        "mark_unread",
+    ]
+
+    section.close()
+
+
+def test_message_list_section_has_delete_button():
+    section, _ = build_section()
+
+    assert hasattr(
+        section,
+        "delete_button",
+    )
+
+    assert (
+        section.delete_button.text()
+        == "Delete"
+    )
+
+    section.close()
+
+
+def test_message_list_section_delete_requires_confirmation(
+    monkeypatch,
+):
+    section, view_model = build_section()
+
+    section.select_message(
+        "message-1"
+    )
+
+    calls = []
+
+    view_model.delete_selected = (
+        lambda: calls.append(
+            "delete"
+        ) or True
+    )
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: (
+            QMessageBox.StandardButton.No
+        ),
+    )
+
+    section.delete_button.click()
+
+    assert calls == []
+
+    section.close()
+
+
+def test_message_list_section_delete_confirms_selected_message(
+    monkeypatch,
+):
+    section, view_model = build_section()
+
+    section.select_message(
+        "message-1"
+    )
+
+    calls = []
+
+    view_model.delete_selected = (
+        lambda: calls.append(
+            "delete"
+        ) or True
+    )
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: (
+            QMessageBox.StandardButton.Yes
+        ),
+    )
+
+    section.delete_button.click()
+
+    assert calls == [
+        "delete",
+    ]
 
     section.close()

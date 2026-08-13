@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QTableWidget,
     QTableWidgetItem,
     QPushButton,
+    QMessageBox,
     QWidget,
 )
 
@@ -28,6 +29,10 @@ from garlicsmtp.application import (
 class MessageListSection(DashboardCard):
 
     message_selected = Signal(
+        str
+    )
+
+    message_deleted = Signal(
         str
     )
 
@@ -57,6 +62,33 @@ class MessageListSection(DashboardCard):
 
         self.refresh_button.clicked.connect(
             self._refresh_messages
+        )
+
+        self.mark_read_button = QPushButton(
+            "Mark read",
+            self,
+        )
+
+        self.mark_read_button.clicked.connect(
+            self._mark_selected_read
+        )
+
+        self.mark_unread_button = QPushButton(
+            "Mark unread",
+            self,
+        )
+
+        self.mark_unread_button.clicked.connect(
+            self._mark_selected_unread
+        )
+
+        self.delete_button = QPushButton(
+            "Delete",
+            self,
+        )
+
+        self.delete_button.clicked.connect(
+            self._delete_selected_message
         )
 
         self.formatter = (
@@ -160,6 +192,18 @@ class MessageListSection(DashboardCard):
 
         self.add_widget(
             self.refresh_button
+        )
+
+        self.add_widget(
+            self.mark_read_button
+        )
+
+        self.add_widget(
+            self.mark_unread_button
+        )
+
+        self.add_widget(
+            self.delete_button
         )
 
         self.add_widget(
@@ -469,5 +513,49 @@ class MessageListSection(DashboardCard):
     ) -> None:
         self.view_model.refresh()
         self.refresh_view()
+
+    def _mark_selected_read(
+        self,
+    ) -> None:
+        if self.view_model.mark_selected_read():
+            self.view_model.refresh()
+            self.refresh_view()
+
+    def _mark_selected_unread(
+        self,
+    ) -> None:
+        if self.view_model.mark_selected_unread():
+            self.view_model.refresh()
+            self.refresh_view()
+
+    def _delete_selected_message(
+        self,
+    ) -> None:
+        message_id = (
+            self.view_model
+            .selected_message_id
+        )
+
+        if message_id is None:
+            return
+
+        answer = QMessageBox.question(
+            self,
+            "Delete message",
+            "Delete the selected message?",
+            QMessageBox.StandardButton.Yes
+            | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+
+        if answer != QMessageBox.StandardButton.Yes:
+            return
+
+        if self.view_model.delete_selected():
+            self.refresh_view()
+
+            self.message_deleted.emit(
+                message_id
+            )
 
     

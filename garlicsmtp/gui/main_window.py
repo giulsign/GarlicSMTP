@@ -596,6 +596,10 @@ class MainWindow(QMainWindow):
             self._select_mailbox
         )
 
+        self.message_list_section.message_deleted.connect(
+            self._message_deleted
+        )
+
     def start(
         self,
     ) -> None:
@@ -726,6 +730,31 @@ class MainWindow(QMainWindow):
         self.view_model.message_preview.select_message(
             mailbox=mailbox,
             message_id=message_id,
+        )
+
+        self.message_preview_section.refresh_view()
+
+    def _message_deleted(
+        self,
+        message_id: str,
+    ) -> None:
+        if (
+            self.view_model
+            .message_preview
+            .message_id
+            != message_id
+        ):
+            return
+
+        mailbox = (
+            self.view_model
+            .message_list
+            .selected_mailbox
+        )
+
+        self.view_model.message_preview.select_message(
+            mailbox=mailbox,
+            message_id=None,
         )
 
         self.message_preview_section.refresh_view()

@@ -283,3 +283,52 @@ class MessageListViewModel:
             return None
 
         return normalized
+
+    def mark_selected_read(
+        self,
+    ) -> bool:
+        if (
+            self._selected_mailbox is None
+            or self._selected_message_id is None
+        ):
+            return False
+
+        return self.explorer.mark_read(
+            self._selected_mailbox,
+            self._selected_message_id,
+        )
+
+    def mark_selected_unread(
+        self,
+    ) -> bool:
+        if (
+            self._selected_mailbox is None
+            or self._selected_message_id is None
+        ):
+            return False
+
+        return self.explorer.mark_unread(
+            self._selected_mailbox,
+            self._selected_message_id,
+        )
+
+    def delete_selected(
+        self,
+    ) -> bool:
+        if (
+            self._selected_mailbox is None
+            or self._selected_message_id is None
+        ):
+            return False
+
+        deleted = self.explorer.delete_message(
+            self._selected_mailbox,
+            self._selected_message_id,
+        )
+
+        if not deleted:
+            return False
+
+        self.refresh()
+
+        return True

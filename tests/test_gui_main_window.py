@@ -44,14 +44,26 @@ from garlicsmtp.application import (
     MessageSummary,
     MessagePreviewViewModel,
 )
+from PySide6.QtWidgets import (
+    QApplication,
+    QMessageBox,
+)
 
 class FakePreviewExplorer:
+
+    def __init__(
+        self,
+    ):
+        self.deleted = set()
 
     def list_messages(
         self,
         mailbox,
     ):
         if mailbox != "bob@test.onion":
+            return ()
+
+        if "message-1" in self.deleted:
             return ()
 
         return (
@@ -82,6 +94,9 @@ class FakePreviewExplorer:
             mailbox != "bob@test.onion"
             or message_id != "message-1"
         ):
+            return None
+
+        if message_id in self.deleted:
             return None
 
         headers = MailHeaders()
@@ -116,6 +131,23 @@ class FakePreviewExplorer:
             ),
             flags=set(),
         )
+
+    def delete_message(
+        self,
+        mailbox,
+        message_id,
+    ):
+        if (
+            mailbox != "bob@test.onion"
+            or message_id != "message-1"
+        ):
+            return False
+
+        self.deleted.add(
+            message_id
+        )
+
+        return True
 
 
 class FakeMessageExplorer:
@@ -603,5 +635,91 @@ def test_main_window_refreshes_message_explorer_sections():
 
     assert "message_list" in calls
     assert "message_preview" in calls
+
+    window.close()
+
+def test_main_window_clears_preview_after_message_delete(
+    monkeypatch,
+):
+    get_application()
+
+    controller = FakeController()
+    explorer = FakePreviewExplorer()
+
+    message_list = MessageListViewModel(
+        explorer
+    )
+
+    message_preview = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model = ApplicationViewModel(
+        controller,
+        message_list=message_list,
+        message_preview=message_preview,
+    )
+
+    window = MainWindow(
+        view_model
+    )
+
+    assert window.mailbox_section.select_mailbox(
+        "bob@test.onion"
+    ) is True
+
+    assert window.message_list_section.select_message(
+        "message-1"
+    ) is True
+
+    assert (
+        window.message_preview_section
+        .subject_value
+        .text()
+        == "Preview integration"
+    )
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        lambda *args, **kwargs: (
+            QMessageBox.StandardButton.Yes
+        ),
+    )
+
+    window.message_list_section.delete_button.click()
+
+    assert (
+        window.message_list_section
+        .table
+        .rowCount()
+        == 0
+    )
+
+    assert (
+        view_model.message_list
+        .selected_message_id
+        is None
+    )
+
+    assert (
+        view_model.message_preview
+        .message_id
+        is None
+    )
+
+    assert (
+        window.message_preview_section
+        .placeholder_value
+        .text()
+        == "Select a message"
+    )
+
+    assert (
+        window.message_preview_section
+        .details_widget
+        .isHidden()
+        is True
+    )
 
     window.close()
