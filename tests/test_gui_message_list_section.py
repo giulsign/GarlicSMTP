@@ -558,3 +558,38 @@ def test_message_list_section_delete_confirms_selected_message(
     ]
 
     section.close()
+
+
+def test_message_list_section_groups_actions_in_toolbar():
+    section, _ = build_section()
+
+    assert hasattr(
+        section,
+        "toolbar_widget",
+    )
+
+    toolbar_layout = (
+        section.toolbar_widget.layout()
+    )
+
+    assert (
+        toolbar_layout.itemAt(0).widget()
+        is section.refresh_button
+    )
+
+    assert (
+        toolbar_layout.itemAt(1).widget()
+        is section.mark_read_button
+    )
+
+    assert (
+        toolbar_layout.itemAt(2).widget()
+        is section.mark_unread_button
+    )
+
+    assert (
+        toolbar_layout.itemAt(3).widget()
+        is section.delete_button
+    )
+
+    section.close()

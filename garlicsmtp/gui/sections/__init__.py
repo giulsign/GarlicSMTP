@@ -22,6 +22,7 @@ from garlicsmtp.gui.sections.message_list_section import (
 from garlicsmtp.gui.sections.message_preview_section import (
     MessagePreviewSection,
 )
+from .compose_section import ComposeSection
 
 __all__ = [
     "ApplicationSection",
@@ -32,4 +33,5 @@ __all__ = [
     "MailboxListSection",
     "MessageListSection",
     "MessagePreviewSection",
+    "ComposeSection"
 ]

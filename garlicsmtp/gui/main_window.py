@@ -220,18 +220,6 @@ class MainWindow(QMainWindow):
                 ),
             )
         )
-
-        self.dashboard_layout.addWidget(
-            self.message_list_section,
-            4,
-            0,
-        )
-
-        self.dashboard_layout.addWidget(
-            self.message_preview_section,
-            4,
-            1,
-        )
         
         self.mailbox_section = (
             MailboxListSection(
@@ -260,6 +248,10 @@ class MainWindow(QMainWindow):
                 view_model=self.view_model,
             )
         )
+
+        """self.activity_section.setMaximumHeight(
+            220
+        )"""
 
         self.mail_metrics_section = (
             MailMetricsSection(
@@ -305,7 +297,15 @@ class MainWindow(QMainWindow):
             4,
             0,
             1,
-            2,
+            1,
+        )
+
+        self.dashboard_layout.addWidget(
+            self.message_preview_section,
+            4,
+            1,
+            1,
+            1,
         )
 
     def _install_compatibility_aliases(

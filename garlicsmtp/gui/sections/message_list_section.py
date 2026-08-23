@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
     QTableWidgetItem,
     QPushButton,
     QMessageBox,
+    QHBoxLayout,
     QWidget,
 )
 
@@ -144,6 +145,44 @@ class MessageListSection(DashboardCard):
             False
         )
 
+        self.toolbar_widget = QWidget(
+            self
+        )
+
+        toolbar_layout = QHBoxLayout(
+            self.toolbar_widget
+        )
+
+        toolbar_layout.setContentsMargins(
+            0,
+            0,
+            0,
+            0,
+        )
+
+        toolbar_layout.setSpacing(
+            8
+        )
+
+        
+        toolbar_layout.addWidget(
+            self.refresh_button
+        )
+
+        toolbar_layout.addWidget(
+            self.mark_read_button
+        )
+
+        toolbar_layout.addWidget(
+            self.mark_unread_button
+        )
+
+        toolbar_layout.addWidget(
+            self.delete_button
+        )
+
+        toolbar_layout.addStretch()
+
         header = self.table.horizontalHeader()
 
         header.setSectionResizeMode(
@@ -191,24 +230,13 @@ class MessageListSection(DashboardCard):
         )
 
         self.add_widget(
-            self.refresh_button
-        )
-
-        self.add_widget(
-            self.mark_read_button
-        )
-
-        self.add_widget(
-            self.mark_unread_button
-        )
-
-        self.add_widget(
-            self.delete_button
+            self.toolbar_widget
         )
 
         self.add_widget(
             self.table
         )
+
 
     @property
     def selected_message_id(

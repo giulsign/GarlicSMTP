@@ -723,3 +723,69 @@ def test_main_window_clears_preview_after_message_delete(
     )
 
     window.close()
+
+
+def test_main_window_places_message_list_and_preview_side_by_side():
+    get_application()
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController()
+        )
+    )
+
+    list_index = (
+        window.dashboard_layout.indexOf(
+            window.message_list_section
+        )
+    )
+
+    preview_index = (
+        window.dashboard_layout.indexOf(
+            window.message_preview_section
+        )
+    )
+
+    (
+        list_row,
+        list_column,
+        list_row_span,
+        list_column_span,
+    ) = window.dashboard_layout.getItemPosition(
+        list_index
+    )
+
+    (
+        preview_row,
+        preview_column,
+        preview_row_span,
+        preview_column_span,
+    ) = window.dashboard_layout.getItemPosition(
+        preview_index
+    )
+
+    assert (
+        list_row,
+        list_column,
+        list_row_span,
+        list_column_span,
+    ) == (
+        4,
+        0,
+        1,
+        1,
+    )
+
+    assert (
+        preview_row,
+        preview_column,
+        preview_row_span,
+        preview_column_span,
+    ) == (
+        4,
+        1,
+        1,
+        1,
+    )
+
+    window.close()
