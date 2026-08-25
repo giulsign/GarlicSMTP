@@ -1,0 +1,58 @@
+GarlicSMTP
+===========
+
+Copyright © 2026 Giuliano Signorelli
+GarlicSMTP Project
+
+GarlicSMTP is source-available software licensed under the
+PolyForm Noncommercial License 1.0.0.
+
+The authoritative license terms are contained in the LICENSE
+file distributed with this software.
+
+NONCOMMERCIAL USE
+-----------------
+
+GarlicSMTP may be used, studied, modified, and distributed only
+as permitted by the PolyForm Noncommercial License 1.0.0.
+
+COMMERCIAL USE
+--------------
+
+The PolyForm Noncommercial License 1.0.0 does not grant a general
+license for commercial use of GarlicSMTP.
+
+Commercial use requires a separate license granted by:
+
+Giuliano Signorelli
+
+Commercial licensing contact:
+giulisign@gmail.com
+
+Commercial licensing requests may also be submitted through the
+official GarlicSMTP repository.
+
+THIRD-PARTY SOFTWARE
+--------------------
+
+GarlicSMTP uses third-party software and libraries.
+
+Those components remain subject to their respective copyright
+notices and license terms. The GarlicSMTP license does not replace,
+modify, restrict, or relicense the licenses applicable to third-party
+software.
+
+See THIRD_PARTY_LICENSES.md for additional information.
+
+TRADEMARKS AND PROJECT NAME
+---------------------------
+
+The copyright license for GarlicSMTP does not itself grant rights
+to trademarks, service marks, logos, or branding associated with
+GarlicSMTP, except where applicable law provides otherwise.
+
+NO WARRANTY
+-----------
+
+GarlicSMTP is provided subject to the warranty and liability terms
+contained in the applicable license.

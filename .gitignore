@@ -36,3 +36,32 @@ dist/
 *.swo
 .DS_Store
 Thumbs.db
+
+# GarlicSMTP runtime directories
+queue/
+logs/
+
+# GarlicSMTP identity / authentication secrets
+onion-service.key
+control.authcookie
+*.authcookie
+*.pem
+*.key
+
+# Environment and local secrets
+.env
+.env.*
+!.env.example
+
+# Backup / temporary files
+*.old
+*.old.*
+*.bak
+*.tmp
+*~
+
+# Additional tooling caches
+.ruff_cache/
+
+# Accidental shell artifacts
+SENDER_ONION=*

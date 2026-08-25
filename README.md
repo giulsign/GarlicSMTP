@@ -1,26 +1,53 @@
 # GarlicSMTP
 
-GarlicSMTP è un Mail Transport Agent (MTA) progettato per consentire la consegna di messaggi SMTP attraverso reti anonime come Tor.
+GarlicSMTP is a privacy-oriented SMTP messaging project designed to
+transport email through Tor Onion Services.
 
-L'obiettivo del progetto è fornire un sistema SMTP completamente indipendente, modulare e installabile automaticamente su sistemi Linux.
+> **Project status:** Alpha software. GarlicSMTP has not undergone an
+> independent professional security audit and must not be considered a
+> guarantee of anonymity, confidentiality, or security.
 
-## Stato del progetto
+## Licensing
 
-Versione attuale:
+GarlicSMTP is source-available software.
 
-v0.1.0-alpha
+The original GarlicSMTP source code is made available under the
+**PolyForm Noncommercial License 1.0.0**.
 
-## Caratteristiche previste
+Noncommercial use, modification, and distribution are permitted only
+as provided by that license.
 
-- Trasporto SMTP tramite Tor
-- Supporto Onion Services v3
-- Logging avanzato
-- Gestione code
-- Retry automatici
-- Installazione automatica
-- Configurazione semplificata
-- Architettura modulare
+Commercial use requires a separate written license from the copyright
+holder.
 
-## Licenza
+Copyright © 2026 Giuliano Signorelli
+GarlicSMTP Project
 
-Da definire.
+Commercial licensing contact: **giulisign@gmail.com**
+
+See:
+
+- `LICENSE`
+- `NOTICE`
+- `COMMERCIAL-LICENSE.md`
+- `THIRD_PARTY_LICENSES.md`
+- `CONTRIBUTING.md`
+- `CLA.md`
+- `SECURITY.md`
+
+GarlicSMTP includes or depends on third-party software. Those components
+remain subject to their respective copyright notices and license terms.
+
+See `THIRD_PARTY_LICENSES.md` for additional information.
+
+## Security
+
+GarlicSMTP handles security-sensitive data and uses Tor Onion Services
+as part of its transport architecture.
+
+Tor can reduce exposure of the network locations of communicating
+endpoints, but it does not provide absolute anonymity and cannot protect
+a compromised endpoint.
+
+See `SECURITY.md` for the project's security policy, threat-model
+limitations, vulnerability reporting procedure, and security guidance.

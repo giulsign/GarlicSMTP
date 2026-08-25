@@ -1,10 +1,7 @@
-mkdir c/GarlicSMTP
-cd GarlicSMTP
-sudo apt install python3.12
-pip install venv
-python3 -m venv .venv
-source .venv/bin/activate
-PySocks>=1.7.1
-PyYAML>=6.0
-dnspython
-sqlite3
+# GarlicSMTP runtime dependencies
+#
+# Third-party components remain subject to their respective
+# upstream licenses. See THIRD_PARTY_LICENSES.md.
+
+dnspython>=2.8,<3
+PySide6>=6.11,<7
