@@ -34,19 +34,19 @@ class MemoryQueueBackend(QueueBackend):
 
 
     def peek(self):
-        if self.empty():
-            return None
+        for item in self.queue:
+            if item.ready():
+                return item
 
-        return self.queue[0]
+        return None
     
     def ack(self, item):
-        if self.empty():
+        try:
+            self.queue.remove(
+                item
+            )
+        except ValueError:
             return False
-
-        if self.queue[0] is not item:
-            return False
-
-        self.queue.popleft()
 
         return True
     

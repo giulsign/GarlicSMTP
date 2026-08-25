@@ -35,6 +35,9 @@ from garlicsmtp.application.event_log import (
 from garlicsmtp.application.event_service import (
     ApplicationEventService,
 )
+from garlicsmtp.tor.onion_service_manager import (
+    OnionServiceManager,
+)
 
 
 @dataclass(slots=True)
@@ -59,5 +62,5 @@ class ApplicationContext:
     queue_worker: QueueWorker
 
     runtime: Runtime
-
+    onion_service: OnionServiceManager | None
     tor_monitor: TorMonitorService

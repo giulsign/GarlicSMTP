@@ -65,6 +65,12 @@ from garlicsmtp.application.message_formatter import (
 from garlicsmtp.application.message_preview_view_model import (
     MessagePreviewViewModel,
 )
+from garlicsmtp.application.mail_composer import (
+    MailComposerService,
+)
+from garlicsmtp.application.compose_view_model import (
+    ComposeViewModel,
+)
 
 __all__ = [
     "ApplicationBuilder",
@@ -92,4 +98,6 @@ __all__ = [
     "MessageListViewModel",
     "MessageFormatter",
     "MessagePreviewViewModel",
+    "MailComposerService",
+    "ComposeViewModel"
 ]

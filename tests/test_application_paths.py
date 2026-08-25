@@ -133,3 +133,19 @@ def test_application_paths_for_user_uses_runtime_settings(
         / "config"
         / "settings.toml"
     )
+
+
+def test_application_paths_exposes_onion_identity_file(
+    tmp_path,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path
+    )
+
+    assert (
+        paths.onion_identity_file
+        == (
+            paths.state_dir
+            / "onion-service.key"
+        )
+    )

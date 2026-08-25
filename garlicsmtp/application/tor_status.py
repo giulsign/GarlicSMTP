@@ -33,6 +33,7 @@ class TorStatus:
     control_listeners: tuple[str, ...] = ()
 
     onion_smtp_port: int = 25
+    onion_hostname: str | None = None
 
     @property
     def socks_endpoint(

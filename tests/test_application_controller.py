@@ -53,6 +53,17 @@ class FakeServer:
     def tick(self):
         pass
 
+class FakeOnionService:
+
+    def __init__(self):
+        self.hostname = None
+
+    def start(self):
+        pass
+
+    def stop(self):
+        pass
+
 class FakeTorMonitor:
 
     def __init__(self):
@@ -132,10 +143,12 @@ def build_context() -> ApplicationContext:
         logger=logger,
     )
     tor_monitor = FakeTorMonitor()
+    onion_service = FakeOnionService()
 
     runtime = Runtime(
         services=[
             smtp_server,
+            onion_service,
             imap_server,
             queue_worker,
             tor_monitor,
@@ -163,6 +176,7 @@ def build_context() -> ApplicationContext:
         smtp_server=smtp_server,
         imap_server=imap_server,
         queue_worker=queue_worker,
+        onion_service=onion_service,
         tor_monitor=tor_monitor,
         runtime=runtime,
     )

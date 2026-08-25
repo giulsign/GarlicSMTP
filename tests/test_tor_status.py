@@ -82,3 +82,36 @@ def test_tor_cookie_path_is_supported():
     assert settings.cookie_file == Path(
         "/run/tor/control.authcookie"
     )
+
+
+def test_tor_status_exposes_onion_hostname():
+    status = TorStatus(
+        enabled=True,
+        socks_host="127.0.0.1",
+        socks_port=9050,
+        socks_available=True,
+        control_enabled=True,
+        control_host="127.0.0.1",
+        control_port=9051,
+        control_available=True,
+        authenticated=True,
+        authentication_method="SAFECOOKIE",
+        version="0.4.8.12",
+        bootstrap_progress=100,
+        bootstrap_summary="Done",
+        built_circuits=1,
+        active_streams=0,
+        new_circuits_allowed=False,
+        new_circuits_available=False,
+        last_error=None,
+        onion_smtp_port=25,
+        onion_hostname=(
+            ("a" * 56)
+            + ".onion"
+        ),
+    )
+
+    assert status.onion_hostname == (
+        ("a" * 56)
+        + ".onion"
+    )

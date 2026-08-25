@@ -30,6 +30,8 @@ def make_tor_status(
     ),
     socks_listeners: tuple[str, ...] = (),
     control_listeners: tuple[str, ...] = (),
+    onion_smtp_port=25,
+    onion_hostname=None,
 ) -> TorStatus:
     return TorStatus(
         enabled=enabled,
@@ -60,6 +62,7 @@ def make_tor_status(
         control_listeners=(
             control_listeners
         ),
+        onion_hostname=onion_hostname,
         onion_smtp_port=25,
     )
 

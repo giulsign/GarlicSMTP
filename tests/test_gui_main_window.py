@@ -48,6 +48,9 @@ from PySide6.QtWidgets import (
     QApplication,
     QMessageBox,
 )
+from garlicsmtp.application.compose_view_model import (
+    ComposeViewModel,
+)
 
 class FakePreviewExplorer:
 
@@ -787,5 +790,79 @@ def test_main_window_places_message_list_and_preview_side_by_side():
         1,
         1,
     )
+
+    window.close()
+
+
+def test_main_window_builds_compose_section():
+    get_application()
+
+    class FakeComposer:
+        def send(
+            self,
+            *,
+            sender,
+            recipient,
+            subject,
+            body,
+        ):
+            del sender
+            del recipient
+            del subject
+            del body
+            return True
+
+    compose = ComposeViewModel(
+        FakeComposer()
+    )
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController(),
+            compose=compose,
+        )
+    )
+
+    assert window.compose_section is not None
+
+    window.close()
+
+
+def test_main_window_refreshes_compose_section():
+    get_application()
+
+    class FakeComposer:
+        def send(
+            self,
+            *,
+            sender,
+            recipient,
+            subject,
+            body,
+        ):
+            return True
+
+    compose = ComposeViewModel(
+        FakeComposer()
+    )
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController(),
+            compose=compose,
+        )
+    )
+
+    calls = []
+
+    window.compose_section.refresh_view = (
+        lambda: calls.append(
+            "compose"
+        )
+    )
+
+    window.refresh_view()
+
+    assert "compose" in calls
 
     window.close()

@@ -24,6 +24,7 @@ from garlicsmtp.tor.control.safecookie import (
     SafeCookieChallenge,
     SafeCookieEngine,
 )
+from dataclasses import dataclass
 
 
 EventListener = Callable[
@@ -31,6 +32,13 @@ EventListener = Callable[
     None,
 ]
 
+@dataclass(
+    frozen=True,
+    slots=True,
+)
+class OnionService:
+    service_id: str
+    private_key: str
 
 class TorControlClient:
 
@@ -349,6 +357,80 @@ class TorControlClient:
             values[keyword] = value
 
         return values
+
+    def add_onion(
+        self,
+        *,
+        key: str,
+        virtual_port: int,
+        target_host: str,
+        target_port: int,
+    ) -> OnionService:
+        self._require_authenticated()
+
+        reply = self._execute_command(
+            (
+                f"ADD_ONION {key} "
+                f"Port={virtual_port},"
+                f"{target_host}:{target_port}"
+            )
+        )
+
+        if not reply.successful:
+            raise TorControlProtocolError(
+                "Tor ADD_ONION command failed "
+                f"with status {reply.status}"
+            )
+
+        service_line = reply.find(
+            "ServiceID"
+        )
+
+        private_key_line = reply.find(
+            "PrivateKey"
+        )
+
+        if service_line is None:
+            raise TorControlProtocolError(
+                "Tor ADD_ONION response "
+                "missing ServiceID"
+            )
+
+        service_id = (
+            service_line.value.strip()
+        )
+
+        if not service_id:
+            raise TorControlProtocolError(
+                "Tor ADD_ONION returned "
+                "an empty ServiceID"
+            )
+
+        if key.startswith("NEW:"):
+            if private_key_line is None:
+                raise TorControlProtocolError(
+                    "Tor ADD_ONION response "
+                    "missing PrivateKey"
+                )
+
+            private_key = (
+                private_key_line.value.strip()
+            )
+
+            if not private_key:
+                raise TorControlProtocolError(
+                    "Tor ADD_ONION returned "
+                    "an empty PrivateKey"
+                )
+
+        else:
+            private_key = key
+
+        return OnionService(
+            service_id=service_id,
+            private_key=private_key,
+        )
+    
 
     def _require_authenticated(
         self,

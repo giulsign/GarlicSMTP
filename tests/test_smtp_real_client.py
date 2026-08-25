@@ -19,12 +19,16 @@ def run_app(app):
     app.start()
     app.run()
 
-def test_smtp_real_client_delivers_to_queue():
+def test_smtp_real_client_delivers_to_queue(tmp_path):
 
     config = GarlicSMTPConfig(
         listen_host="127.0.0.1",
         listen_port=2529,
         hostname="garlicsmtp.local",
+        mailbox_db=str(
+            tmp_path
+            / "mailboxes.db"
+        ),
     )
 
     spy = SpyTransport()

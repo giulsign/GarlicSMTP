@@ -46,19 +46,23 @@ class SQLiteQueueBackend(QueueBackend):
 
     def peek(self):
         with self._lock:
-            row = self.connection.execute(
+            rows = self.connection.execute(
                 """
                 SELECT payload
                 FROM queue_items
                 ORDER BY rowid ASC
-                LIMIT 1
                 """
-            ).fetchone()
+            ).fetchall()
 
-        if row is None:
-            return None
+        for row in rows:
+            item = QueueSerializer.from_json(
+                row[0]
+            )
 
-        return QueueSerializer.from_json(row[0])
+            if item.ready():
+                return item
+
+        return None
 
     def ack(self, item):
         with self._lock:

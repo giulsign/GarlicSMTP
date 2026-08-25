@@ -588,3 +588,82 @@ def test_tor_control_client_rejects_invalid_get_info_key(
         client.get_info(
             key
         )
+
+
+def test_tor_control_client_adds_new_onion_service():
+    service_id = "a" * 56
+
+    connection = FakeConnection(
+        lines=[
+            f"250-ServiceID={service_id}",
+            (
+                "250-PrivateKey="
+                "ED25519-V3:test-private-key"
+            ),
+            "250 OK",
+        ]
+    )
+
+    client = TorControlClient(
+        connection=connection
+    )
+
+    client.connect()
+
+    # Il comando ADD_ONION richiede
+    # una sessione Control autenticata.
+    client._authenticated = True
+
+    result = client.add_onion(
+        key="NEW:ED25519-V3",
+        virtual_port=25,
+        target_host="127.0.0.1",
+        target_port=2525,
+    )
+
+    assert result.service_id == service_id
+
+    assert result.private_key == (
+        "ED25519-V3:test-private-key"
+    )
+
+    assert connection.sent[-1] == (
+        "ADD_ONION NEW:ED25519-V3 "
+        "Port=25,127.0.0.1:2525"
+    )
+
+
+def test_tor_control_client_adds_onion_with_existing_key():
+    service_id = "a" * 56
+
+    connection = FakeConnection(
+        lines=[
+            f"250-ServiceID={service_id}",
+            "250 OK",
+        ]
+    )
+
+    client = TorControlClient(
+        connection=connection
+    )
+
+    client.connect()
+    client._authenticated = True
+
+    existing_key = (
+        "ED25519-V3:"
+        "existing-private-key"
+    )
+
+    result = client.add_onion(
+        key=existing_key,
+        virtual_port=25,
+        target_host="127.0.0.1",
+        target_port=2525,
+    )
+
+    assert result.service_id == service_id
+
+    assert result.private_key == (
+        existing_key
+    )

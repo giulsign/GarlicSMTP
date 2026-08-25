@@ -13,6 +13,7 @@ from tests.test_gui_main_window import (
     FakeController,
     get_application,
 )
+from dataclasses import replace
 
 
 def test_tor_section_displays_status():
@@ -41,6 +42,10 @@ def test_tor_section_displays_status():
                 ),
                 control_listeners=(
                     "127.0.0.1:9051",
+                ), 
+                onion_hostname=(
+                    ("a" * 56)
+                    + ".onion"
                 ),
             )
         )
@@ -97,13 +102,52 @@ def test_tor_section_displays_status():
     )
 
     assert (
-        section.onion_smtp_value.text()
-        == "25"
+    section.onion_smtp_value.text()
+        == (
+            ("a" * 56)
+            + ".onion:25"
+        )
     )
 
     assert (
         section.error_value.text()
         == "None"
+    )
+
+    section.close()
+
+
+def test_tor_section_shows_onion_smtp_address():
+    get_application()
+
+    view_model = ApplicationViewModel(
+        FakeController()
+    )
+
+    view_model._status = replace(
+        view_model.status,
+        tor=replace(
+            view_model.status.tor,
+            onion_hostname=(
+                ("a" * 56)
+                + ".onion"
+            ),
+            onion_smtp_port=25,
+        ),
+    )
+
+    section = TorSection(
+        view_model=view_model
+    )
+
+    section.refresh_view()
+
+    assert (
+        section.onion_smtp_value.text()
+        == (
+            ("a" * 56)
+            + ".onion:25"
+        )
     )
 
     section.close()

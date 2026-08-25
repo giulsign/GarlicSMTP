@@ -110,6 +110,10 @@ class ComposeSection(DashboardCard):
             self._send_message
         )
 
+        self.clear_button.clicked.connect(
+            self._clear_fields
+        )
+
         actions_layout.addWidget(
             self.send_button
         )
@@ -161,3 +165,10 @@ class ComposeSection(DashboardCard):
         self.recipient_input.clear()
         self.subject_input.clear()
         self.body_input.clear() 
+
+    def refresh_view(
+        self,
+    ) -> None:
+        self.sender_input.setText(
+            self.view_model.sender
+        )

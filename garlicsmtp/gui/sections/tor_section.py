@@ -143,7 +143,7 @@ class TorSection(DashboardCard):
 
         self.onion_smtp_value.setText(
             self.view_model
-            .tor_onion_smtp_port_text
+            .tor_onion_smtp_text
         )
 
         self.error_value.setText(

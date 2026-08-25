@@ -1,6 +1,6 @@
 from garlicsmtp.queue.factory import QueueFactory
 from garlicsmtp.queue.sqlite import SQLiteQueueBackend
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import threading
 
 def test_sqlite_queue_persists_items(tmp_path, message):
@@ -126,3 +126,37 @@ def test_sqlite_queue_can_enqueue_from_another_thread(
     assert thread.is_alive() is False
     assert errors == []
     assert backend.size() == 1
+
+
+def test_sqlite_queue_peek_skips_not_ready_item(
+    tmp_path,
+    message,
+):
+    backend = SQLiteQueueBackend(
+        tmp_path / "queue.db"
+    )
+
+    first = QueueFactory.create(
+        message
+    )
+
+    first.next_retry = (
+        datetime.now(UTC)
+        + timedelta(hours=1)
+    )
+
+    second = QueueFactory.create(
+        message
+    )
+
+    second.next_retry = None
+
+    backend.enqueue(first)
+    backend.enqueue(second)
+
+    item = backend.peek()
+
+    assert item is not None
+    assert item.id == second.id
+
+

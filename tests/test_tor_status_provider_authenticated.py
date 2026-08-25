@@ -202,3 +202,29 @@ def test_tor_status_provider_does_not_connect_when_control_disabled():
     assert status.control_enabled is False
     assert status.authenticated is False
     assert calls == []
+
+
+def test_tor_status_provider_exposes_onion_hostname():
+    service_id = "a" * 56
+    onion_hostname = (
+        service_id
+        + ".onion"
+    )
+
+    settings = TorSettings(
+        enabled=True,
+    )
+
+    provider = TorStatusProvider(
+        settings,
+        onion_hostname_provider=(
+            lambda: onion_hostname
+        ),
+    )
+
+    status = provider.initial_status()
+
+    assert (
+        status.onion_hostname
+        == onion_hostname
+    )

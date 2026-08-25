@@ -91,3 +91,46 @@ def test_compose_view_model_clears_after_successful_send():
     assert view_model.recipient == ""
     assert view_model.subject == ""
     assert view_model.body == ""
+
+
+def test_compose_view_model_sets_default_sender():
+    composer = FakeComposer()
+
+    view_model = ComposeViewModel(
+        composer
+    )
+
+    hostname = (
+        ("a" * 56)
+        + ".onion"
+    )
+
+    view_model.set_default_sender(
+        hostname
+    )
+
+    assert view_model.sender == (
+        "garlicsmtp@"
+        + hostname
+    )
+
+
+def test_compose_view_model_does_not_replace_existing_sender():
+    composer = FakeComposer()
+
+    view_model = ComposeViewModel(
+        composer
+    )
+
+    view_model.sender = (
+        "alice@example.onion"
+    )
+
+    view_model.set_default_sender(
+        ("a" * 56)
+        + ".onion"
+    )
+
+    assert view_model.sender == (
+        "alice@example.onion"
+    )

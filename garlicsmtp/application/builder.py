@@ -76,6 +76,14 @@ from garlicsmtp.application.event_log import (
 from garlicsmtp.application.event_service import (
     ApplicationEventService,
 )
+from garlicsmtp.tor.control import (
+    SafeCookieAuthenticator,
+    TorControlClient,
+    TorControlConnection,
+)
+from garlicsmtp.tor.onion_service_manager import (
+    OnionServiceManager,
+)
 
 
 class ApplicationBuilder:
@@ -122,6 +130,11 @@ class ApplicationBuilder:
             )
         )
 
+        local_domains = {
+            settings.local_domain,
+            settings.hostname,
+        }
+
         logger = self._build_logger()
         event_hub = self._build_event_hub()
 
@@ -143,6 +156,7 @@ class ApplicationBuilder:
             settings=settings,
             store=store,
             queue=queue,
+            local_domains=local_domains,
         )
 
         smtp_server = self._build_smtp_server(
@@ -162,9 +176,20 @@ class ApplicationBuilder:
             logger=logger,
         )
 
+        onion_service = None
+
+        if settings.tor.enabled:
+            onion_service = (
+                self._build_onion_service(
+                    settings,
+                    hostname_callback=(local_domains.add),
+                )
+            )
+
         tor_status_provider = (
             self._build_tor_status_provider(
-                settings
+                settings,
+                onion_service=onion_service,
             )
         )
 
@@ -178,6 +203,7 @@ class ApplicationBuilder:
             smtp_server=smtp_server,
             imap_server=imap_server,
             queue_worker=queue_worker,
+            onion_service=onion_service,
             tor_monitor=tor_monitor,
             logger=logger,
         )
@@ -195,6 +221,7 @@ class ApplicationBuilder:
             smtp_server=smtp_server,
             imap_server=imap_server,
             queue_worker=queue_worker,
+            onion_service=onion_service,
             tor_monitor=tor_monitor,
             runtime=runtime,
         )
@@ -254,6 +281,7 @@ class ApplicationBuilder:
         settings: ApplicationSettings,
         store: MessageStore,
         queue: QueueManager,
+        local_domains: set[str],
     ) -> Pipeline:
         queue_stage = QueueStage(
             queue
@@ -269,10 +297,7 @@ class ApplicationBuilder:
             DeliveryStage(
                 store=store,
                 queue_stage=queue_stage,
-                local_domains={
-                    settings.local_domain,
-                    settings.hostname,
-                },
+                local_domains=local_domains,
             )
         )
 
@@ -330,6 +355,7 @@ class ApplicationBuilder:
         smtp_server: SMTPServer,
         imap_server: IMAPServer,
         queue_worker: QueueWorker,
+        onion_service,
         tor_monitor: TorMonitorService,
         logger: Logger,
     ) -> Runtime:
@@ -337,13 +363,25 @@ class ApplicationBuilder:
             Runtime,
         )
 
-        return Runtime(
-            services=[
-                smtp_server,
+        services = [
+            smtp_server,
+        ]
+
+        if onion_service is not None:
+            services.append(
+                onion_service
+            )
+
+        services.extend(
+            [
                 imap_server,
                 queue_worker,
                 tor_monitor,
-            ],
+            ]
+        )
+
+        return Runtime(
+            services=services,
             tasks=[
                 smtp_server,
                 imap_server,
@@ -353,13 +391,58 @@ class ApplicationBuilder:
             logger=logger,
         )
 
+    def _build_onion_service(
+        self,
+        settings: ApplicationSettings,
+        *,
+        hostname_callback=None,
+    ) -> OnionServiceManager:
+        connection = TorControlConnection(
+            host=settings.tor.control_host,
+            port=settings.tor.control_port,
+        )
+
+        client = TorControlClient(
+            connection=connection
+        )
+
+        authenticator = SafeCookieAuthenticator(
+            client=client,
+            configured_cookie_file=(
+                settings.tor.cookie_file
+            ),
+        )
+
+        return OnionServiceManager(
+            client=client,
+            authenticator=authenticator,
+            identity_file=(
+                self.paths.onion_identity_file
+            ),
+            virtual_port=(
+                settings.tor.onion_smtp_port
+            ),
+            target_host=settings.smtp.host,
+            target_port=settings.smtp.port,
+            hostname_callback=hostname_callback,
+        )
+
 
     @staticmethod
     def _build_tor_status_provider(
         settings: ApplicationSettings,
+        *,
+        onion_service=None,
     ) -> TorStatusProvider:
         return TorStatusProvider(
-            settings.tor
+            settings.tor,
+            onion_hostname_provider=(
+                (
+                    lambda: onion_service.hostname
+                )
+                if onion_service is not None
+                else None
+            ),
         )
 
 

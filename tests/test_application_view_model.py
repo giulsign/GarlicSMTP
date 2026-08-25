@@ -13,6 +13,56 @@ from garlicsmtp.application import (
     ApplicationEventSource,
     MessageListViewModel,
 )
+from garlicsmtp.application.compose_view_model import (
+    ComposeViewModel,
+)
+from tests.support.application import (
+    make_application_status,
+    make_tor_status,
+)
+
+class FakeComposer:
+
+    def send(
+        self,
+        *,
+        sender,
+        recipient,
+        subject,
+        body,
+    ):
+        del sender
+        del recipient
+        del subject
+        del body
+
+        return True
+
+class FakeController:
+
+    def __init__(
+        self,
+    ):
+        self.current_status = (
+            make_application_status()
+        )
+
+    def status(
+        self,
+    ):
+        return self.current_status
+
+    def subscribe(
+        self,
+        listener,
+    ):
+        del listener
+
+    def unsubscribe(
+        self,
+        listener,
+    ):
+        del listener
 
 class FakeMessageExplorer:
 
@@ -382,4 +432,32 @@ def test_application_view_model_exposes_message_list():
 
     assert view_model.message_list is (
         message_list
+    )
+
+
+def test_application_view_model_sets_compose_default_sender():
+    controller = FakeController()
+
+    controller.current_status = make_application_status(
+        tor=make_tor_status(
+            onion_hostname=(
+                ("a" * 56)
+                + ".onion"
+            ),
+        )
+    )
+
+    compose = ComposeViewModel(
+        FakeComposer()
+    )
+
+    view_model = ApplicationViewModel(
+        controller,
+        compose=compose,
+    )
+
+    assert compose.sender == (
+        "garlicsmtp@"
+        + ("a" * 56)
+        + ".onion"
     )

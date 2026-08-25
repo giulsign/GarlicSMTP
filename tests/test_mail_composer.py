@@ -1,30 +1,31 @@
+import pytest
+
 from garlicsmtp.application.mail_composer import (
     MailComposerService,
 )
-import pytest
 
 
-class FakeQueue:
+class FakePipeline:
 
     def __init__(self):
-        self.items = []
+        self.contexts = []
 
-    def enqueue(
+    def execute(
         self,
-        item,
+        context,
     ):
-        self.items.append(
-            item
+        self.contexts.append(
+            context
         )
 
-        return True
+        return context
 
 
-def test_mail_composer_queues_message():
-    queue = FakeQueue()
+def test_mail_composer_sends_message_through_pipeline():
+    pipeline = FakePipeline()
 
     composer = MailComposerService(
-        queue
+        pipeline
     )
 
     result = composer.send(
@@ -37,13 +38,11 @@ def test_mail_composer_queues_message():
     assert result is True
 
     assert len(
-        queue.items
+        pipeline.contexts
     ) == 1
 
-    message = (
-        queue.items[0]
-        .message
-    )
+    context = pipeline.contexts[0]
+    message = context.message
 
     assert (
         message.envelope.sender
@@ -72,7 +71,7 @@ def test_mail_composer_queues_message():
 
 def test_mail_composer_rejects_empty_sender():
     composer = MailComposerService(
-        FakeQueue()
+        FakePipeline()
     )
 
     with pytest.raises(
@@ -88,7 +87,7 @@ def test_mail_composer_rejects_empty_sender():
 
 def test_mail_composer_rejects_empty_recipient():
     composer = MailComposerService(
-        FakeQueue()
+        FakePipeline()
     )
 
     with pytest.raises(

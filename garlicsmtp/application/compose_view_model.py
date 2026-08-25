@@ -33,3 +33,20 @@ class ComposeViewModel:
         self.recipient = ""
         self.subject = ""
         self.body = ""
+
+    def set_default_sender(
+        self,
+        hostname: str,
+    ) -> None:
+        if self.sender:
+            return
+
+        hostname = hostname.strip()
+
+        if not hostname:
+            return
+
+        self.sender = (
+            "garlicsmtp@"
+            + hostname
+        )

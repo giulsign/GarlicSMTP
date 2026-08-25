@@ -5,6 +5,9 @@ from garlicsmtp.configuration import (
     ApplicationPaths,
     ApplicationSettings,
 )
+from garlicsmtp.tor.onion_service_manager import (
+    OnionServiceManager,
+)
 
 
 def test_application_builder_creates_context(
@@ -127,6 +130,7 @@ def test_application_builder_connects_runtime_services(
 
     assert context.runtime.services == [
         context.smtp_server,
+        context.onion_service,
         context.imap_server,
         context.queue_worker,
         context.tor_monitor,
@@ -187,4 +191,164 @@ def test_application_builder_preserves_explicit_paths(
         / "garlicsmtp"
         / "config"
         / "settings.toml"
+    )
+
+from garlicsmtp.application.builder import (
+    ApplicationBuilder,
+)
+
+
+class FakeService:
+
+    def __init__(
+        self,
+        name,
+    ):
+        self.name = name
+
+
+def test_application_builder_puts_onion_service_after_smtp():
+    smtp_server = FakeService(
+        "smtp"
+    )
+    imap_server = FakeService(
+        "imap"
+    )
+    queue_worker = FakeService(
+        "queue"
+    )
+    onion_service = FakeService(
+        "onion"
+    )
+    tor_monitor = FakeService(
+        "tor_monitor"
+    )
+
+    runtime = ApplicationBuilder._build_runtime(
+        smtp_server=smtp_server,
+        imap_server=imap_server,
+        queue_worker=queue_worker,
+        onion_service=onion_service,
+        tor_monitor=tor_monitor,
+        logger=None,
+    )
+
+    assert runtime.services == [
+        smtp_server,
+        onion_service,
+        imap_server,
+        queue_worker,
+        tor_monitor,
+    ]
+
+
+def test_application_builder_builds_onion_service(
+    tmp_path,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path
+    )
+
+    settings = ApplicationSettings()
+
+    settings.tor.control_enabled = True
+
+    builder = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    )
+
+    onion_service = (
+        builder._build_onion_service(
+            settings
+        )
+    )
+
+    assert isinstance(
+        onion_service,
+        OnionServiceManager,
+    )
+
+    assert (
+        onion_service.identity_file
+        == paths.onion_identity_file
+    )
+
+    assert onion_service.virtual_port == (
+        settings.tor.onion_smtp_port
+    )
+
+    assert onion_service.target_host == (
+        settings.smtp.host
+    )
+
+    assert onion_service.target_port == (
+        settings.smtp.port
+    )
+
+
+def test_application_builder_disables_onion_service_when_tor_disabled(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    settings = ApplicationSettings()
+
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    assert context.onion_service is None
+
+    assert context.runtime.services == [
+        context.smtp_server,
+        context.imap_server,
+        context.queue_worker,
+        context.tor_monitor,
+    ]
+
+
+def test_application_builder_connects_onion_hostname_to_tor_status(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = True
+
+    builder = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    )
+
+    onion_service = (
+        builder._build_onion_service(
+            settings
+        )
+    )
+
+    onion_service.hostname = (
+        ("a" * 56)
+        + ".onion"
+    )
+
+    provider = (
+        builder._build_tor_status_provider(
+            settings,
+            onion_service=onion_service,
+        )
+    )
+
+    status = provider.initial_status()
+
+    assert status.onion_hostname == (
+        ("a" * 56)
+        + ".onion"
     )

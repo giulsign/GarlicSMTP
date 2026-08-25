@@ -27,6 +27,10 @@ from garlicsmtp.application import (
     MessageListViewModel,
     MessagePreviewViewModel,
 )
+from garlicsmtp.application import (
+    ComposeViewModel,
+    MailComposerService,
+)
 
 
 def build_view_model(
@@ -53,10 +57,19 @@ def build_view_model(
         )
     )
 
+    mail_composer = MailComposerService(
+        context.pipeline
+    )
+
+    compose = ComposeViewModel(
+        mail_composer
+    )
+
     return ApplicationViewModel(
         controller,
         message_list=message_list,
         message_preview=message_preview,
+        compose=compose,
     )
 
 

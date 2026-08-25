@@ -4,8 +4,8 @@ from garlicsmtp.models import (
     MailMessage,
     Metadata,
 )
-from garlicsmtp.queue.factory import (
-    QueueFactory,
+from garlicsmtp.core.pipeline import (
+    PipelineContext,
 )
 
 
@@ -13,9 +13,9 @@ class MailComposerService:
 
     def __init__(
         self,
-        queue,
+        pipeline,
     ) -> None:
-        self.queue = queue
+        self.pipeline = pipeline
 
     def send(
         self,
@@ -58,12 +58,14 @@ class MailComposerService:
             body=body,
         )
 
-        item = QueueFactory.create(
-            message
+        context = PipelineContext(
+            message=message
+        )
+
+        context = self.pipeline.execute(
+            context
         )
 
         return bool(
-            self.queue.enqueue(
-                item
-            )
+            context.accepted
         )

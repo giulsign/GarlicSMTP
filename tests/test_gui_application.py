@@ -16,3 +16,173 @@ def test_gui_builds_message_list_view_model(
         view_model.message_list,
         MessageListViewModel,
     )
+
+
+from types import SimpleNamespace
+
+import garlicsmtp.gui.application as gui_application
+
+from tests.support import (
+    make_application_status,
+)
+
+
+class FakePipeline:
+
+    def __init__(self):
+        self.contexts = []
+
+    def execute(
+        self,
+        context,
+    ):
+        self.contexts.append(
+            context
+        )
+
+        return context
+
+
+class FakeController:
+
+    def __init__(
+        self,
+        context,
+    ):
+        self.context = context
+
+    def status(
+        self,
+    ):
+        return make_application_status()
+
+
+def test_build_view_model_connects_composer_to_application_pipeline(
+    monkeypatch,
+):
+    pipeline = FakePipeline()
+
+    context = SimpleNamespace(
+        pipeline=pipeline,
+        store=object(),
+    )
+
+    class FakeBuilder:
+
+        def build(
+            self,
+        ):
+            return context
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        FakeBuilder,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationController",
+        FakeController,
+    )
+
+    view_model = (
+        gui_application.build_view_model()
+    )
+
+    assert view_model.compose is not None
+
+    assert (
+        view_model.compose
+        .composer
+        .pipeline
+        is pipeline
+    )
+
+
+def test_build_view_model_composer_sends_through_pipeline(
+    monkeypatch,
+):
+    pipeline = FakePipeline()
+
+    context = SimpleNamespace(
+        pipeline=pipeline,
+        store=object(),
+    )
+
+    class FakeBuilder:
+
+        def build(
+            self,
+        ):
+            return context
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        FakeBuilder,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationController",
+        FakeController,
+    )
+
+    view_model = (
+        gui_application.build_view_model()
+    )
+
+    view_model.compose.sender = (
+        "alice@sender.onion"
+    )
+
+    view_model.compose.recipient = (
+        "bob@receiver.onion"
+    )
+
+    view_model.compose.subject = (
+        "GUI integration"
+    )
+
+    view_model.compose.body = (
+        "Hello from GarlicSMTP"
+    )
+
+    assert (
+        view_model.compose.send()
+        is True
+    )
+
+    assert len(
+        pipeline.contexts
+    ) == 1
+
+    message = (
+        pipeline.contexts[0]
+        .message
+    )
+
+    assert (
+        message.envelope.sender
+        == "alice@sender.onion"
+    )
+
+    assert (
+        message.envelope.recipients
+        == [
+            "bob@receiver.onion",
+        ]
+    )
+
+    assert (
+        message.headers.get(
+            "Subject"
+        )
+        == "GUI integration"
+    )
+
+    assert (
+        message.body
+        == "Hello from GarlicSMTP"
+    )

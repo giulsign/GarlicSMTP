@@ -67,7 +67,11 @@ from garlicsmtp.gui.sections import (
     MessagePreviewSection,
     ServicesSection,
     TorSection,
-)   
+    ComposeSection,
+)  
+from garlicsmtp.application.compose_view_model import (
+    ComposeViewModel,
+) 
 
 
 class ViewModelEventBridge(QObject):
@@ -203,6 +207,13 @@ class MainWindow(QMainWindow):
     def _build_dashboard_sections(
         self,
     ) -> None:
+        self.compose_section = None
+
+        if self.view_model.compose is not None:
+            self.compose_section = ComposeSection(
+                view_model=self.view_model.compose,
+            )
+        
         self.message_list_section = (
             MessageListSection( 
                 view_model=(
@@ -264,6 +275,36 @@ class MainWindow(QMainWindow):
     def _add_dashboard_sections(
         self,
     ) -> None:
+
+        if self.compose_section is not None:
+            self.dashboard_layout.addWidget(
+                self.compose_section,
+                4,
+                0,
+                1,
+                2,
+            )
+
+            message_row = 5
+        else:
+            message_row = 4
+
+        self.dashboard_layout.addWidget(
+            self.message_list_section,
+            message_row,
+            0,
+            1,
+            1,
+        )
+
+        self.dashboard_layout.addWidget(
+            self.message_preview_section,
+            message_row,
+            1,
+            1,
+            1,
+        )
+        
         self.dashboard_layout.addWidget(
             self.application_section,
             0,
@@ -292,7 +333,7 @@ class MainWindow(QMainWindow):
             2,
         )
 
-        self.dashboard_layout.addWidget(
+        """self.dashboard_layout.addWidget(
             self.message_list_section,
             4,
             0,
@@ -306,7 +347,7 @@ class MainWindow(QMainWindow):
             1,
             1,
             1,
-        )
+        )"""
 
     def _install_compatibility_aliases(
         self,
@@ -665,6 +706,8 @@ class MainWindow(QMainWindow):
         self,
     ) -> None:
         self._refresh_sections()
+        if self.compose_section is not None:
+                    self.compose_section.refresh_view()
 
         self.runtime_badge.set_status(
             text=self.view_model.runtime_text,
@@ -685,6 +728,7 @@ class MainWindow(QMainWindow):
         self.restart_button.setEnabled(
             self.view_model.can_restart
         )
+        
 
     def closeEvent(
         self,

@@ -114,3 +114,12 @@ class ApplicationPaths:
                 parents=True,
                 exist_ok=True,
             )
+
+    @property
+    def onion_identity_file(
+        self,
+    ) -> Path:
+        return (
+            self.state_dir
+            / "onion-service.key"
+        )

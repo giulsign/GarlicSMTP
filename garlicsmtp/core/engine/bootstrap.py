@@ -61,7 +61,7 @@ class Bootstrap:
             ),
             imap=IMAPSettings(),
             tor=TorSettings(
-                enabled=True,
+                enabled=False,
                 socks_host=(
                     self.config.socks_host
                 ),

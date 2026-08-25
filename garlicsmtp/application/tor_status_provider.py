@@ -35,10 +35,9 @@ class TorStatusProvider:
         self,
         settings: TorSettings,
         *,
-        client_factory: (
-            TorControlClientFactory | None
-        ) = None,
+        client_factory=None,
         authenticator_factory=None,
+        onion_hostname_provider=None,
     ) -> None:
         self.settings = settings
 
@@ -46,10 +45,14 @@ class TorStatusProvider:
             client_factory
             or self._build_client
         )
-        
+
         self.authenticator_factory = (
             authenticator_factory
             or self._build_authenticator
+        )
+
+        self.onion_hostname_provider = (
+            onion_hostname_provider
         )
 
     def snapshot(
@@ -183,6 +186,9 @@ class TorStatusProvider:
                     self.settings
                     .onion_smtp_port
                 ),
+                onion_hostname=(
+                    self._onion_hostname()
+                ),
             )
 
         except Exception as exc:
@@ -260,6 +266,9 @@ class TorStatusProvider:
             onion_smtp_port=(
                 self.settings
                 .onion_smtp_port
+            ),
+            onion_hostname=(
+                self._onion_hostname()
             ),
         )
 
@@ -400,10 +409,20 @@ class TorStatusProvider:
             ),
         )
 
+    def _onion_hostname(
+        self,
+    ) -> str | None:
+        if self.onion_hostname_provider is None:
+            return None
+
+        return self.onion_hostname_provider()
 
     def initial_status(
         self,
     ) -> TorStatus:
+        onion_hostname=(
+            self._onion_hostname()
+        ),
         if not self.settings.enabled:
             error = "Tor transport is disabled"
 
@@ -422,3 +441,4 @@ class TorStatusProvider:
         return self._unavailable(
             error=error
         )
+

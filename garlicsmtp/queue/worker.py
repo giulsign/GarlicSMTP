@@ -54,7 +54,7 @@ class QueueWorker(Service, Tickable):
 
             raise
 
-        except PermanentDeliveryError:
+        except PermanentDeliveryError as exc:
             self.queue.ack(item)
             item.attempts += 1
 

@@ -152,3 +152,71 @@ def test_compose_section_send_uses_view_model():
     ]
 
     section.close()
+
+
+def test_compose_section_clear_button_clears_fields():
+    get_application()
+
+    view_model = ComposeViewModel(
+        FakeComposer()
+    )
+
+    section = ComposeSection(
+        view_model=view_model
+    )
+
+    section.sender_input.setText(
+        "alice@sender.onion"
+    )
+
+    section.recipient_input.setText(
+        "bob@receiver.onion"
+    )
+
+    section.subject_input.setText(
+        "Hello"
+    )
+
+    section.body_input.setPlainText(
+        "Body"
+    )
+
+    section.clear_button.click()
+
+    assert section.sender_input.text() == ""
+    assert section.recipient_input.text() == ""
+    assert section.subject_input.text() == ""
+
+    assert (
+        section.body_input.toPlainText()
+        == ""
+    )
+
+    section.close()
+
+
+def test_compose_section_refreshes_sender_from_view_model():
+    get_application()
+
+    view_model = ComposeViewModel(
+        FakeComposer()
+    )
+
+    section = ComposeSection(
+        view_model=view_model
+    )
+
+    view_model.sender = (
+        "garlicsmtp@"
+        + ("a" * 56)
+        + ".onion"
+    )
+
+    section.refresh_view()
+
+    assert (
+        section.sender_input.text()
+        == view_model.sender
+    )
+
+    section.close()

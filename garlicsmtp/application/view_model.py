@@ -21,6 +21,9 @@ from garlicsmtp.application.message_list_view_model import (
 from garlicsmtp.application.message_preview_view_model import (
     MessagePreviewViewModel,
 )
+from garlicsmtp.application.compose_view_model import (
+    ComposeViewModel,
+)
 
 class EmptyMessagePreviewExplorer:
 
@@ -79,7 +82,9 @@ class ApplicationViewModel:
         controller,
         message_list: MessageListViewModel | None = None,
         message_preview: MessagePreviewViewModel | None = None,
+        compose: ComposeViewModel | None = None,
     ) -> None:
+        self.compose = compose
         self.message_preview = (
             message_preview
             if message_preview is not None
@@ -91,6 +96,7 @@ class ApplicationViewModel:
         self._status = (
             self.controller.status()
         )
+        self._refresh_compose_sender()
         self.message_list = (
             message_list
             if message_list is not None
@@ -126,6 +132,8 @@ class ApplicationViewModel:
         self._status = (
             self.controller.status()
         )
+
+        self._refresh_compose_sender()  
 
         if self.message_preview.message_id is not None:
             self.message_preview.refresh()
@@ -551,6 +559,8 @@ class ApplicationViewModel:
             self.controller.status()
         )
 
+        self._refresh_compose_sender()
+
         if self.message_preview.message_id is not None:
             self.message_preview.refresh()
 
@@ -715,3 +725,55 @@ class ApplicationViewModel:
             return "1 stored message"
 
         return f"{count} stored messages"
+
+    @property
+    def tor_onion_smtp_text(
+        self,
+    ) -> str:
+        hostname = (
+            self._status.tor
+            .onion_hostname
+        )
+
+        if not hostname:
+            return "Unavailable"
+
+        return (
+            f"{hostname}:"
+            f"{self._status.tor.onion_smtp_port}"
+        )
+
+    @property
+    def tor_onion_smtp_text(
+        self,
+    ) -> str:
+        hostname = (
+            self._status.tor
+            .onion_hostname
+        )
+
+        if not hostname:
+            return "Unavailable"
+
+        return (
+            f"{hostname}:"
+            f"{self._status.tor.onion_smtp_port}"
+        )
+
+    def _refresh_compose_sender(
+        self,
+    ) -> None:
+        if self.compose is None:
+            return
+
+        hostname = (
+            self._status.tor
+            .onion_hostname
+        )
+
+        if not hostname:
+            return
+
+        self.compose.set_default_sender(
+            hostname
+        )
