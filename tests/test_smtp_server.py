@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 import threading
 
 from garlicsmtp.core.pipeline import Pipeline
@@ -173,4 +178,154 @@ def test_smtp_server_handles_connection_in_thread():
     assert (
         server.server.client.closed
         is True
+    )
+
+
+def test_smtp_server_connection_error_log_is_privacy_safe():
+    logger = SpyLogger()
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=2532,
+        logger=logger,
+        pipeline=build_pipeline(),
+    )
+
+    class FakeClient:
+
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    client = FakeClient()
+
+    def fail_handle_connection(
+        client,
+        address,
+    ):
+        raise RuntimeError(
+            "secret recipient "
+            "bob@private.onion "
+            "subject=Top Secret"
+        )
+
+    server.handle_connection = (
+        fail_handle_connection
+    )
+
+    server._serve_connection(
+        client,
+        (
+            "203.0.113.55",
+            45123,
+        ),
+    )
+
+    output = "\n".join(
+        logger.messages
+    )
+
+    assert (
+        "SMTP connection error "
+        "[RuntimeError]"
+        in output
+    )
+
+    assert (
+        "203.0.113.55"
+        not in output
+    )
+
+    assert (
+        "45123"
+        not in output
+    )
+
+    assert (
+        "bob@private.onion"
+        not in output
+    )
+
+    assert (
+        "Top Secret"
+        not in output
+    )
+
+    assert client.closed is True
+
+
+def test_smtp_server_thread_name_does_not_expose_remote_address(
+    monkeypatch,
+):
+    captured = {}
+
+    class FakeClient:
+
+        def close(self):
+            pass
+
+    class FakeTCPServer:
+
+        def accept_once(self):
+            return (
+                FakeClient(),
+                (
+                    "203.0.113.77",
+                    45678,
+                ),
+            )
+
+    class FakeThread:
+
+        def __init__(
+            self,
+            *,
+            target,
+            args,
+            daemon,
+            name,
+        ):
+            captured["name"] = name
+            captured["target"] = target
+            captured["args"] = args
+            self._alive = False
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(
+        "garlicsmtp.smtp.server.threading.Thread",
+        FakeThread,
+    )
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=2533,
+        pipeline=build_pipeline(),
+    )
+
+    server.server = FakeTCPServer()
+    server.running = True
+
+    server.tick()
+
+    thread_name = captured[
+        "name"
+    ]
+
+    assert (
+        thread_name
+        == "smtp-connection"
+    )
+
+    assert (
+        "203.0.113.77"
+        not in thread_name
+    )
+
+    assert (
+        "45678"
+        not in thread_name
     )

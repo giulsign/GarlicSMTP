@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 from garlicsmtp.core.service import Service
 from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.transport.manager import TransportManager
@@ -42,7 +47,9 @@ class QueueWorker(Service, Tickable):
 
             item.attempts += 1
 
-            item.last_error = str(exc)
+            item.last_error = (
+                type(exc).__name__
+            )
 
             item.next_retry = self.retry_policy.next_retry(
                 item.attempts
@@ -58,7 +65,9 @@ class QueueWorker(Service, Tickable):
             self.queue.ack(item)
             item.attempts += 1
 
-            item.last_error = str(exc)
+            item.last_error = (
+                type(exc).__name__
+            )
 
             item.next_retry = self.retry_policy.next_retry(
                 item.attempts
@@ -97,5 +106,6 @@ class QueueWorker(Service, Tickable):
             self.process()
         except Exception as exc:
             self.logger.error(
-                f"QueueWorker error: {exc}"
+                "QueueWorker error "
+                f"[{type(exc).__name__}]"
             )

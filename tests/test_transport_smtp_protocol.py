@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 from garlicsmtp.transport.smtp.connection import SMTPConnection
 from garlicsmtp.transport.smtp.protocol import SMTPClientProtocol
 

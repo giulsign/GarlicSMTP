@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 from garlicsmtp.network.socks5.connection import Socks5Connection
 from garlicsmtp.network.socks5.reply import Socks5Reply
 from garlicsmtp.network.socks5.request import Socks5ConnectRequest

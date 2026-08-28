@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 import threading
 from socket import socket
 
@@ -102,10 +107,7 @@ class SMTPServer(Service, Tickable):
                 address,
             ),
             daemon=True,
-            name=(
-                f"smtp-{address[0]}:"
-                f"{address[1]}"
-            ),
+            name="smtp-connection",
         )
 
         with self._threads_lock:
@@ -130,9 +132,8 @@ class SMTPServer(Service, Tickable):
 
         except Exception as exc:
             self.logger.error(
-                f"SMTP connection error from "
-                f"{address[0]}:{address[1]}: "
-                f"{exc}"
+                "SMTP connection error "
+                f"[{type(exc).__name__}]"
             )
 
         finally:

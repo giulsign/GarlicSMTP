@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 from garlicsmtp.queue.item import QueueItem
 from garlicsmtp.queue.serializer import QueueSerializer
 from datetime import UTC, datetime

@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 from garlicsmtp.smtp.headerparser import HeaderParser
 from garlicsmtp.smtp.rfc5322 import RFC5322Parser
 from garlicsmtp.smtp.state import SMTPState
