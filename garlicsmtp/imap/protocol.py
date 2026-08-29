@@ -216,7 +216,7 @@ class IMAPProtocol:
         return [
             IMAPReply.untagged(
                 "OK",
-                "GarlicSMTP IMAP ready",
+                "IMAP ready",
             )
         ]
 
@@ -3118,10 +3118,7 @@ class IMAPProtocol:
         return [
             IMAPReply(
                 (
-                    '* ID ('
-                    '"name" "GarlicSMTP" '
-                    '"version" "1.0"'
-                    ')'
+                    "* ID NIL"
                 )
             ),
             IMAPReply.tagged(

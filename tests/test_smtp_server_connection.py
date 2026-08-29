@@ -39,6 +39,6 @@ def test_smtp_server_handles_connection():
     )
 
     assert client.sent == (
-        b"220 garlicsmtp.onion GarlicSMTP ready\r\n"
+        b"220 garlicsmtp.onion ready\r\n"
         b"221 Bye\r\n"
     )

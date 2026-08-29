@@ -48,8 +48,6 @@ def test_smtp_client_delivers_message(message):
         SMTPClient
     )
     
-
-    client.hostname = "garlicsmtp.local"
     client.protocol = FakeProtocol()
 
     message.headers.fields[
@@ -64,7 +62,7 @@ def test_smtp_client_delivers_message(message):
         ("greeting",),
         (
             "ehlo",
-            "garlicsmtp.local",
+            "[127.0.0.1]",
         ),
         (
             "mail_from",

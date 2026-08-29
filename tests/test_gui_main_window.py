@@ -863,3 +863,59 @@ def test_main_window_refreshes_compose_section():
     assert "compose" in calls
 
     window.close()
+
+
+def test_execute_action_hides_exception_details(
+    monkeypatch,
+):
+    get_application()
+
+    window = MainWindow(
+        ApplicationViewModel(
+            FakeController()
+        )
+    )
+
+    captured = {}
+
+    monkeypatch.setattr(
+        QMessageBox,
+        "critical",
+        lambda parent, title, message: (
+            captured.update(
+                title=title,
+                message=message,
+            )
+        ),
+    )
+
+    monkeypatch.setattr(
+        window,
+        "refresh_view",
+        lambda: None,
+    )
+
+    def failing_action():
+        raise RuntimeError(
+            "SECRET onion=abc.onion "
+            "cookie=/private/path"
+        )
+
+    window._execute_action(
+        failing_action
+    )
+
+    assert captured["title"] == (
+        "GarlicSMTP error"
+    )
+    assert captured["message"] == (
+        "Operation failed"
+    )
+    assert "SECRET" not in captured["message"]
+    assert ".onion" not in captured["message"]
+    assert (
+        "/private/path"
+        not in captured["message"]
+    )
+
+    window.close()

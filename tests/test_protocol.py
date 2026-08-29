@@ -73,7 +73,7 @@ def test_protocol_greeting():
 
     assert connection.client.sent == (
         b"220 garlicsmtp.onion "
-        b"GarlicSMTP ready\r\n"
+        b"ready\r\n"
     )
 
 
@@ -164,7 +164,7 @@ def test_protocol_serve_ehlo_quit():
 
     assert sock.sent == (
         b"220 garlicsmtp.onion "
-        b"GarlicSMTP ready\r\n"
+        b"ready\r\n"
         b"250 Hello test.onion\r\n"
         b"221 Bye\r\n"
     )
@@ -198,7 +198,7 @@ def test_protocol_ehlo_mail_quit():
 
     assert sock.sent == (
         b"220 garlicsmtp.onion "
-        b"GarlicSMTP ready\r\n"
+        b"ready\r\n"
         b"250 Hello client.onion\r\n"
         b"250 Sender OK\r\n"
         b"221 Bye\r\n"
@@ -241,7 +241,7 @@ def test_protocol_ehlo_mail_rcpt_quit():
 
     assert sock.sent == (
         b"220 garlicsmtp.onion "
-        b"GarlicSMTP ready\r\n"
+        b"ready\r\n"
         b"250 Hello client.onion\r\n"
         b"250 Sender OK\r\n"
         b"250 Recipient OK\r\n"
@@ -290,7 +290,7 @@ def test_protocol_data_body_quit():
 
     assert sock.sent == (
         b"220 garlicsmtp.onion "
-        b"GarlicSMTP ready\r\n"
+        b"ready\r\n"
         b"250 Hello client.onion\r\n"
         b"250 Sender OK\r\n"
         b"250 Recipient OK\r\n"

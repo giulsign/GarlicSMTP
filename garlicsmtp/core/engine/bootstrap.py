@@ -178,9 +178,6 @@ class Bootstrap:
                     socks_port=(
                         self.config.socks_port
                     ),
-                    hostname=(
-                        self.config.hostname
-                    ),
                 )
             )
 

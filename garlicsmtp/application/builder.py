@@ -272,7 +272,6 @@ class ApplicationBuilder:
                 socks_port=(
                     settings.tor.socks_port
                 ),
-                hostname=settings.hostname,
             )
         )
 

@@ -116,7 +116,6 @@ def test_onion_transport_delivers_to_real_smtp_server(
 
         transport = OnionTransport(
             socks_client=socks,
-            hostname="sender.onion",
         )
 
         message = MailMessage(

@@ -22,6 +22,8 @@ from garlicsmtp.storage.serializer import (
 )
 from garlicsmtp.imap import (
     IMAPLiteralResponse,
+    IMAPResponse,
+    IMAPReply
 )
 from datetime import timedelta
 
@@ -41,14 +43,14 @@ def serialize(replies):
     ]
 
 
-def test_imap_greeting():
-
-    protocol = IMAPProtocol()
-
-    assert serialize(
-        protocol.greeting()
-    ) == [
-        "* OK GarlicSMTP IMAP ready\r\n"
+def greeting(
+    self,
+) -> list[IMAPResponse]:
+    return [
+        IMAPReply.untagged(
+            "OK",
+            "IMAP ready",
+        )
     ]
 
 
@@ -4852,10 +4854,7 @@ def test_id_returns_server_identification():
     )
 
     assert replies == [
-        (
-            '* ID ("name" "GarlicSMTP" '
-            '"version" "1.0")\r\n'
-        ),
+        "* ID NIL\r\n",
         "A002 OK ID completed\r\n",
     ]
 
@@ -4880,10 +4879,7 @@ def test_id_accepts_no_arguments():
     )
 
     assert replies == [
-        (
-            '* ID ("name" "GarlicSMTP" '
-            '"version" "1.0")\r\n'
-        ),
+        "* ID NIL\r\n",
         "A002 OK ID completed\r\n",
     ]
 

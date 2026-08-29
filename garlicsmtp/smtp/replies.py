@@ -16,7 +16,7 @@ class ReplyFactory:
     def greeting(hostname: str) -> SMTPReply:
         return SMTPReply(
             220,
-            f"{hostname} GarlicSMTP ready"
+            f"{hostname} ready",
         )
 
     @staticmethod

@@ -16,7 +16,6 @@ class SMTPTransport(Transport):
     def __init__(self):
         self.resolver = DNSResolver()
         self.connection_factory = SMTPConnection
-        self.hostname = "garlicsmtp.local"
 
     def deliver(self, item: QueueItem) -> bool:
         recipient = item.message.envelope.recipients[0]
@@ -37,7 +36,7 @@ class SMTPTransport(Transport):
                 f"SMTP greeting failed ({greeting.code})"
             )
 
-        protocol.ehlo(self.hostname)
+        protocol.ehlo("[127.0.0.1]")
 
         protocol.mail_from(
             item.message.envelope.sender

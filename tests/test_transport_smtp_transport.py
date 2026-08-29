@@ -81,7 +81,7 @@ def test_transport_connects_to_mx(message):
     ]
 
     assert FakeConnection.sent == [
-        "EHLO garlicsmtp.local\r\n",
+        "EHLO [127.0.0.1]\r\n",
         "MAIL FROM:<alice@test.onion>\r\n",
         "RCPT TO:<bob@test.onion>\r\n",
         "DATA\r\n",

@@ -85,7 +85,7 @@ def test_imap_parser_rejects_unclosed_quote():
 
     with pytest.raises(
         IMAPParseError,
-        match="Invalid IMAP command",
+        match=r"^Invalid IMAP command$",
     ):
         IMAPParser.parse(
             'A001 LOGIN alice "secret'

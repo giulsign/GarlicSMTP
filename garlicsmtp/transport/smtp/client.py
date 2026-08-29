@@ -14,10 +14,8 @@ class SMTPClient:
     def __init__(
         self,
         connection: SMTPConnection,
-        hostname: str = "garlicsmtp.local",
     ):
         self.connection = connection
-        self.hostname = hostname
         self.protocol = SMTPClientProtocol(
             connection,
         )
@@ -29,7 +27,7 @@ class SMTPClient:
         self.protocol.greeting()
 
         self.protocol.ehlo(
-            self.hostname,
+            "[127.0.0.1]",
         )
 
         self.protocol.mail_from(

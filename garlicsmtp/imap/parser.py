@@ -52,7 +52,7 @@ class IMAPParser:
 
         except ValueError as exc:
             raise IMAPParseError(
-                f"Invalid IMAP command: {exc}"
+                "Invalid IMAP command"
             ) from exc
 
         if len(parts) < 2:

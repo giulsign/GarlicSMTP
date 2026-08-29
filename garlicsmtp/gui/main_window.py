@@ -681,11 +681,11 @@ class MainWindow(QMainWindow):
         try:
             action()
 
-        except Exception as exc:
+        except Exception:
             QMessageBox.critical(
                 self,
                 "GarlicSMTP error",
-                str(exc),
+                "Operation failed",
             )
 
         self.refresh_view()

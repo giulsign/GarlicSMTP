@@ -30,12 +30,10 @@ class OnionTransport(Transport):
         socks_client: Socks5Client | None = None,
         socks_host: str = "127.0.0.1",
         socks_port: int = 9050,
-        hostname: str = "garlicsmtp.local",
         destination_port: int = 25,
         smtp_client_factory=None,
     ):
         self.validator = OnionValidator()
-        self.hostname = hostname
         self.destination_port = destination_port
 
         self.socks_client = socks_client or Socks5Client(
@@ -127,5 +125,4 @@ class OnionTransport(Transport):
 
         return SMTPClient(
             connection=smtp_connection,
-            hostname=self.hostname,
         )

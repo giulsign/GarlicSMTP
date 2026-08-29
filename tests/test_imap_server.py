@@ -95,7 +95,7 @@ def test_imap_server_real_connection(
             timeout=5,
         ) as client:
             assert receive_line(client) == (
-                "* OK GarlicSMTP IMAP ready\r\n"
+                "* OK IMAP ready\r\n"
             )
 
             client.sendall(
@@ -315,7 +315,7 @@ def test_imap_server_real_append(
             timeout=5,
         ) as client:
             assert receive_line(client) == (
-                "* OK GarlicSMTP IMAP ready\r\n"
+                "* OK IMAP ready\r\n"
             )
 
             client.sendall(

@@ -173,7 +173,6 @@ def test_onion_transport_runs_real_smtp_client(message):
 
     transport = OnionTransport(
         socks_client=socks,
-        hostname="sender.onion",
     )
 
     assert transport.deliver(item) is True
@@ -187,7 +186,7 @@ def test_onion_transport_runs_real_smtp_client(message):
     ).decode("utf-8")
 
     assert sent == (
-        "EHLO sender.onion\r\n"
+        "EHLO [127.0.0.1]\r\n"
         "MAIL FROM:<alice@sender.onion>\r\n"
         f"RCPT TO:<bob@{host}>\r\n"
         "DATA\r\n"
