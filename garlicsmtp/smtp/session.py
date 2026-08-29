@@ -5,7 +5,7 @@
 
 from dataclasses import dataclass, field
 
-from garlicsmtp.models import Envelope, MailHeaders, MailMessage, Metadata
+from garlicsmtp.models import Envelope, MailHeaders, MailMessage
 from garlicsmtp.smtp.datareceiver import SMTPDataReceiver
 from garlicsmtp.smtp.state import SMTPState
 
@@ -21,7 +21,6 @@ class SMTPSession:
         default_factory=lambda: MailMessage(
             envelope=Envelope(),
             headers=MailHeaders(),
-            metadata=Metadata(),
         )
     )
 
@@ -30,6 +29,5 @@ class SMTPSession:
         self.message = MailMessage(
             envelope=Envelope(),
             headers=MailHeaders(),
-            metadata=Metadata(),
         )
         self.state = SMTPState.WAIT_MAIL

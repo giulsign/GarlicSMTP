@@ -13,10 +13,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
-)
-from PySide6.QtWidgets import (
-    QApplication,
 )
 from garlicsmtp.storage.entry import (
     MessageEntry,
@@ -29,9 +25,6 @@ from garlicsmtp.core.engine.state import (
 )
 from garlicsmtp.gui.main_window import (
     MainWindow,
-)
-from tests.support import (
-    make_application_status,
 )
 from tests.support import (
     make_application_status,
@@ -126,7 +119,6 @@ class FakePreviewExplorer:
                     ],
                 ),
                 headers=headers,
-                metadata=Metadata(),
                 body="Preview body",
             ),
             internal_date=datetime(

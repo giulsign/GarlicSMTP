@@ -11,7 +11,6 @@ from garlicsmtp.queue.item import QueueItem
 
 from garlicsmtp.models import Envelope
 from garlicsmtp.models import MailHeaders
-from garlicsmtp.models import Metadata
 from garlicsmtp.models import MailMessage
 
 
@@ -23,9 +22,6 @@ message = MailMessage(
     ),
 
     headers=MailHeaders(),
-
-    metadata=Metadata()
-
 )
 
 item = QueueItem(

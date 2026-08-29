@@ -486,7 +486,7 @@ def test_worker_persists_only_temporary_error_category(
     )
 
 
-def test_worker_persists_only_permanent_error_category(
+def test_worker_does_not_persist_permanent_error_metadata(
     message,
 ):
     class SensitivePermanentTransport:
@@ -527,17 +527,38 @@ def test_worker_persists_only_permanent_error_category(
     worker.tick()
     worker.stop()
 
-    assert (
-        item.last_error
-        == "PermanentDeliveryError"
+    assert queue.size() == 0
+
+    assert item.attempts == 0
+    assert item.last_error is None
+    assert item.next_retry is None
+
+
+def test_worker_discards_item_on_permanent_error(message):
+
+    queue = QueueManager()
+
+    item = QueueFactory.create(message)
+    queue.enqueue(item)
+
+    transport = TransportManager(
+        default_transport=PermanentFailingTransport(),
     )
 
-    assert (
-        "alice@secret.onion"
-        not in item.last_error
+    logger = SpyLogger()
+
+    worker = QueueWorker(
+        queue=queue,
+        transport=transport,
+        logger=logger,
     )
 
-    assert (
-        "private-key-value"
-        not in item.last_error
-    )
+    worker.start()
+    worker.tick()
+    worker.stop()
+
+    assert queue.size() == 0
+
+    assert item.attempts == 0
+    assert item.last_error is None
+    assert item.next_retry is None

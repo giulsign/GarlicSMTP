@@ -6,6 +6,7 @@
 from garlicsmtp.models import MailMessage
 from garlicsmtp.transport.smtp.connection import SMTPConnection
 from garlicsmtp.transport.smtp.protocol import SMTPClientProtocol
+from garlicsmtp.storage.serializer import MessageSerializer
 
 
 class SMTPClient:
@@ -52,22 +53,6 @@ class SMTPClient:
     def serialize_message(
         message: MailMessage,
     ) -> str:
-        lines = []
-
-        for name, value in message.headers.fields.items():
-            if isinstance(value, list):
-                for entry in value:
-                    lines.append(
-                        f"{name}: {entry}"
-                    )
-            else:
-                lines.append(
-                    f"{name}: {value}"
-                )
-
-        lines.append("")
-        lines.append(
-            message.body or ""
+        return MessageSerializer.to_rfc5322(
+            message
         )
-
-        return "\r\n".join(lines)

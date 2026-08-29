@@ -196,7 +196,9 @@ class MessagePreviewViewModel:
         if self._entry is None:
             return None
 
-        return self._entry.message.metadata.size
+        return MessageExplorerService.resolve_size(
+            self._entry.message
+        )
 
     @property
     def size_text(

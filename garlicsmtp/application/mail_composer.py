@@ -7,7 +7,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 from garlicsmtp.core.pipeline import (
     PipelineContext,
@@ -59,7 +58,6 @@ class MailComposerService:
                 ],
             ),
             headers=headers,
-            metadata=Metadata(),
             body=body,
         )
 

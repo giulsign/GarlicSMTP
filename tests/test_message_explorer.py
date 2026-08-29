@@ -14,7 +14,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 from garlicsmtp.storage.store import (
     MessageStore,
@@ -26,8 +25,7 @@ def make_message(
     sender="alice@test.onion",
     header_sender=None,
     subject="Test subject",
-    body="Hello",
-    size=0,
+    body="Hello",   
 ):
     headers = MailHeaders()
 
@@ -43,9 +41,6 @@ def make_message(
             subject,
         )
 
-    metadata = Metadata()
-    metadata.size = size
-
     return MailMessage(
         envelope=Envelope(
             sender=sender,
@@ -54,7 +49,6 @@ def make_message(
             ],
         ),
         headers=headers,
-        metadata=metadata,
         body=body,
     )
 
@@ -87,7 +81,6 @@ def test_message_explorer_lists_messages():
             header_sender=(
                 "Alice <alice@test.onion>"
             ),
-            size=512,
         ),
         flags={
             "\\Flagged",
@@ -125,7 +118,7 @@ def test_message_explorer_lists_messages():
         "Alice <alice@test.onion>"
     )
 
-    assert summaries[0].size == 512
+    assert summaries[0].size > 0
     assert summaries[0].flagged is True
 
     assert summaries[1].subject == "First"
@@ -194,7 +187,6 @@ def test_message_explorer_calculates_size():
         make_message(
             subject="Size test",
             body="Hello",
-            size=0,
         ),
     )
 

@@ -12,10 +12,12 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 from garlicsmtp.storage.entry import (
     MessageEntry,
+)
+from garlicsmtp.application import (
+    MessageExplorerService,
 )
 
 
@@ -31,7 +33,6 @@ def make_entry(
     subject="GarlicSMTP",
     body="Hello from GarlicSMTP",
     flags=(),
-    size=128,
 ):
     headers = MailHeaders()
 
@@ -59,9 +60,6 @@ def make_entry(
                 ),
             ),
             headers=headers,
-            metadata=Metadata(
-                size=size,
-            ),
             body=body,
         ),
         internal_date=datetime(
@@ -385,54 +383,40 @@ def test_message_preview_view_model_exposes_size_text():
         message_id="message-1",
     )
 
-    assert view_model.size_text == "128 B"
-
-def test_message_preview_view_model_formats_size_in_kilobytes():
-    explorer = FakeExplorer()
-
-    explorer.entries[
+    entry = explorer.entries[
         (
             "bob@test.onion",
             "message-1",
         )
-    ] = make_entry(
-        size=2048,
+    ]
+
+    expected_size = (
+        MessageExplorerService.resolve_size(
+            entry.message
+        )
     )
 
-    view_model = MessagePreviewViewModel(
-        explorer
+    assert view_model.size == expected_size
+    assert view_model.size_text == (
+        f"{expected_size} B"
     )
 
-    view_model.select_message(
-        mailbox="bob@test.onion",
-        message_id="message-1",
+def test_message_preview_view_model_formats_size_in_kilobytes():
+    assert (
+        MessagePreviewViewModel._format_size(
+            2048
+        )
+        == "2.0 KB"
     )
-
-    assert view_model.size_text == "2.0 KB"
 
 
 def test_message_preview_view_model_formats_size_in_megabytes():
-    explorer = FakeExplorer()
-
-    explorer.entries[
-        (
-            "bob@test.onion",
-            "message-1",
+    assert (
+        MessagePreviewViewModel._format_size(
+            2 * 1024 * 1024
         )
-    ] = make_entry(
-        size=2 * 1024 * 1024,
+        == "2.0 MB"
     )
-
-    view_model = MessagePreviewViewModel(
-        explorer
-    )
-
-    view_model.select_message(
-        mailbox="bob@test.onion",
-        message_id="message-1",
-    )
-
-    assert view_model.size_text == "2.0 MB"
 
 
 def test_message_preview_view_model_recognizes_html_content():
@@ -509,3 +493,34 @@ def test_message_preview_view_model_exposes_safe_html_fallback():
     assert view_model.display_body == (
         "Hello from GarlicSMTP"
     )
+
+
+def test_message_preview_view_model_derives_size_from_message():
+    explorer = FakeExplorer()
+
+    entry = make_entry()
+
+    entry.message.headers.add(
+        "Subject",
+        "Size test",
+    )
+    entry.message.body = "Hello GarlicSMTP"
+
+    explorer.entries[
+        (
+            "bob@test.onion",
+            "message-1",
+        )
+    ] = entry
+
+    view_model = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    assert view_model.size > 0
+    assert view_model.size_text != "0 B"

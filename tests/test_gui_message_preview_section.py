@@ -15,7 +15,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 from garlicsmtp.storage.entry import (
     MessageEntry,
@@ -53,9 +52,6 @@ def make_entry():
                 ],
             ),
             headers=headers,
-            metadata=Metadata(
-                size=128,
-            ),
             body="Hello from GarlicSMTP",
         ),
         internal_date=datetime(
@@ -158,7 +154,7 @@ def test_message_preview_section_displays_message():
 
     assert (
         section.size_value.text()
-        == "128 B"
+        == view_model.size_text
     )
 
     assert section.uid_value.text() == "12"

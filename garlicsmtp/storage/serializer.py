@@ -4,14 +4,12 @@
 # See LICENSE for the full license terms.
 
 import json
-from dataclasses import asdict
-from datetime import datetime
+from dataclasses import asdict 
 
 from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 
 
@@ -22,10 +20,6 @@ class MessageSerializer:
         message: MailMessage,
     ) -> dict:
         data = asdict(message)
-
-        data["metadata"]["received"] = (
-            message.metadata.received.isoformat()
-        )
 
         return data
 
@@ -43,33 +37,13 @@ class MessageSerializer:
     def from_dict(
         data: dict,
     ) -> MailMessage:
-        metadata_data = dict(
-            data["metadata"]
-        )
-
-        received = metadata_data.get(
-            "received"
-        )
-
-        if isinstance(
-            received,
-            str,
-        ):
-            metadata_data["received"] = (
-                datetime.fromisoformat(
-                    received
-                )
-            )
-
+        
         return MailMessage(
             envelope=Envelope(
                 **data["envelope"]
             ),
             headers=MailHeaders(
                 **data["headers"]
-            ),
-            metadata=Metadata(
-                **metadata_data
             ),
             body=data["body"],
         )

@@ -13,7 +13,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 
 
@@ -79,7 +78,6 @@ class IMAPMessageParser:
                 recipients=recipients,
             ),
             headers=headers,
-            metadata=Metadata(),
             body=cls._extract_body(
                 parsed
             ),

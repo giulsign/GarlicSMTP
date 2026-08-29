@@ -80,3 +80,43 @@ def test_smtp_client_delivers_message(message):
         ),
         ("quit",),
     ]
+
+
+from garlicsmtp.models import Envelope, MailHeaders, MailMessage
+from garlicsmtp.transport.smtp.client import SMTPClient
+
+
+def test_smtp_client_serialization_does_not_add_headers():
+    headers = MailHeaders()
+    headers.add(
+        "Subject",
+        "Hello",
+    )
+
+    message = MailMessage(
+        envelope=Envelope(
+            sender="alice@sender.onion",
+            recipients=[
+                "bob@receiver.onion",
+            ],
+        ),
+        headers=headers,
+        body="Hello",
+    )
+
+    serialized = SMTPClient.serialize_message(
+        message
+    )
+
+    header_block = serialized.split(
+        "\r\n\r\n",
+        1,
+    )[0]
+
+    assert "Subject: Hello" in header_block
+    assert "Date:" not in header_block
+    assert "Message-ID:" not in header_block
+    assert "Received:" not in header_block
+    assert "Return-Path:" not in header_block
+    assert "X-Mailer:" not in header_block
+    assert "User-Agent:" not in header_block

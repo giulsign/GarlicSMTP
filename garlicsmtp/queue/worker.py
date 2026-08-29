@@ -61,22 +61,8 @@ class QueueWorker(Service, Tickable):
 
             raise
 
-        except PermanentDeliveryError as exc:
+        except PermanentDeliveryError:
             self.queue.ack(item)
-            item.attempts += 1
-
-            item.last_error = (
-                type(exc).__name__
-            )
-
-            item.next_retry = self.retry_policy.next_retry(
-                item.attempts
-            )
-
-            self.queue.update(item)
-
-            self.queue.nack(item)
-
             raise
 
 

@@ -15,7 +15,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 from garlicsmtp.queue.factory import QueueFactory
 from garlicsmtp.queue.manager import QueueManager
@@ -132,7 +131,6 @@ def test_onion_transport_delivers_to_real_smtp_server(
                     "Subject": "Local E2E",
                 }
             ),
-            metadata=Metadata(),
             body="Hello local onion flow",
         )
 

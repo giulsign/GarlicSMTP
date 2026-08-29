@@ -9,7 +9,6 @@ from garlicsmtp.core.pipeline import LoggerStage
 
 from garlicsmtp.models.envelope import Envelope
 from garlicsmtp.models.header import MailHeaders
-from garlicsmtp.models.metadata import Metadata
 from garlicsmtp.models import MailMessage
 
 
@@ -21,7 +20,6 @@ def test_pipeline_logger():
             recipients=["bob@test.onion"]
         ),
         headers=MailHeaders(),
-        metadata=Metadata()
     )
 
     pipeline = Pipeline()
@@ -45,7 +43,6 @@ def test_pipeline_logger_is_privacy_safe(
             ],
         ),
         headers=MailHeaders(),
-        metadata=Metadata(),
         body="very secret body",
     )
 

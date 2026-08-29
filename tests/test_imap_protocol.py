@@ -15,7 +15,6 @@ from garlicsmtp.models import (
     Envelope,
     MailHeaders,
     MailMessage,
-    Metadata,
 )
 from garlicsmtp.storage.store import MessageStore
 from garlicsmtp.storage.serializer import (
@@ -2214,7 +2213,6 @@ def test_imap_uid_search_subject(
                 "Subject": "Other message",
             }
         ),
-        metadata=Metadata(),
         body="Different content",
     )
 
@@ -7525,7 +7523,6 @@ def test_imap_uid_search_body(
                 "Subject": "Garlic subject",
             }
         ),
-        metadata=Metadata(),
         body="Nothing relevant here.",
     )
 
@@ -7591,7 +7588,6 @@ def test_imap_uid_search_header(
                 "Subject": "Other subject",
             }
         ),
-        metadata=Metadata(),
         body="garlic",
     )
 
@@ -7749,7 +7745,6 @@ def test_imap_uid_search_cc(
                 "Cc": "carol@test.onion",
             }
         ),
-        metadata=Metadata(),
         body="",
     )
 
@@ -7765,7 +7760,6 @@ def test_imap_uid_search_cc(
                 "Cc": "dave@test.onion",
             }
         ),
-        metadata=Metadata(),
         body="carol@test.onion",
     )
 
@@ -7828,7 +7822,6 @@ def test_imap_uid_search_bcc(
                 "Bcc": "carol@test.onion",
             }
         ),
-        metadata=Metadata(),
         body="",
     )
 
@@ -7844,7 +7837,6 @@ def test_imap_uid_search_bcc(
                 "Bcc": "dave@test.onion",
             }
         ),
-        metadata=Metadata(),
         body="carol@test.onion",
     )
 
@@ -8014,7 +8006,6 @@ def test_imap_uid_search_not_subject(
                 "Subject": "Other subject",
             }
         ),
-        metadata=Metadata(),
         body="",
     )
 
@@ -8082,7 +8073,6 @@ def test_imap_uid_search_not_header(
                 "Subject": "Other subject",
             }
         ),
-        metadata=Metadata(),
         body="",
     )
 
@@ -8226,7 +8216,6 @@ def test_imap_uid_search_or_seen_subject(
                 "Subject": "Other subject",
             }
         ),
-        metadata=Metadata(),
         body="",
     )
 
@@ -8242,7 +8231,6 @@ def test_imap_uid_search_or_seen_subject(
                 "Subject": "Nothing relevant",
             }
         ),
-        metadata=Metadata(),
         body="",
     )
 
@@ -8325,7 +8313,6 @@ def test_imap_uid_search_or_subject_body(
                 "Subject": "Other subject",
             }
         ),
-        metadata=Metadata(),
         body="Onion transport active",
     )
 
@@ -8341,7 +8328,6 @@ def test_imap_uid_search_or_subject_body(
                 "Subject": "Nothing relevant",
             }
         ),
-        metadata=Metadata(),
         body="Nothing relevant here",
     )
 

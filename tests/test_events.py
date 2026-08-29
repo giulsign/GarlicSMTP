@@ -6,7 +6,7 @@
 from garlicsmtp.core.events.bus import EventBus
 from garlicsmtp.core.events.handler import EventHandler
 from garlicsmtp.core.events.mailaccepted import MailAcceptedEvent
-
+from garlicsmtp.models import Envelope, MailHeaders, MailMessage
 
 class PrintHandler(EventHandler):
 
@@ -25,7 +25,7 @@ bus.subscribe(
 
 )
 
-from garlicsmtp.models import Envelope, MailHeaders, MailMessage, Metadata
+
 
 message = MailMessage(
     envelope=Envelope(
@@ -33,7 +33,6 @@ message = MailMessage(
         recipients=["bob@test.onion"],
     ),
     headers=MailHeaders(),
-    metadata=Metadata(),
 )
 
 event = MailAcceptedEvent.from_message(message)

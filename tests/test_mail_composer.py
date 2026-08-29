@@ -68,6 +68,10 @@ def test_mail_composer_sends_message_through_pipeline():
         == "Hello"
     )
 
+    assert message.headers.fields == {
+        "Subject": "Hello",
+    }
+
     assert (
         message.body
         == "Hello from GarlicSMTP"
@@ -104,3 +108,19 @@ def test_mail_composer_rejects_empty_recipient():
             subject="Hello",
             body="Test",
         )
+
+
+def test_mail_composer_does_not_generate_headers_for_empty_subject():
+    pipeline = FakePipeline()
+    composer = MailComposerService(pipeline)
+
+    composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="",
+        body="Hello",
+    )
+
+    message = pipeline.contexts[0].message
+
+    assert message.headers.fields == {}

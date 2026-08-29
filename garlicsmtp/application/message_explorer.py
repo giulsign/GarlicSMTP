@@ -188,7 +188,7 @@ class MessageExplorerService:
             internal_date=(
                 entry.internal_date
             ),
-            size=cls._resolve_size(
+            size=cls.resolve_size(
                 message
             ),
             flags=tuple(
@@ -234,35 +234,17 @@ class MessageExplorerService:
         return subject
 
     @staticmethod
-    def _resolve_size(
+    def resolve_size(
         message: MailMessage,
     ) -> int:
-        metadata_size = getattr(
-            message.metadata,
-            "size",
-            0,
-        )
-
-        if (
-            isinstance(
-                metadata_size,
-                int,
-            )
-            and metadata_size > 0
-        ):
-            return metadata_size
-
         header_size = sum(
             len(
-                f"{key}: {value}\r\n"
-                .encode(
+                f"{key}: {value}\r\n".encode(
                     "utf-8"
                 )
             )
             for key, value in (
-                message.headers
-                .fields
-                .items()
+                message.headers.fields.items()
             )
         )
 
@@ -272,7 +254,6 @@ class MessageExplorerService:
             )
         )
 
-        # Riga vuota tra header e body.
         return (
             header_size
             + 2
