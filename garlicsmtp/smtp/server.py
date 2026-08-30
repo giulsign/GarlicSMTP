@@ -13,6 +13,7 @@ from garlicsmtp.logger import Logger
 from garlicsmtp.network.server import TCPServer
 from garlicsmtp.smtp.connection import SMTPConnection
 from garlicsmtp.smtp.protocol import SMTPProtocol
+from garlicsmtp.security.verifier import MessageVerifier
 
 
 class SMTPServer(Service, Tickable):
@@ -25,6 +26,7 @@ class SMTPServer(Service, Tickable):
         port: int = 2525,
         hostname: str = "localhost",
         logger=None,
+        verifier: MessageVerifier | None = None,
     ):
         self.server = TCPServer(
             host,
@@ -37,6 +39,7 @@ class SMTPServer(Service, Tickable):
         self.port = port
         self.logger = logger or Logger()
         self.pipeline = pipeline
+        self.verifier = verifier
         self._connection_threads = set()
         self._threads_lock = threading.Lock()
 
@@ -78,6 +81,7 @@ class SMTPServer(Service, Tickable):
             connection,
             hostname=self.hostname,
             pipeline=self.pipeline,
+            verifier=self.verifier,
         )
 
         protocol.serve()

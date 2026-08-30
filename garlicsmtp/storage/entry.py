@@ -7,7 +7,12 @@ from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
 from garlicsmtp.models import MailMessage
+from enum import Enum
 
+class VerificationStatus(str, Enum):
+    UNSIGNED = "unsigned"
+    VERIFIED = "verified"
+    INVALID = "invalid"
 
 @dataclass(slots=True)
 class MessageEntry:
@@ -26,4 +31,8 @@ class MessageEntry:
 
     flags: set[str] = field(
         default_factory=set
+    )
+
+    verification_status: VerificationStatus = (
+        VerificationStatus.UNSIGNED
     )

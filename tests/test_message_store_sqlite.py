@@ -11,7 +11,10 @@ import sqlite3
 from garlicsmtp.storage.serializer import (
     MessageSerializer,
 )
-from garlicsmtp.storage.store import MessageStore
+from garlicsmtp.storage.store import MessageStore   
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 from datetime import UTC, datetime
 
 
@@ -1417,3 +1420,172 @@ def test_sqlite_recreated_mailbox_gets_new_uid_validity(
     assert after != before
 
     backend.close()
+
+
+def test_sqlite_save_entry_preserves_verification_status(
+    tmp_path,
+    message,
+):
+    database = tmp_path / "mail.db"
+
+    backend = SQLiteMessageStoreBackend(
+        database
+    )
+
+    try:
+        entry = backend.save_entry(
+            "bob@test.onion",
+            message,
+            verification_status=(
+                VerificationStatus.VERIFIED
+            ),
+        )
+
+        restored = backend.get_entry(
+            "bob@test.onion",
+            entry.id,
+        )
+
+        assert restored is not None
+        assert (
+            restored.verification_status
+            == VerificationStatus.VERIFIED
+        )
+    finally:
+        backend.close()
+
+
+def test_sqlite_list_entries_preserves_verification_status(
+    tmp_path,
+    message,
+):
+    database = tmp_path / "mail.db"
+
+    backend = SQLiteMessageStoreBackend(
+        database
+    )
+
+    try:
+        backend.save_entry(
+            "bob@test.onion",
+            message,
+            verification_status=(
+                VerificationStatus.VERIFIED
+            ),
+        )
+
+        entries = backend.list_entries(
+            "bob@test.onion"
+        )
+
+        assert len(entries) == 1
+        assert (
+            entries[0].verification_status
+            == VerificationStatus.VERIFIED
+        )
+    finally:
+        backend.close()
+
+
+def test_sqlite_migrates_legacy_verification_status(
+    tmp_path,
+    message,
+):
+    database = tmp_path / "legacy.db"
+
+    connection = sqlite3.connect(
+        database
+    )
+
+    try:
+        connection.execute(
+            """
+            CREATE TABLE messages (
+                id TEXT PRIMARY KEY,
+                mailbox TEXT NOT NULL,
+                uid INTEGER,
+                payload TEXT NOT NULL,
+                internal_date TEXT,
+                flags TEXT,
+                created TEXT NOT NULL
+            )
+            """
+        )
+
+        connection.execute(
+            """
+            CREATE TABLE mailboxes (
+                name TEXT PRIMARY KEY
+            )
+            """
+        )
+
+        internal_date = datetime(
+            2030,
+            1,
+            2,
+            3,
+            4,
+            5,
+            tzinfo=UTC,
+        )
+
+        connection.execute(
+            """
+            INSERT INTO messages (
+                id,
+                mailbox,
+                uid,
+                payload,
+                internal_date,
+                flags,
+                created
+            )
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                "legacy-message",
+                "bob@test.onion",
+                1,
+                MessageSerializer.to_json(
+                    message
+                ),
+                internal_date.isoformat(),
+                "[]",
+                internal_date.isoformat(),
+            ),
+        )
+
+        connection.commit()
+    finally:
+        connection.close()
+
+    backend = SQLiteMessageStoreBackend(
+        database
+    )
+
+    try:
+        restored = backend.get_entry(
+            "bob@test.onion",
+            "legacy-message",
+        )
+
+        assert restored is not None
+        assert (
+            restored.verification_status
+            == VerificationStatus.UNSIGNED
+        )
+
+        columns = {
+            row[1]
+            for row in backend.connection.execute(
+                "PRAGMA table_info(messages)"
+            ).fetchall()
+        }
+
+        assert (
+            "verification_status"
+            in columns
+        )
+    finally:
+        backend.close()

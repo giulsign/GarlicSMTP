@@ -9,6 +9,7 @@ from datetime import datetime
 
 from garlicsmtp.models import MailMessage
 from garlicsmtp.storage.entry import MessageEntry
+from garlicsmtp.storage.entry import VerificationStatus
 
 
 class MessageStoreBackend(ABC):
@@ -133,6 +134,9 @@ class MessageStoreBackend(ABC):
         self,
         mailbox: str,
         message: MailMessage,
+        verification_status: VerificationStatus = (
+            VerificationStatus.UNSIGNED
+        ),
     ) -> MessageEntry:
         raise NotImplementedError
     

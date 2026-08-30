@@ -9,6 +9,9 @@ from garlicsmtp.storage.entry import MessageEntry
 from garlicsmtp.storage.entry_serializer import (
     MessageEntrySerializer,
 )
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 
 
 def test_message_entry_serializer_roundtrip(
@@ -62,4 +65,54 @@ def test_message_entry_serializer_roundtrip(
     assert (
         restored.message.envelope.recipients
         == message.envelope.recipients
+    )
+
+
+def test_message_entry_serializes_verification_status(
+    message,
+):
+    entry = MessageEntry(
+        id="message-id",
+        mailbox="bob@test.onion",
+        uid=7,
+        message=message,
+        verification_status=(
+            VerificationStatus.VERIFIED
+        ),
+    )
+
+    data = MessageEntrySerializer.to_dict(
+        entry
+    )
+
+    assert data["verification_status"] == (
+        "verified"
+    )
+
+
+def test_message_entry_legacy_data_defaults_to_unsigned(
+    message,
+):
+    entry = MessageEntry(
+        id="message-id",
+        mailbox="bob@test.onion",
+        uid=7,
+        message=message,
+    )
+
+    data = MessageEntrySerializer.to_dict(
+        entry
+    )
+
+    data.pop(
+        "verification_status",
+        None,
+    )
+
+    restored = MessageEntrySerializer.from_dict(
+        data
+    )
+
+    assert restored.verification_status == (
+        VerificationStatus.UNSIGNED
     )

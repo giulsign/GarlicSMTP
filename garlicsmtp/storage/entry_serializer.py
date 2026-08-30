@@ -8,6 +8,9 @@ from datetime import datetime
 
 from garlicsmtp.storage.entry import MessageEntry
 from garlicsmtp.storage.serializer import MessageSerializer
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 
 
 class MessageEntrySerializer:
@@ -26,6 +29,9 @@ class MessageEntrySerializer:
             "flags": sorted(entry.flags),
             "message": MessageSerializer.to_dict(
                 entry.message
+            ),
+            "verification_status": (
+                entry.verification_status.value
             ),
         }
 
@@ -57,6 +63,12 @@ class MessageEntrySerializer:
             ),
             message=MessageSerializer.from_dict(
                 data["message"]
+            ),
+            verification_status=VerificationStatus(
+                data.get(
+                    "verification_status",
+                    "unsigned",
+                )
             ),
         )
 

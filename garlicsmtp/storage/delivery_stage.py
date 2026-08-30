@@ -31,11 +31,13 @@ class DeliveryStage(PipelineStage):
         )
 
         if domain in self.local_domains:
-            self.store.save(
+            self.store.save_entry(
                 recipient,
                 message,
+                verification_status=(
+                    context.verification_status
+                ),
             )
-
             return context
 
         return self.queue_stage.process(

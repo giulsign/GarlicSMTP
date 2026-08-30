@@ -13,6 +13,7 @@ from datetime import UTC, datetime
 from uuid import uuid4
 
 from garlicsmtp.storage.entry import MessageEntry
+from garlicsmtp.storage.entry import VerificationStatus
 
 
 class MemoryMessageStoreBackend(
@@ -43,6 +44,9 @@ class MemoryMessageStoreBackend(
         self,
         mailbox: str,
         message: MailMessage,
+        verification_status: VerificationStatus = (
+            VerificationStatus.UNSIGNED
+        ),
     ) -> MessageEntry:
         self._mailbox_names.add(
             mailbox
@@ -62,6 +66,7 @@ class MemoryMessageStoreBackend(
             uid=uid,
             message=message,
             internal_date=datetime.now(UTC),
+            verification_status=verification_status,
         )
 
         self._mailboxes[mailbox][

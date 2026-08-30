@@ -17,6 +17,7 @@ from garlicsmtp.storage.serializer import (
 )
 import json
 from garlicsmtp.storage.entry import MessageEntry
+from garlicsmtp.storage.entry import VerificationStatus
 
 
 class SQLiteMessageStoreBackend(
@@ -53,6 +54,7 @@ class SQLiteMessageStoreBackend(
                     payload TEXT NOT NULL,
                     internal_date TEXT,
                     flags TEXT,
+                    verification_status TEXT NOT NULL DEFAULT 'unsigned',
                     created TEXT NOT NULL
                 )
                 """
@@ -126,6 +128,15 @@ class SQLiteMessageStoreBackend(
                 """
                 ALTER TABLE messages
                 ADD COLUMN flags TEXT
+                """
+            )
+
+        if "verification_status" not in columns:
+            self.connection.execute(
+                """
+                ALTER TABLE messages
+                ADD COLUMN verification_status
+                TEXT NOT NULL DEFAULT 'unsigned'
                 """
             )
 
@@ -572,6 +583,9 @@ class SQLiteMessageStoreBackend(
         self,
         mailbox: str,
         message: MailMessage,
+        verification_status: VerificationStatus = (
+            VerificationStatus.UNSIGNED
+        ),
     ) -> MessageEntry:
         message_id = str(uuid4())
         internal_date = datetime.now(UTC)
@@ -593,9 +607,10 @@ class SQLiteMessageStoreBackend(
                     payload,
                     internal_date,
                     flags,
+                    verification_status,
                     created
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     message_id,
@@ -604,6 +619,7 @@ class SQLiteMessageStoreBackend(
                     MessageSerializer.to_json(message),
                     internal_date.isoformat(),
                     json.dumps(sorted(flags)),
+                    verification_status.value,
                     internal_date.isoformat(),
                 ),
             )
@@ -617,6 +633,7 @@ class SQLiteMessageStoreBackend(
             message=message,
             internal_date=internal_date,
             flags=flags,
+            verification_status=verification_status,
         )
     
     def append_entry(
@@ -691,7 +708,8 @@ class SQLiteMessageStoreBackend(
                     uid,
                     payload,
                     internal_date,
-                    flags
+                    flags,
+                    verification_status
                 FROM messages
                 WHERE mailbox = ?
                 AND id = ?
@@ -712,6 +730,7 @@ class SQLiteMessageStoreBackend(
             payload,
             internal_date,
             flags,
+            verification_status,
         ) = row
 
         return MessageEntry(
@@ -726,6 +745,9 @@ class SQLiteMessageStoreBackend(
             ),
             flags=set(
                 json.loads(flags)
+            ),
+            verification_status=VerificationStatus(
+                verification_status
             ),
         )
     
@@ -743,7 +765,8 @@ class SQLiteMessageStoreBackend(
                     uid,
                     payload,
                     internal_date,
-                    flags
+                    flags,
+                    verification_status
                 FROM messages
                 WHERE mailbox = ?
                 ORDER BY uid ASC
@@ -765,6 +788,9 @@ class SQLiteMessageStoreBackend(
                 flags=set(
                     json.loads(flags)
                 ),
+                verification_status=VerificationStatus(
+                    verification_status
+                ),
             )
             for (
                 message_id,
@@ -773,6 +799,7 @@ class SQLiteMessageStoreBackend(
                 payload,
                 internal_date,
                 flags,
+                verification_status,
             ) in rows
         ]
     

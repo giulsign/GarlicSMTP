@@ -329,3 +329,60 @@ def test_smtp_server_thread_name_does_not_expose_remote_address(
         "45678"
         not in thread_name
     )
+
+
+def test_smtp_server_passes_verifier_to_protocol(
+    monkeypatch,
+):
+    verifier = object()
+    captured = {}
+
+    class FakeClient:
+
+        def close(self):
+            pass
+
+    class FakeProtocol:
+
+        def __init__(
+            self,
+            connection,
+            *,
+            hostname,
+            pipeline,
+            verifier,
+        ):
+            captured["connection"] = connection
+            captured["hostname"] = hostname
+            captured["pipeline"] = pipeline
+            captured["verifier"] = verifier
+
+        def serve(self):
+            captured["served"] = True
+
+    monkeypatch.setattr(
+        "garlicsmtp.smtp.server.SMTPProtocol",
+        FakeProtocol,
+    )
+
+    pipeline = build_pipeline()
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        hostname="test.onion",
+        pipeline=pipeline,
+        verifier=verifier,
+    )
+
+    client = FakeClient()
+
+    server.handle_connection(
+        client,
+        ("127.0.0.1", 12345),
+    )
+
+    assert captured["hostname"] == "test.onion"
+    assert captured["pipeline"] is pipeline
+    assert captured["verifier"] is verifier
+    assert captured["served"] is True

@@ -9,6 +9,9 @@ from garlicsmtp.storage.memory.backend import (
 from garlicsmtp.storage.store import (
     MessageStore,
 )
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 from datetime import UTC, datetime
 
 
@@ -618,3 +621,27 @@ def test_memory_store_rename_moves_subscription():
     assert backend.list_subscribed_mailboxes() == [
         "Old",
     ]
+
+
+def test_memory_save_entry_preserves_verification_status(
+    message,
+):
+    backend = MemoryMessageStoreBackend()
+
+    entry = backend.save_entry(
+        "bob@test.onion",
+        message,
+        verification_status=(
+            VerificationStatus.VERIFIED
+        ),
+    )
+
+    restored = backend.get_entry(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert restored is not None
+    assert restored.verification_status == (
+        VerificationStatus.VERIFIED
+    )

@@ -8,6 +8,9 @@ from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.queue.stage import QueueStage
 from garlicsmtp.smtp.connection import SMTPConnection
 from garlicsmtp.smtp.protocol import SMTPProtocol
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 
 
 class FakeSocket:
@@ -357,3 +360,55 @@ def test_protocol_data_queues_message():
     )
 
     assert item.message.body == "Hello Queue"
+
+
+def test_protocol_data_passes_verification_status_to_pipeline():
+    sock = FakeSocket()
+
+    sock.buffer = [
+        b"EHLO client.onion\r\n",
+        b"MAIL FROM:<alice@test.onion>\r\n",
+        b"RCPT TO:<bob@test.onion>\r\n",
+        b"DATA\r\n",
+        b"Subject: Test\r\n",
+        b"\r\n",
+        b"Hello Bob\r\n",
+        b".\r\n",
+        b"QUIT\r\n",
+    ]
+
+    connection = SMTPConnection(
+        sock,
+        ("127.0.0.1", 2525),
+    )
+
+    class FakeVerifier:
+
+        def verify(self, message):
+            return VerificationStatus.VERIFIED
+
+    class SpyPipeline:
+
+        def __init__(self):
+            self.context = None
+
+        def execute(self, context):
+            self.context = context
+            return context
+
+    pipeline = SpyPipeline()
+
+    protocol = SMTPProtocol(
+        connection,
+        hostname="garlicsmtp.onion",
+        pipeline=pipeline,
+        verifier=FakeVerifier(),
+    )
+
+    protocol.serve()
+
+    assert pipeline.context is not None
+    assert (
+        pipeline.context.verification_status
+        == VerificationStatus.VERIFIED
+    )

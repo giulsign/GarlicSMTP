@@ -3,7 +3,7 @@
 #
 # See LICENSE for the full license terms.
 
-from garlicsmtp.core.pipeline import LoggerStage, Pipeline, PipelineContext
+from garlicsmtp.core.pipeline import Pipeline, PipelineContext
 from garlicsmtp.smtp.connection import SMTPConnection
 from garlicsmtp.smtp.engine import SMTPEngine
 from garlicsmtp.smtp.handlers.register import create_dispatcher
@@ -11,8 +11,10 @@ from garlicsmtp.smtp.parser import SMTPParser
 from garlicsmtp.smtp.replies import ReplyFactory
 from garlicsmtp.smtp.session import SMTPSession
 from garlicsmtp.smtp.state import SMTPState
-from garlicsmtp.queue.manager import QueueManager
-from garlicsmtp.queue.stage import QueueStage
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
+from garlicsmtp.security.verifier import MessageVerifier
 
 
 
@@ -27,6 +29,7 @@ class SMTPProtocol:
         connection: SMTPConnection,
         hostname: str = "localhost",
         pipeline: Pipeline | None = None,
+        verifier: MessageVerifier | None = None,
     ):
         if pipeline is None:
             raise ValueError(
@@ -41,6 +44,7 @@ class SMTPProtocol:
         self.dispatcher = create_dispatcher()
         self.engine = SMTPEngine()
         self.pipeline = pipeline
+        self.verifier = verifier
 
     def send_greeting(self) -> None:
         reply = ReplyFactory.greeting(self.hostname)
@@ -62,11 +66,22 @@ class SMTPProtocol:
             )
 
             if done:
-                context = PipelineContext(
-                    message=self.session.message,
+                verification_status = (
+                    self.verifier.verify(
+                        self.session.message
+                    )
+                    if self.verifier is not None
+                    else VerificationStatus.UNSIGNED
                 )
 
-                context = self.pipeline.execute(context)
+                context = PipelineContext(
+                    message=self.session.message,
+                    verification_status=verification_status,
+                )
+
+                context = self.pipeline.execute(
+                    context
+                )
 
                 if context.accepted:
                     reply = ReplyFactory.ok("Message accepted")

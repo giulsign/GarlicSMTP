@@ -20,6 +20,10 @@ from garlicsmtp.storage.memory.backend import (
 from garlicsmtp.storage.null_event_sink import (
     NullStoreEventSink,
 )
+from garlicsmtp.storage.entry import (
+    MessageEntry,
+    VerificationStatus,
+)
 
 
 class MessageStore:
@@ -136,10 +140,14 @@ class MessageStore:
         self,
         mailbox: str,
         message: MailMessage,
+        verification_status: VerificationStatus = (
+            VerificationStatus.UNSIGNED
+        ),
     ) -> MessageEntry:
         entry = self.backend.save_entry(
             mailbox,
             message,
+            verification_status=verification_status,
         )
 
         self.event_sink.message_added(

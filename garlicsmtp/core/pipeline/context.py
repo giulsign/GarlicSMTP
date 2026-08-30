@@ -6,11 +6,16 @@
 from dataclasses import dataclass 
 
 from garlicsmtp.models import MailMessage 
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 
-@dataclass 
-
-class PipelineContext: 
-	message: MailMessage 
-	accepted: bool = True 
-	reject_reason: str = "" 
-	transport: str = "onion"
+@dataclass
+class PipelineContext:
+    message: MailMessage
+    accepted: bool = True
+    reject_reason: str = ""
+    transport: str = "onion"
+    verification_status: VerificationStatus = (
+        VerificationStatus.UNSIGNED
+    )
