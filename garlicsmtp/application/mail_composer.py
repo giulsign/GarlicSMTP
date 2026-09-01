@@ -18,8 +18,10 @@ class MailComposerService:
     def __init__(
         self,
         pipeline,
+        signer=None,
     ) -> None:
         self.pipeline = pipeline
+        self.signer = signer
 
     def send(
         self,
@@ -60,6 +62,11 @@ class MailComposerService:
             headers=headers,
             body=body,
         )
+
+        if self.signer is not None:
+            message = self.signer.sign(
+                message
+            )
 
         context = PipelineContext(
             message=message

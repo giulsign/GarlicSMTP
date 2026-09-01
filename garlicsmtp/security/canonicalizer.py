@@ -6,7 +6,9 @@
 import json
 
 from garlicsmtp.models import MailMessage
-
+from garlicsmtp.security.signature_header import (
+    SIGNATURE_HEADER,
+)
 
 class MessageCanonicalizer:
 
@@ -25,9 +27,11 @@ class MessageCanonicalizer:
                     message.envelope.recipients
                 ),
             },
-            "headers": dict(
-                message.headers.fields
-            ),
+            "headers": {
+                name.lower(): value
+                for name, value in message.headers.fields.items()
+                if name.lower() != SIGNATURE_HEADER.lower()
+            },
             "body": message.body or "",
         }
 
@@ -39,3 +43,21 @@ class MessageCanonicalizer:
         )
 
         return text.encode("utf-8")
+
+
+def test_canonicalizer_excludes_signature_header_case_insensitively():
+    first = build_message()
+    second = build_message()
+
+    first.headers.fields[
+        "X-GarlicSMTP-Signature"
+    ] = "v=1; alg=ed25519; key=abc; sig=first"
+
+    second.headers.fields[
+        "x-garlicsmtp-signature"
+    ] = "v=1; alg=ed25519; key=abc; sig=second"
+
+    assert (
+        MessageCanonicalizer.canonicalize(first)
+        == MessageCanonicalizer.canonicalize(second)
+    )

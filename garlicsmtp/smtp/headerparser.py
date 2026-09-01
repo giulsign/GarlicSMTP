@@ -3,42 +3,48 @@
 #
 # See LICENSE for the full license terms.
 
-""" RFC5322 Header Parser """ 
-class HeaderParser: 
-	@staticmethod 
+from garlicsmtp.security.signature_header import (
+    SIGNATURE_HEADER,
+)
 
-	def parse(lines): 
-	
-		headers = {} 
-			
-		current = None 
-		
-		for line in lines: 
-		
-			# 
-			# Header continuato (RFC5322 Folding) 
-			# 
-			
-			if line.startswith((" ", "\t")): 
-			
-				if current is not None: 
-				
-					headers[current] += " " + line.strip() 
-					
-				continue 
-				
-			if ":" not in line: 
-			
-				continue 
-				
-			key, value = line.split(":", 1) 
-			
-			key = key.strip() 
-			
-			value = value.strip() 	
-			
-			headers[key] = value 
-			
-			current = key 
-			
-		return headers
+class HeaderParser:
+    @staticmethod
+    def parse(lines):
+        headers = {}
+        current = None
+
+        signature_name = SIGNATURE_HEADER.lower()
+        signature_seen = False
+
+        for line in lines:
+            #
+            # Header continuato (RFC5322 Folding)
+            #
+            if line.startswith((" ", "\t")):
+                if current is not None:
+                    headers[current] += (
+                        " " + line.strip()
+                    )
+
+                continue
+
+            if ":" not in line:
+                continue
+
+            key, value = line.split(":", 1)
+
+            key = key.strip()
+            value = value.strip()
+
+            if key.lower() == signature_name:
+                if signature_seen:
+                    raise ValueError(
+                        "Duplicate signature header"
+                    )
+
+                signature_seen = True
+
+            headers[key] = value
+            current = key
+
+        return headers

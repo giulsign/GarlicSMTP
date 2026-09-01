@@ -21,9 +21,18 @@ class SMTPEngine:
                 raw_message
             )
 
-            parsed_headers = HeaderParser.parse(
-                header_lines
-            )
+            try:
+                parsed_headers = HeaderParser.parse(
+                    header_lines
+                )
+            except ValueError:
+                session.data_error = (
+                    "Invalid message headers"
+                )
+
+                session.state = SMTPState.WAIT_MAIL
+
+                return True
 
             for key, value in parsed_headers.items():
                 session.message.headers.add(

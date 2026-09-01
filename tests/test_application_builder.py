@@ -13,6 +13,12 @@ from garlicsmtp.configuration import (
 from garlicsmtp.tor.onion_service_manager import (
     OnionServiceManager,
 )
+from garlicsmtp.security.trust_store import (
+    FileTrustStore,
+)
+from garlicsmtp.security.verifier import (
+    Ed25519MessageVerifier,
+)
 
 
 def test_application_builder_creates_context(
@@ -356,4 +362,77 @@ def test_application_builder_connects_onion_hostname_to_tor_status(
     assert status.onion_hostname == (
         ("a" * 56)
         + ".onion"
+    )
+
+
+def test_application_builder_wires_trust_aware_verifier_into_smtp_server(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    verifier = context.smtp_server.verifier
+
+    assert isinstance(
+        verifier,
+        Ed25519MessageVerifier,
+    )
+
+    assert isinstance(
+        verifier.trust_store,
+        FileTrustStore,
+    )
+
+    assert (
+        verifier.trust_store.path
+        == tmp_path / "trusted_keys.json"
+    )
+
+
+def test_application_builder_preserves_trusted_key_across_builds(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    first_context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    first_store = (
+        first_context.smtp_server
+        .verifier
+        .trust_store
+    )
+
+    sender = "alice@sender.onion"
+    public_key = b"a" * 32
+
+    first_store.trust(
+        sender,
+        public_key,
+    )
+
+    second_context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    second_store = (
+        second_context.smtp_server
+        .verifier
+        .trust_store
+    )
+
+    assert second_store.is_trusted(
+        sender,
+        public_key,
     )

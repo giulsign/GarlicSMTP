@@ -178,6 +178,7 @@ def build_context() -> ApplicationContext:
         queue=queue,
         transport=transport,
         pipeline=pipeline,
+        signer=None,
         smtp_server=smtp_server,
         imap_server=imap_server,
         queue_worker=queue_worker,

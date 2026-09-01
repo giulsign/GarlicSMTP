@@ -70,6 +70,7 @@ def test_build_view_model_connects_composer_to_application_pipeline(
     context = SimpleNamespace(
         pipeline=pipeline,
         store=object(),
+        signer=None,
     )
 
     class FakeBuilder:
@@ -113,6 +114,7 @@ def test_build_view_model_composer_sends_through_pipeline(
     context = SimpleNamespace(
         pipeline=pipeline,
         store=object(),
+        signer=None,
     )
 
     class FakeBuilder:
@@ -190,4 +192,47 @@ def test_build_view_model_composer_sends_through_pipeline(
     assert (
         message.body
         == "Hello from GarlicSMTP"
+    )
+
+
+def test_build_view_model_connects_composer_to_context_signer(
+    monkeypatch,
+):
+    pipeline = FakePipeline()
+    signer = object()
+
+    context = SimpleNamespace(
+        pipeline=pipeline,
+        store=object(),
+        signer=signer,
+    )
+
+    class FakeBuilder:
+
+        def build(
+            self,
+        ):
+            return context
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        FakeBuilder,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationController",
+        FakeController,
+    )
+
+    view_model = (
+        gui_application.build_view_model()
+    )
+
+    assert (
+        view_model.compose
+        .composer
+        .signer
+        is signer
     )

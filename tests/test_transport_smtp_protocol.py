@@ -177,3 +177,30 @@ def test_protocol_quit():
 
     assert connection.socket.sent == b"QUIT\r\n"
     assert reply.code == 221
+
+
+def test_protocol_data_dot_stuffs_leading_dots():
+    connection = SMTPConnection()
+
+    connection.socket = FakeSocketMultiReply()
+    connection._buffer = b""
+
+    protocol = SMTPClientProtocol(
+        connection
+    )
+
+    reply = protocol.data(
+        "line one\r\n"
+        ".leading dot\r\n"
+        "..two leading dots"
+    )
+
+    assert connection.socket.sent == (
+        b"DATA\r\n"
+        b"line one\r\n"
+        b"..leading dot\r\n"
+        b"...two leading dots\r\n"
+        b".\r\n"
+    )
+
+    assert reply.code == 250

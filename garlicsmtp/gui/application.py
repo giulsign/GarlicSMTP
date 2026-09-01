@@ -63,7 +63,8 @@ def build_view_model(
     )
 
     mail_composer = MailComposerService(
-        context.pipeline
+        context.pipeline,
+        signer=context.signer,
     )
 
     compose = ComposeViewModel(

@@ -43,6 +43,9 @@ from garlicsmtp.application.event_service import (
 from garlicsmtp.tor.onion_service_manager import (
     OnionServiceManager,
 )
+from garlicsmtp.security.signer import (
+    MessageSigner,
+)
 
 
 @dataclass(slots=True)
@@ -61,6 +64,7 @@ class ApplicationContext:
     queue: QueueManager
     transport: TransportManager
     pipeline: Pipeline
+    signer: MessageSigner
 
     smtp_server: SMTPServer
     imap_server: IMAPServer

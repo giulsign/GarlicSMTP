@@ -55,7 +55,7 @@ class SMTPProtocol:
 
     def process_one_command(self) -> bool:
         line = self.receive_command()
-        
+
         if line is None:
             return False
 
@@ -66,6 +66,15 @@ class SMTPProtocol:
             )
 
             if done:
+                if self.session.data_error:
+                    reply = ReplyFactory.transaction_failed()
+
+                    self.connection.send(
+                        reply.serialize()
+                    )
+
+                    return True
+
                 verification_status = (
                     self.verifier.verify(
                         self.session.message
@@ -84,13 +93,15 @@ class SMTPProtocol:
                 )
 
                 if context.accepted:
-                    reply = ReplyFactory.ok("Message accepted")
-                else:
-                    reply = ReplyFactory.transaction_failed(
-                        context.reject_reason
+                    reply = ReplyFactory.ok(
+                        "Message accepted"
                     )
+                else:
+                    reply = ReplyFactory.transaction_failed()
 
-                self.connection.send(reply.serialize())
+                self.connection.send(
+                    reply.serialize()
+                )
 
             return True
 
@@ -98,7 +109,11 @@ class SMTPProtocol:
 
         if command.command == "QUIT":
             reply = ReplyFactory.bye()
-            self.connection.send(reply.serialize())
+
+            self.connection.send(
+                reply.serialize()
+            )
+
             return False
 
         reply = self.dispatcher.dispatch(
@@ -106,7 +121,9 @@ class SMTPProtocol:
             command,
         )
 
-        self.connection.send(reply.serialize())
+        self.connection.send(
+            reply.serialize()
+        )
 
         return True
 

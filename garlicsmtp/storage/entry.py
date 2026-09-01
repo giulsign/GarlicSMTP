@@ -13,6 +13,7 @@ class VerificationStatus(str, Enum):
     UNSIGNED = "unsigned"
     VERIFIED = "verified"
     INVALID = "invalid"
+    UNKNOWN_KEY = "unknown_key"
 
 @dataclass(slots=True)
 class MessageEntry:

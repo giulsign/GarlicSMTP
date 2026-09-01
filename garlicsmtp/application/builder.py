@@ -87,7 +87,19 @@ from garlicsmtp.tor.control import (
     TorControlConnection,
 )
 from garlicsmtp.tor.onion_service_manager import (
-    OnionServiceManager,
+    OnionServiceManager,    
+)
+from garlicsmtp.security.signer import (
+    MessageSigner,
+)
+from garlicsmtp.security.signing_identity import (
+    SigningIdentity,
+)
+from garlicsmtp.security.trust_store import (
+    FileTrustStore,
+)
+from garlicsmtp.security.verifier import (
+    Ed25519MessageVerifier,
 )
 
 
@@ -164,10 +176,27 @@ class ApplicationBuilder:
             local_domains=local_domains,
         )
 
+        signing_identity = SigningIdentity(
+            self.paths.root_dir / "signing.key"
+        )
+
+        signer = MessageSigner(
+            signing_identity.private_key
+        )
+
+        trust_store = FileTrustStore(
+            self.paths.root_dir / "trusted_keys.json"
+        )
+
+        verifier = Ed25519MessageVerifier(
+            trust_store=trust_store
+        )
+
         smtp_server = self._build_smtp_server(
             settings=settings,
             pipeline=pipeline,
             logger=logger,
+            verifier=verifier,
         )
 
         imap_server = self._build_imap_server(
@@ -223,6 +252,7 @@ class ApplicationBuilder:
             queue=queue,
             transport=transport,
             pipeline=pipeline,
+            signer=signer,
             smtp_server=smtp_server,
             imap_server=imap_server,
             queue_worker=queue_worker,
@@ -318,6 +348,7 @@ class ApplicationBuilder:
         settings: ApplicationSettings,
         pipeline: Pipeline,
         logger: Logger,
+        verifier: Ed25519MessageVerifier,
     ) -> SMTPServer:
         return SMTPServer(
             pipeline=pipeline,
@@ -325,6 +356,7 @@ class ApplicationBuilder:
             port=settings.smtp.port,
             hostname=settings.hostname,
             logger=logger,
+            verifier=verifier,
     )
 
     @staticmethod

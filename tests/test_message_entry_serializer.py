@@ -116,3 +116,37 @@ def test_message_entry_legacy_data_defaults_to_unsigned(
     assert restored.verification_status == (
         VerificationStatus.UNSIGNED
     )
+
+
+def test_message_entry_serializer_preserves_unknown_key(
+    message,
+):
+    entry = MessageEntry(
+        id="message-1",
+        mailbox="bob@test.onion",
+        uid=1,
+        message=message,
+        verification_status=(
+            VerificationStatus.UNKNOWN_KEY
+        ),
+    )
+
+    data = MessageEntrySerializer.to_dict(
+        entry
+    )
+
+    restored = (
+        MessageEntrySerializer.from_dict(
+            data
+        )
+    )
+
+    assert (
+        data["verification_status"]
+        == "unknown_key"
+    )
+
+    assert (
+        restored.verification_status
+        == VerificationStatus.UNKNOWN_KEY
+    )

@@ -16,6 +16,7 @@ class SMTPSession:
     helo: str = ""
     authenticated: bool = False
     state: SMTPState = SMTPState.CONNECT
+    data_error: str = ""
     receiver: SMTPDataReceiver = field(default_factory=SMTPDataReceiver)
     message: MailMessage = field(
         default_factory=lambda: MailMessage(
@@ -30,4 +31,5 @@ class SMTPSession:
             envelope=Envelope(),
             headers=MailHeaders(),
         )
+        self.data_error = ""
         self.state = SMTPState.WAIT_MAIL

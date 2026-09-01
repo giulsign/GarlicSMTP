@@ -11,6 +11,7 @@ from garlicsmtp.smtp.protocol import SMTPProtocol
 from garlicsmtp.storage.entry import (
     VerificationStatus,
 )
+from garlicsmtp.smtp.replies import ReplyFactory
 
 
 class FakeSocket:
@@ -412,3 +413,66 @@ def test_protocol_data_passes_verification_status_to_pipeline():
         pipeline.context.verification_status
         == VerificationStatus.VERIFIED
     )
+
+
+def test_protocol_rejects_invalid_data_without_verifier_or_pipeline():
+    sock = FakeSocket()
+
+    sock.buffer = [
+        b"EHLO client.onion\r\n",
+        b"MAIL FROM:<alice@test.onion>\r\n",
+        b"RCPT TO:<bob@test.onion>\r\n",
+        b"DATA\r\n",
+        b"X-GarlicSMTP-Signature: malformed\r\n",
+        b"x-garlicsmtp-signature: duplicate\r\n",
+        b"\r\n",
+        b"Hello Bob\r\n",
+        b".\r\n",
+        b"QUIT\r\n",
+    ]
+
+    connection = SMTPConnection(
+        sock,
+        ("127.0.0.1", 2525),
+    )
+
+    class SpyVerifier:
+
+        def __init__(self):
+            self.calls = 0
+
+        def verify(self, message):
+            self.calls += 1
+            return VerificationStatus.VERIFIED
+
+    class SpyPipeline:
+
+        def __init__(self):
+            self.calls = 0
+
+        def execute(self, context):
+            self.calls += 1
+            return context
+
+    verifier = SpyVerifier()
+    pipeline = SpyPipeline()
+
+    protocol = SMTPProtocol(
+        connection,
+        hostname="garlicsmtp.onion",
+        pipeline=pipeline,
+        verifier=verifier,
+    )
+
+    protocol.serve()
+
+    assert verifier.calls == 0
+    assert pipeline.calls == 0
+
+    expected_reply = (
+        ReplyFactory.transaction_failed()
+        .serialize()
+    )
+
+    assert expected_reply in sock.sent
+    assert b"250 Message accepted\r\n" not in sock.sent

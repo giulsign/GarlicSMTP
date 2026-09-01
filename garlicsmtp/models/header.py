@@ -13,10 +13,29 @@ class MailHeaders:
 
     fields: dict[str, str] = field(default_factory=dict)
 
-    def add(self, key, value):
+    def add(
+        self,
+        key: str,
+        value: str,
+    ):
+        key_lower = key.lower()
+
+        for existing_key in self.fields:
+            if existing_key.lower() == key_lower:
+                self.fields[existing_key] = value
+                return
 
         self.fields[key] = value
 
-    def get(self, key, default=None):
+    def get(
+        self,
+        key: str,
+        default=None,
+    ):
+        key_lower = key.lower()
 
-        return self.fields.get(key, default)
+        for name, value in self.fields.items():
+            if name.lower() == key_lower:
+                return value
+
+        return default

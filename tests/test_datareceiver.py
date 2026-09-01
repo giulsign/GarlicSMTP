@@ -3,6 +3,16 @@
 #
 # See LICENSE for the full license terms.
 
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+)
+
+from garlicsmtp.models import (
+    Envelope,
+    MailHeaders,
+    MailMessage,
+)
+from garlicsmtp.security.signer import MessageSigner
 from garlicsmtp.smtp.engine import SMTPEngine
 from garlicsmtp.smtp.session import SMTPSession
 
@@ -11,7 +21,6 @@ def test_smtp_engine_receives_text_plain_message():
     engine = SMTPEngine()
 
     session = SMTPSession("127.0.0.1")
-
     session.state = session.state.RECEIVE_DATA
 
     lines = [
@@ -52,7 +61,6 @@ def test_smtp_engine_receives_quoted_printable_text():
     engine = SMTPEngine()
 
     session = SMTPSession("127.0.0.1")
-
     session.state = session.state.RECEIVE_DATA
 
     lines = [
@@ -88,7 +96,6 @@ def test_smtp_engine_prefers_plain_text_in_multipart_alternative():
     engine = SMTPEngine()
 
     session = SMTPSession("127.0.0.1")
-
     session.state = session.state.RECEIVE_DATA
 
     lines = [
@@ -127,3 +134,91 @@ def test_smtp_engine_prefers_plain_text_in_multipart_alternative():
     assert session.message.body == (
         "Hello from plain text"
     )
+
+
+def test_smtp_engine_rejects_duplicate_signature_header():
+    engine = SMTPEngine()
+
+    session = SMTPSession("127.0.0.1")
+    session.state = session.state.RECEIVE_DATA
+
+    lines = [
+        "X-GarlicSMTP-Signature: first",
+        "x-garlicsmtp-signature: second",
+        "",
+        "Hello",
+        ".",
+    ]
+
+    for line in lines:
+        done = engine.receive_data(
+            session,
+            line,
+        )
+
+        if done:
+            break
+
+    assert done is True
+    assert session.data_error == "Invalid message headers"
+    assert session.state == session.state.WAIT_MAIL
+
+
+def test_smtp_engine_rejects_duplicate_signature_even_if_one_is_valid():
+    private_key = Ed25519PrivateKey.generate()
+    signer = MessageSigner(private_key)
+
+    message = MailMessage(
+        envelope=Envelope(
+            sender="alice@sender.onion",
+            recipients=[
+                "bob@receiver.onion",
+            ],
+        ),
+        headers=MailHeaders(
+            fields={
+                "Subject": "Hello",
+            }
+        ),
+        body="Hello",
+    )
+
+    signer.sign(message)
+
+    valid_signature = message.headers.get(
+        "X-GarlicSMTP-Signature"
+    )
+
+    session = SMTPSession("127.0.0.1")
+    session.state = session.state.RECEIVE_DATA
+
+    session.message.envelope.sender = (
+        message.envelope.sender
+    )
+    session.message.envelope.recipients = list(
+        message.envelope.recipients
+    )
+
+    lines = [
+        "Subject: Hello",
+        "X-GarlicSMTP-Signature: malformed",
+        f"x-garlicsmtp-signature: {valid_signature}",
+        "",
+        "Hello",
+        ".",
+    ]
+
+    engine = SMTPEngine()
+
+    for line in lines:
+        done = engine.receive_data(
+            session,
+            line,
+        )
+
+        if done:
+            break
+
+    assert done is True
+    assert session.data_error == "Invalid message headers"
+    assert session.state == session.state.WAIT_MAIL
