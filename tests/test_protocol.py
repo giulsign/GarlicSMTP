@@ -216,6 +216,7 @@ def test_protocol_ehlo_mail_rcpt_quit():
         b"EHLO client.onion\r\n",
         b"MAIL FROM:<alice@test.onion>\r\n",
         b"RCPT TO:<bob@test.onion>\r\n",
+        b"RCPT TO:<carol@test.onion>\r\n",
         b"QUIT\r\n",
     ]
 
@@ -240,6 +241,7 @@ def test_protocol_ehlo_mail_rcpt_quit():
         protocol.session.message.envelope.recipients
         == [
             "bob@test.onion",
+            "carol@test.onion",
         ]
     )
 
@@ -248,6 +250,7 @@ def test_protocol_ehlo_mail_rcpt_quit():
         b"ready\r\n"
         b"250 Hello client.onion\r\n"
         b"250 Sender OK\r\n"
+        b"250 Recipient OK\r\n"
         b"250 Recipient OK\r\n"
         b"221 Bye\r\n"
     )
@@ -444,6 +447,134 @@ def test_protocol_rejects_invalid_data_without_verifier_or_pipeline():
         def verify(self, message):
             self.calls += 1
             return VerificationStatus.VERIFIED
+
+    class SpyPipeline:
+
+        def __init__(self):
+            self.calls = 0
+
+        def execute(self, context):
+            self.calls += 1
+            return context
+
+    verifier = SpyVerifier()
+    pipeline = SpyPipeline()
+
+    protocol = SMTPProtocol(
+        connection,
+        hostname="garlicsmtp.onion",
+        pipeline=pipeline,
+        verifier=verifier,
+    )
+
+    protocol.serve()
+
+    assert verifier.calls == 0
+    assert pipeline.calls == 0
+
+    expected_reply = (
+        ReplyFactory.transaction_failed()
+        .serialize()
+    )
+
+    assert expected_reply in sock.sent
+    assert b"250 Message accepted\r\n" not in sock.sent
+
+
+def test_protocol_rejects_malformed_base64_without_verifier_or_pipeline():
+    sock = FakeSocket()
+
+    sock.buffer = [
+        b"EHLO client.onion\r\n",
+        b"MAIL FROM:<alice@test.onion>\r\n",
+        b"RCPT TO:<bob@test.onion>\r\n",
+        b"DATA\r\n",
+        b"Content-Type: text/plain; charset=utf-8\r\n",
+        b"Content-Transfer-Encoding: base64\r\n",
+        b"\r\n",
+        b"%%%not-valid-base64%%%\r\n",
+        b".\r\n",
+        b"QUIT\r\n",
+    ]
+
+    connection = SMTPConnection(
+        sock,
+        ("127.0.0.1", 2525),
+    )
+
+    class SpyVerifier:
+
+        def __init__(self):
+            self.calls = 0
+
+        def verify(self, message):
+            self.calls += 1
+            return VerificationStatus.UNKNOWN_KEY
+
+    class SpyPipeline:
+
+        def __init__(self):
+            self.calls = 0
+
+        def execute(self, context):
+            self.calls += 1
+            return context
+
+    verifier = SpyVerifier()
+    pipeline = SpyPipeline()
+
+    protocol = SMTPProtocol(
+        connection,
+        hostname="garlicsmtp.onion",
+        pipeline=pipeline,
+        verifier=verifier,
+    )
+
+    protocol.serve()
+
+    assert verifier.calls == 0
+    assert pipeline.calls == 0
+
+    expected_reply = (
+        ReplyFactory.transaction_failed()
+        .serialize()
+    )
+
+    assert expected_reply in sock.sent
+    assert b"250 Message accepted\r\n" not in sock.sent
+
+
+def test_protocol_rejects_malformed_multipart_without_verifier_or_pipeline():
+    sock = FakeSocket()
+
+    sock.buffer = [
+        b"EHLO client.onion\r\n",
+        b"MAIL FROM:<alice@test.onion>\r\n",
+        b"RCPT TO:<bob@test.onion>\r\n",
+        b"DATA\r\n",
+        (
+            b"Content-Type: multipart/alternative; "
+            b'boundary="garlic-boundary"\r\n'
+        ),
+        b"\r\n",
+        b"This is not a valid multipart body\r\n",
+        b".\r\n",
+        b"QUIT\r\n",
+    ]
+
+    connection = SMTPConnection(
+        sock,
+        ("127.0.0.1", 2525),
+    )
+
+    class SpyVerifier:
+
+        def __init__(self):
+            self.calls = 0
+
+        def verify(self, message):
+            self.calls += 1
+            return VerificationStatus.UNKNOWN_KEY
 
     class SpyPipeline:
 

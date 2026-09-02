@@ -3,8 +3,10 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
 from garlicsmtp.queue.factory import QueueFactory
 from garlicsmtp.transport.onion.transport import OnionTransport
+from garlicsmtp.exceptions import PermanentDeliveryError
 
 
 class FakeConnection:
@@ -95,6 +97,7 @@ class ScriptedSocket:
             b"250 mail.hidden\r\n"
             b"250 sender accepted\r\n"
             b"250 recipient accepted\r\n"
+            b"250 recipient accepted\r\n"
             b"354 end with dot\r\n"
             b"250 message accepted\r\n"
             b"221 bye\r\n"
@@ -156,7 +159,8 @@ def test_onion_transport_runs_real_smtp_client(message):
     )
 
     message.envelope.recipients = [
-        f"bob@{host}"
+        f"bob@{host}",
+        f"carol@{host}",
     ]
 
     message.headers.fields[
@@ -189,6 +193,7 @@ def test_onion_transport_runs_real_smtp_client(message):
         "EHLO [127.0.0.1]\r\n"
         "MAIL FROM:<alice@sender.onion>\r\n"
         f"RCPT TO:<bob@{host}>\r\n"
+        f"RCPT TO:<carol@{host}>\r\n"
         "DATA\r\n"
         "Subject: Tor delivery test\r\n"
         "\r\n"
@@ -198,3 +203,43 @@ def test_onion_transport_runs_real_smtp_client(message):
     )
 
     assert socks.connection.closed is True
+
+
+import pytest
+
+from garlicsmtp.exceptions import PermanentDeliveryError
+
+
+def test_onion_transport_rejects_recipients_on_different_hosts(
+    message,
+):
+    first_host = "a" * 56 + ".onion"
+    second_host = "b" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{first_host}",
+        f"carol@{second_host}",
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+    smtp = FakeSMTPClient()
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+    )
+
+    with pytest.raises(
+        PermanentDeliveryError,
+        match="different onion hosts",
+    ):
+        transport.deliver(item)
+
+    assert socks.connected == []
+    assert smtp.delivered == []

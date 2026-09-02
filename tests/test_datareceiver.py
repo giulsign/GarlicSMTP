@@ -15,6 +15,7 @@ from garlicsmtp.models import (
 from garlicsmtp.security.signer import MessageSigner
 from garlicsmtp.smtp.engine import SMTPEngine
 from garlicsmtp.smtp.session import SMTPSession
+from garlicsmtp.smtp.state import SMTPState
 
 
 def test_smtp_engine_receives_text_plain_message():
@@ -222,3 +223,79 @@ def test_smtp_engine_rejects_duplicate_signature_even_if_one_is_valid():
     assert done is True
     assert session.data_error == "Invalid message headers"
     assert session.state == session.state.WAIT_MAIL
+
+
+def test_smtp_engine_rejects_malformed_base64_body():
+    session = SMTPSession(
+        client_ip="127.0.0.1"
+    )
+
+    session.state = SMTPState.RECEIVE_DATA
+
+    engine = SMTPEngine()
+
+    lines = [
+        "Content-Type: text/plain; charset=utf-8",
+        "Content-Transfer-Encoding: base64",
+        "",
+        "%%%not-valid-base64%%%",
+    ]
+
+    for line in lines:
+        assert (
+            engine.receive_data(
+                session,
+                line,
+            )
+            is False
+        )
+
+    assert (
+        engine.receive_data(
+            session,
+            ".",
+        )
+        is True
+    )
+
+    assert session.data_error
+    assert session.state == SMTPState.WAIT_MAIL
+
+
+def test_smtp_engine_rejects_malformed_multipart_alternative():
+    session = SMTPSession(
+        client_ip="127.0.0.1"
+    )
+
+    session.state = SMTPState.RECEIVE_DATA
+
+    engine = SMTPEngine()
+
+    lines = [
+        (
+            "Content-Type: multipart/alternative; "
+            'boundary="garlic-boundary"'
+        ),
+        "",
+        "This is not a valid multipart body",
+    ]
+
+    for line in lines:
+        assert (
+            engine.receive_data(
+                session,
+                line,
+            )
+            is False
+        )
+
+    assert (
+        engine.receive_data(
+            session,
+            ".",
+        )
+        is True
+    )
+
+    assert session.data_error
+    assert session.state == SMTPState.WAIT_MAIL

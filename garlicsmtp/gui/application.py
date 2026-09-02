@@ -65,6 +65,11 @@ def build_view_model(
     mail_composer = MailComposerService(
         context.pipeline,
         signer=context.signer,
+        verifier=getattr(
+            context,
+            "verifier",
+            None,
+        ),
     )
 
     compose = ComposeViewModel(

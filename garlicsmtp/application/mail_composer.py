@@ -19,9 +19,11 @@ class MailComposerService:
         self,
         pipeline,
         signer=None,
+        verifier=None,
     ) -> None:
         self.pipeline = pipeline
         self.signer = signer
+        self.verifier = verifier
 
     def send(
         self,
@@ -63,14 +65,31 @@ class MailComposerService:
             body=body,
         )
 
+        verification_status = None
+
         if self.signer is not None:
             message = self.signer.sign(
                 message
             )
 
-        context = PipelineContext(
-            message=message
-        )
+            if self.verifier is not None:
+                verification_status = (
+                    self.verifier.verify(
+                        message
+                    )
+                )
+
+        if verification_status is None:
+            context = PipelineContext(
+                message=message
+            )
+        else:
+            context = PipelineContext(
+                message=message,
+                verification_status=(
+                    verification_status
+                ),
+            )
 
         context = self.pipeline.execute(
             context

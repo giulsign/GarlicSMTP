@@ -19,6 +19,15 @@ from garlicsmtp.security.signature_header import (
     SIGNATURE_HEADER,
     SignatureHeader,
 )
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
+from garlicsmtp.security.trust_store import (
+    MemoryTrustStore,
+)
+from garlicsmtp.security.verifier import (
+    Ed25519MessageVerifier,
+)
 
 
 class FakePipeline:
@@ -48,6 +57,25 @@ class FakeSigner:
         )
 
         return message
+
+class FakeVerifier:
+
+    def __init__(
+        self,
+        status,
+    ):
+        self.status = status
+        self.messages = []
+
+    def verify(
+        self,
+        message,
+    ):
+        self.messages.append(
+            message
+        )
+
+        return self.status
     
 def test_mail_composer_sends_message_through_pipeline():
     pipeline = FakePipeline()
@@ -213,3 +241,110 @@ def test_mail_composer_uses_real_message_signer():
 
     assert header.version == 1
     assert header.algorithm == "ed25519"
+
+
+def test_mail_composer_uses_verifier_status_for_signed_message():
+    pipeline = FakePipeline()
+
+    verifier = FakeVerifier(
+        VerificationStatus.VERIFIED
+    )
+
+    composer = MailComposerService(
+        pipeline,
+        signer=FakeSigner(),
+        verifier=verifier,
+    )
+
+    composer.send(
+        sender="alice@sender.onion",
+        recipient="alice@sender.onion",
+        subject="Self delivery",
+        body="Hello myself",
+    )
+
+    assert len(verifier.messages) == 1
+
+    context = pipeline.contexts[0]
+
+    assert (
+        context.verification_status
+        == VerificationStatus.VERIFIED
+    )
+
+
+def test_mail_composer_marks_untrusted_local_signature_unknown_key():
+    pipeline = FakePipeline()
+
+    private_key = Ed25519PrivateKey.generate()
+
+    signer = MessageSigner(
+        private_key
+    )
+
+    verifier = Ed25519MessageVerifier(
+        trust_store=MemoryTrustStore()
+    )
+
+    composer = MailComposerService(
+        pipeline,
+        signer=signer,
+        verifier=verifier,
+    )
+
+    composer.send(
+        sender="alice@sender.onion",
+        recipient="alice@sender.onion",
+        subject="Self delivery",
+        body="Hello myself",
+    )
+
+    context = pipeline.contexts[0]
+
+    assert (
+        context.verification_status
+        == VerificationStatus.UNKNOWN_KEY
+    )
+
+
+def test_mail_composer_marks_trusted_local_signature_verified():
+    pipeline = FakePipeline()
+
+    private_key = Ed25519PrivateKey.generate()
+
+    signer = MessageSigner(
+        private_key
+    )
+
+    trust_store = MemoryTrustStore()
+
+    public_key = private_key.public_key().public_bytes_raw()
+
+    trust_store.trust(
+        "garlicsmtp@sender.onion",
+        public_key,
+    )
+
+    verifier = Ed25519MessageVerifier(
+        trust_store=trust_store
+    )
+
+    composer = MailComposerService(
+        pipeline,
+        signer=signer,
+        verifier=verifier,
+    )
+
+    composer.send(
+        sender="garlicsmtp@sender.onion",
+        recipient="garlicsmtp@sender.onion",
+        subject="Self delivery",
+        body="Hello myself",
+    )
+
+    context = pipeline.contexts[0]
+
+    assert (
+        context.verification_status
+        == VerificationStatus.VERIFIED
+    )

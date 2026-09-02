@@ -19,6 +19,9 @@ from garlicsmtp.security.trust_store import (
 from garlicsmtp.security.verifier import (
     Ed25519MessageVerifier,
 )
+from cryptography.hazmat.primitives import (
+    serialization,
+)
 
 
 def test_application_builder_creates_context(
@@ -362,6 +365,57 @@ def test_application_builder_connects_onion_hostname_to_tor_status(
     assert status.onion_hostname == (
         ("a" * 56)
         + ".onion"
+    )
+
+
+def test_application_builder_trusts_local_onion_sender_key(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = True
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    onion_service = context.onion_service
+
+    hostname = (
+        ("a" * 56)
+        + ".onion"
+    )
+
+    assert onion_service is not None
+    assert (
+        onion_service.hostname_callback
+        is not None
+    )
+
+    onion_service.hostname_callback(
+        hostname
+    )
+
+    public_key = (
+        context.signer.private_key
+        .public_key()
+        .public_bytes(
+            encoding=serialization.Encoding.Raw,
+            format=serialization.PublicFormat.Raw,
+        )
+    )
+
+    assert (
+        context.verifier
+        .trust_store
+        .is_trusted(
+            "garlicsmtp@" + hostname,
+            public_key,
+        )
     )
 
 

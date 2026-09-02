@@ -194,3 +194,56 @@ def test_canonicalizer_normalizes_header_names_case_insensitively():
         MessageCanonicalizer.canonicalize(first)
         == MessageCanonicalizer.canonicalize(second)
     )
+
+
+def test_canonicalizer_excludes_signature_header_case_insensitively():
+    first = build_message()
+    second = build_message()
+
+    first.headers.fields[
+        "X-GarlicSMTP-Signature"
+    ] = "v=1; alg=ed25519; key=abc; sig=first"
+
+    second.headers.fields[
+        "x-garlicsmtp-signature"
+    ] = "v=1; alg=ed25519; key=abc; sig=second"
+
+    assert (
+        MessageCanonicalizer.canonicalize(first)
+        == MessageCanonicalizer.canonicalize(second)
+    )
+
+
+def test_canonicalizer_distinguishes_unicode_normalization_forms():
+    first = build_message()
+    second = build_message()
+
+    first.body = "Café"
+    second.body = "Cafe\u0301"
+
+    assert first.body != second.body
+
+    assert (
+        MessageCanonicalizer.canonicalize(first)
+        != MessageCanonicalizer.canonicalize(second)
+    )
+
+
+def test_canonicalizer_changes_when_recipient_order_changes():
+    first = build_message()
+    second = build_message()
+
+    first.envelope.recipients = [
+        "bob@test.onion",
+        "carol@test.onion",
+    ]
+
+    second.envelope.recipients = [
+        "carol@test.onion",
+        "bob@test.onion",
+    ]
+
+    assert (
+        MessageCanonicalizer.canonicalize(first)
+        != MessageCanonicalizer.canonicalize(second)
+    )

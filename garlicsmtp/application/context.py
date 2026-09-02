@@ -46,6 +46,9 @@ from garlicsmtp.tor.onion_service_manager import (
 from garlicsmtp.security.signer import (
     MessageSigner,
 )
+from garlicsmtp.security.verifier import (
+    Ed25519MessageVerifier,
+)
 
 
 @dataclass(slots=True)
@@ -71,5 +74,7 @@ class ApplicationContext:
     queue_worker: QueueWorker
 
     runtime: Runtime
-    onion_service: OnionServiceManager | None
     tor_monitor: TorMonitorService
+    onion_service: OnionServiceManager | None
+    verifier: Ed25519MessageVerifier | None = None
+    

@@ -3,8 +3,10 @@
 #
 # See LICENSE for the full license terms.
 
+import base64
 import json
-from dataclasses import asdict 
+import quopri
+from dataclasses import asdict
 
 from garlicsmtp.models import (
     Envelope,
@@ -37,7 +39,6 @@ class MessageSerializer:
     def from_dict(
         data: dict,
     ) -> MailMessage:
-        
         return MailMessage(
             envelope=Envelope(
                 **data["envelope"]
@@ -57,9 +58,7 @@ class MessageSerializer:
         )
 
     @staticmethod
-    def to_rfc5322(
-        message: MailMessage,
-    ) -> str:
+    def to_rfc5322(message):
         lines = []
 
         for name, value in message.headers.fields.items():
@@ -74,6 +73,61 @@ class MessageSerializer:
                 )
 
         lines.append("")
-        lines.append(message.body or "")
+
+        body = message.body or ""
+
+        content_type = message.headers.get(
+            "Content-Type",
+            "",
+        )
+
+        encoding = message.headers.get(
+            "Content-Transfer-Encoding",
+            "",
+        )
+
+        if content_type.lower().startswith(
+            "multipart/alternative"
+        ):
+            boundary = ""
+
+            for parameter in content_type.split(";")[1:]:
+                name, separator, value = (
+                    parameter.partition("=")
+                )
+
+                if (
+                    separator
+                    and name.strip().lower()
+                    == "boundary"
+                ):
+                    boundary = (
+                        value.strip()
+                        .strip('"')
+                    )
+                    break
+
+            if boundary:
+                body = "\r\n".join(
+                    [
+                        f"--{boundary}",
+                        "Content-Type: text/plain; charset=utf-8",
+                        "",
+                        body,
+                        f"--{boundary}--",
+                    ]
+                )
+
+        elif encoding.lower() == "quoted-printable":
+            body = quopri.encodestring(
+                body.encode("utf-8")
+            ).decode("ascii")
+
+        elif encoding.lower() == "base64":
+            body = base64.b64encode(
+                body.encode("utf-8")
+            ).decode("ascii")
+
+        lines.append(body)
 
         return "\r\n".join(lines)

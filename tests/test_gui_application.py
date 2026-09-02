@@ -200,11 +200,13 @@ def test_build_view_model_connects_composer_to_context_signer(
 ):
     pipeline = FakePipeline()
     signer = object()
+    verifier = object()
 
     context = SimpleNamespace(
         pipeline=pipeline,
         store=object(),
         signer=signer,
+        verifier=verifier,
     )
 
     class FakeBuilder:
@@ -235,4 +237,11 @@ def test_build_view_model_connects_composer_to_context_signer(
         .composer
         .signer
         is signer
+    )
+
+    assert (
+        view_model.compose
+        .composer
+        .verifier
+        is verifier
     )

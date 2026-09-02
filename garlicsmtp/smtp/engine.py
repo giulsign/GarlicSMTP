@@ -3,6 +3,7 @@
 #
 # See LICENSE for the full license terms.
 
+import binascii
 from garlicsmtp.smtp.headerparser import HeaderParser
 from garlicsmtp.smtp.rfc5322 import RFC5322Parser
 from garlicsmtp.smtp.state import SMTPState
@@ -58,10 +59,22 @@ class SMTPEngine:
                 )
             )
 
-            body = MimeDecoder.decode(
-                raw_body,
-                encoding,
-            )
+            try:
+                body = MimeDecoder.decode(
+                    raw_body,
+                    encoding,
+                )
+            except (
+                binascii.Error,
+                UnicodeDecodeError,
+            ):
+                session.data_error = (
+                    "Invalid message body"
+                )
+
+                session.state = SMTPState.WAIT_MAIL
+
+                return True
 
             if content_type.lower().startswith(
                 "multipart/alternative"
@@ -85,13 +98,22 @@ class SMTPEngine:
                         break
 
                 if boundary:
-                    body = (
-                        MimeDecoder
-                        .extract_multipart_alternative(
-                            raw_body,
-                            boundary,
+                    try:
+                        body = (
+                            MimeDecoder
+                            .extract_multipart_alternative(
+                                raw_body,
+                                boundary,
+                            )
                         )
-                    )
+                    except ValueError:
+                        session.data_error = (
+                            "Invalid multipart body"
+                        )
+
+                        session.state = SMTPState.WAIT_MAIL
+
+                        return True
 
             session.message.body = body
 

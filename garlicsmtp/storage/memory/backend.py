@@ -348,56 +348,6 @@ class MemoryMessageStoreBackend(
         entry.flags.difference_update(flags)
 
         return True
-    
-
-    def test_memory_store_deletes_entry(
-        message,
-    ):
-        store = MessageStore()
-
-        first = store.save_entry(
-            "bob@test.onion",
-            message,
-        )
-
-        second = store.save_entry(
-            "bob@test.onion",
-            message,
-        )
-
-        assert store.delete_entry(
-            "bob@test.onion",
-            first.id,
-        ) is True
-
-        assert store.get_entry(
-            "bob@test.onion",
-            first.id,
-        ) is None
-
-        restored = store.get_entry(
-            "bob@test.onion",
-            second.id,
-        )
-
-        assert restored is not None
-        assert restored.id == second.id
-
-
-    def test_memory_store_delete_returns_false_for_missing_entry(
-        message,
-    ):
-        store = MessageStore()
-
-        store.save_entry(
-            "bob@test.onion",
-            message,
-        )
-
-        assert store.delete_entry(
-            "bob@test.onion",
-            "missing",
-        ) is False
 
     def copy_entry(
         self,

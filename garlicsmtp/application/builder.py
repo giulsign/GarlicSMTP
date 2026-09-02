@@ -192,6 +192,24 @@ class ApplicationBuilder:
             trust_store=trust_store
         )
 
+        signing_public_key = (
+            signing_identity.private_key
+            .public_key()
+            .public_bytes_raw()
+        )
+
+        def register_local_hostname(
+            hostname: str,
+        ) -> None:
+            local_domains.add(
+                hostname
+            )
+
+            trust_store.trust(
+                "garlicsmtp@" + hostname,
+                signing_public_key,
+            )
+
         smtp_server = self._build_smtp_server(
             settings=settings,
             pipeline=pipeline,
@@ -216,7 +234,7 @@ class ApplicationBuilder:
             onion_service = (
                 self._build_onion_service(
                     settings,
-                    hostname_callback=(local_domains.add),
+                    hostname_callback=register_local_hostname,
                 )
             )
 
@@ -253,6 +271,7 @@ class ApplicationBuilder:
             transport=transport,
             pipeline=pipeline,
             signer=signer,
+            verifier=verifier,
             smtp_server=smtp_server,
             imap_server=imap_server,
             queue_worker=queue_worker,

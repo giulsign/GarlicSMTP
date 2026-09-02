@@ -6,7 +6,7 @@
 from quopri import decodestring
 from email import policy
 from email.parser import Parser
-
+import base64
 
 class MimeDecoder:
 
@@ -24,7 +24,13 @@ class MimeDecoder:
             ).decode(
                 "utf-8"
             )
-
+        
+        if normalized == "base64":
+            return base64.b64decode(
+                body.encode("ascii"),
+                validate=True,
+            ).decode("utf-8")
+        
         return body
 
     @staticmethod
@@ -44,6 +50,11 @@ class MimeDecoder:
             )
         )
 
+        if not message.is_multipart():
+            raise ValueError(
+                "Invalid multipart body"
+            )
+
         for part in message.iter_parts():
             if part.get_content_type() != "text/plain":
                 continue
@@ -56,4 +67,6 @@ class MimeDecoder:
             ):
                 return content.strip()
 
-        return body
+        raise ValueError(
+            "Multipart body has no text/plain part"
+        )

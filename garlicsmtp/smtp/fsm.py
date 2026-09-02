@@ -39,6 +39,7 @@ class SMTPStateMachine:
         },
 
         SMTPState.WAIT_DATA: {
+            "RCPT",
             "DATA",
             "RSET",
             "NOOP",
