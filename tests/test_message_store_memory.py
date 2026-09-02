@@ -694,4 +694,4 @@ def test_memory_store_delete_returns_false_for_missing_entry(
     assert backend.delete_entry(
         "bob@test.onion",
         "missing",
-    ) is False
+    ) is False  
