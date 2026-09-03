@@ -105,6 +105,86 @@ def test_protocol_ehlo():
 
     assert reply.code == 250
 
+class FakeSocketE2EECapability:
+
+    def __init__(self):
+        self.sent = b""
+        self.replies = [
+            b"250-Hello garlic.onion\r\n",
+            b"250-GARLICSMTP-E2EE v=1; alg=x25519; key=dGVzdA==\r\n",
+            b"250 OK\r\n",
+        ]
+
+    def sendall(self, data):
+        self.sent += data
+
+    def recv(self, size):
+        return self.replies.pop(0)
+
+    def close(self):
+        pass
+
+
+def test_protocol_ehlo_reads_e2ee_capability():
+    connection = SMTPConnection()
+
+    connection.socket = FakeSocketE2EECapability()
+    connection._buffer = b""
+
+    protocol = SMTPClientProtocol(
+        connection
+    )
+
+    reply = protocol.ehlo(
+        "garlic.onion"
+    )
+
+    assert reply.code == 250
+    assert reply.message == (
+        "Hello garlic.onion\n"
+        "GARLICSMTP-E2EE "
+        "v=1; alg=x25519; key=dGVzdA==\n"
+        "OK"
+    )
+
+def test_protocol_ehlo_exposes_e2ee_capability():
+    connection = SMTPConnection()
+
+    connection.socket = FakeSocketE2EECapability()
+    connection._buffer = b""
+
+    protocol = SMTPClientProtocol(
+        connection
+    )
+
+    reply = protocol.ehlo(
+        "garlic.onion"
+    )
+
+    assert reply.capability(
+        "GARLICSMTP-E2EE"
+    ) == (
+        "v=1; alg=x25519; key=dGVzdA=="
+    )
+
+def test_protocol_ehlo_returns_none_for_missing_capability():
+    connection = SMTPConnection()
+
+    connection.socket = FakeSocket()
+    connection._buffer = b""
+
+    protocol = SMTPClientProtocol(
+        connection
+    )
+
+    reply = protocol.ehlo(
+        "garlic.onion"
+    )
+
+    assert reply.capability(
+        "GARLICSMTP-E2EE"
+    ) is None
+
 def test_protocol_mail_from():
 
     connection = SMTPConnection()

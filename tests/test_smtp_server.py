@@ -351,11 +351,15 @@ def test_smtp_server_passes_verifier_to_protocol(
             hostname,
             pipeline,
             verifier,
+            e2ee_capability,
         ):
             captured["connection"] = connection
             captured["hostname"] = hostname
             captured["pipeline"] = pipeline
             captured["verifier"] = verifier
+            captured["e2ee_capability"] = (
+                e2ee_capability
+            )
 
         def serve(self):
             captured["served"] = True
@@ -385,4 +389,8 @@ def test_smtp_server_passes_verifier_to_protocol(
     assert captured["hostname"] == "test.onion"
     assert captured["pipeline"] is pipeline
     assert captured["verifier"] is verifier
+    assert (
+        captured["e2ee_capability"]
+        is None
+    )
     assert captured["served"] is True

@@ -22,6 +22,12 @@ from garlicsmtp.security.verifier import (
 from cryptography.hazmat.primitives import (
     serialization,
 )
+from garlicsmtp.security.encryption_capability import (
+    EncryptionCapability,
+)
+from garlicsmtp.security.encryption_identity import (
+    EncryptionIdentity,
+)
 
 
 def test_application_builder_creates_context(
@@ -490,3 +496,37 @@ def test_application_builder_preserves_trusted_key_across_builds(
         sender,
         public_key,
     )
+
+
+def test_application_builder_configures_e2ee_capability(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    identity = EncryptionIdentity(
+        paths.root_dir / "encryption.key"
+    )
+
+    capability = EncryptionCapability.parse(
+        context.smtp_server.e2ee_capability
+    )
+
+    assert (
+        capability.public_key.public_bytes_raw()
+        == identity.private_key
+        .public_key()
+        .public_bytes_raw()
+    )
+
+    context.queue.backend.close()
+    context.store.backend.close()

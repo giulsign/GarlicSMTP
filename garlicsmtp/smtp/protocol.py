@@ -30,6 +30,7 @@ class SMTPProtocol:
         hostname: str = "localhost",
         pipeline: Pipeline | None = None,
         verifier: MessageVerifier | None = None,
+        e2ee_capability: str | None = None,
     ):
         if pipeline is None:
             raise ValueError(
@@ -41,7 +42,7 @@ class SMTPProtocol:
         self.session = SMTPSession(
             connection.ip
         )
-        self.dispatcher = create_dispatcher()
+        self.dispatcher = create_dispatcher(e2ee_capability=e2ee_capability)
         self.engine = SMTPEngine()
         self.pipeline = pipeline
         self.verifier = verifier

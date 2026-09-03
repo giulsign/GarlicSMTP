@@ -11,4 +11,16 @@ class SMTPServerReply:
 
     code: int
 
-    message: str 
+    message: str
+
+    def capability(
+        self,
+        name: str,
+    ) -> str | None:
+        prefix = name + " "
+
+        for line in self.message.splitlines():
+            if line.startswith(prefix):
+                return line[len(prefix):]
+
+        return None

@@ -18,5 +18,26 @@ class SMTPReply:
     code: int
     message: str
 
-    def serialize(self) -> bytes:
-        return f"{self.code} {self.message}\r\n".encode("ascii")
+    def serialize(self) -> bytes:   
+        lines = self.message.splitlines()
+
+        if len(lines) == 1:
+            return (
+                f"{self.code} {lines[0]}\r\n"
+                .encode("ascii")
+            )
+
+        serialized = []
+
+        for line in lines[:-1]:
+            serialized.append(
+                f"{self.code}-{line}\r\n"
+            )
+
+        serialized.append(
+            f"{self.code} {lines[-1]}\r\n"
+        )
+
+        return "".join(
+            serialized
+        ).encode("ascii")

@@ -101,6 +101,12 @@ from garlicsmtp.security.trust_store import (
 from garlicsmtp.security.verifier import (
     Ed25519MessageVerifier,
 )
+from garlicsmtp.security.encryption_identity import (
+    EncryptionIdentity,
+)
+from garlicsmtp.security.encryption_capability import (
+    EncryptionCapability,
+)
 
 
 class ApplicationBuilder:
@@ -180,6 +186,17 @@ class ApplicationBuilder:
             self.paths.root_dir / "signing.key"
         )
 
+        encryption_identity = EncryptionIdentity(
+            self.paths.root_dir / "encryption.key"
+        )
+
+        e2ee_capability = EncryptionCapability(
+            public_key=(
+                encryption_identity.private_key
+                .public_key()
+            )
+        ).serialize()
+
         signer = MessageSigner(
             signing_identity.private_key
         )
@@ -215,6 +232,7 @@ class ApplicationBuilder:
             pipeline=pipeline,
             logger=logger,
             verifier=verifier,
+            e2ee_capability=e2ee_capability,
         )
 
         imap_server = self._build_imap_server(
@@ -368,6 +386,7 @@ class ApplicationBuilder:
         pipeline: Pipeline,
         logger: Logger,
         verifier: Ed25519MessageVerifier,
+        e2ee_capability: str,
     ) -> SMTPServer:
         return SMTPServer(
             pipeline=pipeline,
@@ -376,6 +395,7 @@ class ApplicationBuilder:
             hostname=settings.hostname,
             logger=logger,
             verifier=verifier,
+            e2ee_capability=e2ee_capability,
     )
 
     @staticmethod

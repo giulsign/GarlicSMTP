@@ -27,6 +27,7 @@ class SMTPServer(Service, Tickable):
         hostname: str = "localhost",
         logger=None,
         verifier: MessageVerifier | None = None,
+        e2ee_capability: str | None = None,
     ):
         self.server = TCPServer(
             host,
@@ -40,6 +41,7 @@ class SMTPServer(Service, Tickable):
         self.logger = logger or Logger()
         self.pipeline = pipeline
         self.verifier = verifier
+        self.e2ee_capability = e2ee_capability
         self._connection_threads = set()
         self._threads_lock = threading.Lock()
 
@@ -82,6 +84,7 @@ class SMTPServer(Service, Tickable):
             hostname=self.hostname,
             pipeline=self.pipeline,
             verifier=self.verifier,
+            e2ee_capability=self.e2ee_capability,
         )
 
         protocol.serve()
