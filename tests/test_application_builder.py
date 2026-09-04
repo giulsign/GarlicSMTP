@@ -28,6 +28,9 @@ from garlicsmtp.security.encryption_capability import (
 from garlicsmtp.security.encryption_identity import (
     EncryptionIdentity,
 )
+from garlicsmtp.security.encryption_key_store import (
+    FileEncryptionKeyStore,
+)
 
 
 def test_application_builder_creates_context(
@@ -530,3 +533,71 @@ def test_application_builder_configures_e2ee_capability(
 
     context.queue.backend.close()
     context.store.backend.close()
+
+
+def test_application_builder_builds_persistent_encryption_key_store(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    assert isinstance(
+        context.encryption_key_store,
+        FileEncryptionKeyStore,
+    )
+
+    assert (
+        context.encryption_key_store.path
+        == tmp_path / "encryption_keys.json"
+    )
+
+    context.queue.backend.close()
+
+
+def test_application_builder_pins_discovered_e2ee_key(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    onion_transport = (
+        context.transport.default_transport
+    )
+
+    host = "a" * 56 + ".onion"
+
+    capability = EncryptionCapability.parse(
+        (
+            "v=1; alg=x25519; "
+            "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        )
+    )
+
+    assert (
+        onion_transport.e2ee_capability_callback
+        is not None
+    )
+
+    onion_transport.e2ee_capability_callback(
+        host,
+        capability,
+    )
+
+    assert (
+        context.encryption_key_store.get(host)
+        == b"\x00" * 32
+    )
+
+    context.queue.backend.close()

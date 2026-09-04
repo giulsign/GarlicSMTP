@@ -42,6 +42,9 @@ class FakeSMTPClient:
     def __init__(self):
         self.delivered = []
 
+    def discover_e2ee_capability(self):
+        return None
+
     def deliver(self, message):
         self.delivered.append(message)
         return True

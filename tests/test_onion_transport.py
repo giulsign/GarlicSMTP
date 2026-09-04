@@ -7,6 +7,15 @@ import pytest
 from garlicsmtp.queue.factory import QueueFactory
 from garlicsmtp.transport.onion.transport import OnionTransport
 from garlicsmtp.exceptions import PermanentDeliveryError
+from garlicsmtp.security.encryption_capability import (
+    EncryptionCapability,
+)
+from garlicsmtp.exceptions import (
+    TemporaryDeliveryError,
+)
+from garlicsmtp.security.encryption_key_store import (
+    MemoryEncryptionKeyStore,
+)
 
 
 class FakeConnection:
@@ -36,11 +45,22 @@ class FakeSocksClient:
 
         return self.connection
 
-
 class FakeSMTPClient:
 
-    def __init__(self):
+    def __init__(
+        self,
+        e2ee_capability=(
+            "v=1; alg=x25519; "
+            "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        ),
+    ):
         self.delivered = []
+        self.e2ee_capability = (
+            e2ee_capability
+        )
+
+    def discover_e2ee_capability(self):
+        return self.e2ee_capability
 
     def deliver(self, message):
         self.delivered.append(
@@ -49,6 +69,7 @@ class FakeSMTPClient:
 
         return True
 
+    
 
 def test_onion_transport_connects_and_delivers(message):
 
@@ -84,6 +105,56 @@ def test_onion_transport_connects_and_delivers(message):
 
     assert socks.connection.closed is True
 
+def test_onion_transport_reports_discovered_e2ee_capability(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+    smtp = FakeSMTPClient()
+
+    discovered = []
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+        e2ee_capability_callback=(
+            lambda hostname, capability:
+            discovered.append(
+                (hostname, capability)
+            )
+        ),
+    )
+
+    assert transport.deliver(item) is True
+
+    assert len(discovered) == 1
+
+    discovered_host, capability = (
+        discovered[0]
+    )
+
+    assert discovered_host == host
+
+    assert isinstance(
+        capability,
+        EncryptionCapability,
+    )
+
+    assert capability.serialize() == (
+        "v=1; alg=x25519; "
+        "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    )
 
 class ScriptedSocket:
 
@@ -243,3 +314,269 @@ def test_onion_transport_rejects_recipients_on_different_hosts(
 
     assert socks.connected == []
     assert smtp.delivered == []
+
+
+def test_onion_transport_does_not_report_missing_e2ee_capability(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+
+    smtp = FakeSMTPClient(
+        e2ee_capability=None,
+    )
+
+    discovered = []
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+        e2ee_capability_callback=(
+            lambda hostname, capability:
+            discovered.append(
+                (hostname, capability)
+            )
+        ),
+    )
+
+    assert transport.deliver(item) is True
+
+    assert discovered == []
+
+
+def test_onion_transport_reports_parsed_e2ee_capability(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+    smtp = FakeSMTPClient()
+
+    discovered = []
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+        e2ee_capability_callback=(
+            lambda hostname, capability:
+            discovered.append(
+                (hostname, capability)
+            )
+        ),
+    )
+
+    assert transport.deliver(item) is True
+
+    assert len(discovered) == 1
+
+    discovered_host, capability = (
+        discovered[0]
+    )
+
+    assert discovered_host == host
+
+    assert isinstance(
+        capability,
+        EncryptionCapability,
+    )
+
+    assert capability.serialize() == (
+        "v=1; alg=x25519; "
+        "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    )
+
+
+def test_onion_transport_treats_invalid_e2ee_capability_as_temporary_error(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+
+    smtp = FakeSMTPClient(
+        e2ee_capability=(
+            "v=1; alg=x25519; key=dGVzdA=="
+        ),
+    )
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+    )
+
+    with pytest.raises(
+        TemporaryDeliveryError,
+        match="Invalid E2EE capability",
+    ):
+        transport.deliver(item)
+
+
+def test_onion_transport_discovered_key_can_be_pinned(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+    smtp = FakeSMTPClient()
+
+    store = MemoryEncryptionKeyStore()
+
+    def remember_capability(
+        hostname,
+        capability,
+    ):
+        store.remember(
+            hostname,
+            capability.public_key.public_bytes_raw(),
+        )
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+        e2ee_capability_callback=(
+            remember_capability
+        ),
+    )
+
+    assert transport.deliver(item) is True
+
+    assert store.get(host) == (
+        b"\x00" * 32
+    )
+
+
+def test_onion_transport_treats_e2ee_key_change_as_temporary_error(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+    
+    def reject_changed_key(
+        hostname,
+        capability,
+    ):
+        raise ValueError(
+            "encryption key changed"
+        )
+
+    socks_client = FakeSocksClient()
+
+    smtp_client = FakeSMTPClient(
+        e2ee_capability=(
+            "v=1; alg=x25519; "
+            "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+        )
+    )
+
+    transport = OnionTransport(
+        socks_client=socks_client,
+        smtp_client_factory=lambda connection: smtp_client,
+        e2ee_capability_callback=reject_changed_key,
+    )
+
+    item = QueueFactory.create(
+        message
+    )
+
+    with pytest.raises(
+        TemporaryDeliveryError,
+        match="E2EE key rejected",
+    ):
+        transport.deliver(item)
+
+    assert socks_client.connection.closed is True
+
+
+def test_onion_transport_discovers_e2ee_before_delivering(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = FakeSocksClient()
+    events = []
+
+    class DiscoverySMTPClient:
+
+        e2ee_capability = None
+
+        def discover_e2ee_capability(self):
+            events.append("discover")
+
+            self.e2ee_capability = (
+                "v=1; alg=x25519; "
+                "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+            )
+
+            return self.e2ee_capability
+
+        def deliver(self, message):
+            events.append("deliver")
+            return True
+
+    smtp = DiscoverySMTPClient()
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+    )
+
+    assert transport.deliver(item) is True
+
+    assert events == [
+        "discover",
+        "deliver",
+    ]

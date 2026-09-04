@@ -49,6 +49,9 @@ from garlicsmtp.security.signer import (
 from garlicsmtp.security.verifier import (
     Ed25519MessageVerifier,
 )
+from garlicsmtp.security.encryption_key_store import (
+    FileEncryptionKeyStore,
+)
 
 
 @dataclass(slots=True)
@@ -68,6 +71,7 @@ class ApplicationContext:
     transport: TransportManager
     pipeline: Pipeline
     signer: MessageSigner
+    encryption_key_store: FileEncryptionKeyStore
 
     smtp_server: SMTPServer
     imap_server: IMAPServer
@@ -77,4 +81,5 @@ class ApplicationContext:
     tor_monitor: TorMonitorService
     onion_service: OnionServiceManager | None
     verifier: Ed25519MessageVerifier | None = None
+
     

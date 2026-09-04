@@ -20,15 +20,35 @@ class SMTPClient:
             connection,
         )
 
+    def discover_e2ee_capability(
+        self,
+    ) -> str | None:
+        self.protocol.greeting()
+
+        ehlo_reply = self.protocol.ehlo(
+            "[127.0.0.1]",
+        )
+
+        self.e2ee_capability = (
+            ehlo_reply.capability(
+                "GARLICSMTP-E2EE"
+            )
+        )
+
+        self._session_prepared = True
+
+        return self.e2ee_capability
+
     def deliver(
         self,
         message: MailMessage,
     ) -> bool:
-        self.protocol.greeting()
-
-        self.protocol.ehlo(
-            "[127.0.0.1]",
-        )
+        if not getattr(
+            self,
+            "_session_prepared",
+            False,
+        ):
+            self.discover_e2ee_capability()
 
         self.protocol.mail_from(
             message.envelope.sender,
@@ -44,6 +64,8 @@ class SMTPClient:
         )
 
         self.protocol.quit()
+
+        self._session_prepared = False
 
         return True
 

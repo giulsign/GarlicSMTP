@@ -39,6 +39,9 @@ from garlicsmtp.application.event_log import (
 from garlicsmtp.application.event_service import (
     ApplicationEventService,
 )
+from garlicsmtp.security.encryption_key_store import (
+    MemoryEncryptionKeyStore,
+)
 
 
 class FakeServer:
@@ -167,6 +170,8 @@ def build_context() -> ApplicationContext:
         logger=logger,
     )
 
+    encryption_key_store = MemoryEncryptionKeyStore()
+
     return ApplicationContext(
         paths=paths,
         settings=settings,
@@ -179,6 +184,7 @@ def build_context() -> ApplicationContext:
         transport=transport,
         pipeline=pipeline,
         signer=None,
+        encryption_key_store=encryption_key_store,
         smtp_server=smtp_server,
         imap_server=imap_server,
         queue_worker=queue_worker,

@@ -12,6 +12,12 @@ from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.queue.worker import QueueWorker
 from garlicsmtp.transport.dummy import DummyTransport
 from garlicsmtp.transport.manager import TransportManager
+from garlicsmtp.transport.onion.transport import (
+    OnionTransport,
+)
+from garlicsmtp.security.encryption_key_store import (
+    MemoryEncryptionKeyStore,
+)
 
 
 class SpyLogger:
@@ -562,3 +568,225 @@ def test_worker_discards_item_on_permanent_error(message):
     assert item.attempts == 0
     assert item.last_error is None
     assert item.next_retry is None
+
+
+def test_worker_retries_invalid_onion_e2ee_capability(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    class FakeConnection:
+
+        def __init__(self):
+            self.socket = object()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeSocksClient:
+
+        def __init__(self):
+            self.connection = FakeConnection()
+
+        def connect(
+            self,
+            host,
+            port,
+        ):
+            return self.connection
+
+    class InvalidCapabilitySMTPClient:
+
+        e2ee_capability = (
+            "v=1; alg=x25519; key=dGVzdA=="
+        )
+
+        def discover_e2ee_capability(self):
+            return self.e2ee_capability
+
+        def deliver(
+            self,
+            message,
+        ):
+            return True
+
+    queue = QueueManager()
+
+    item = QueueFactory.create(
+        message
+    )
+
+    queue.enqueue(
+        item
+    )
+
+    socks = FakeSocksClient()
+
+    onion_transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection:
+            InvalidCapabilitySMTPClient()
+        ),
+    )
+
+    transport = TransportManager(
+        default_transport=onion_transport,
+    )
+
+    worker = QueueWorker(
+        queue=queue,
+        transport=transport,
+        retry_policy=FixedRetryPolicy(),
+    )
+
+    worker.start()
+    worker.tick()
+    worker.stop()
+
+    assert queue.size() == 1
+    assert queue.peek() is None
+
+    assert item.attempts == 1
+    assert (
+        item.last_error
+        == "TemporaryDeliveryError"
+    )
+    assert item.next_retry is not None
+
+    assert (
+        socks.connection.closed
+        is True
+    )
+
+
+def test_worker_retries_changed_onion_e2ee_key_without_overwriting_pin(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    class FakeConnection:
+
+        def __init__(self):
+            self.socket = object()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeSocksClient:
+
+        def __init__(self):
+            self.connection = FakeConnection()
+
+        def connect(
+            self,
+            host,
+            port,
+        ):
+            return self.connection
+
+    class ChangedKeySMTPClient:
+
+        e2ee_capability = (
+            "v=1; alg=x25519; "
+            "key=AQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQEBAQE="
+        )
+
+        def discover_e2ee_capability(self):
+            return self.e2ee_capability
+
+        def deliver(
+            self,
+            message,
+        ):
+            return True
+
+    encryption_key_store = (
+        MemoryEncryptionKeyStore()
+    )
+
+    original_key = b"\x00" * 32
+
+    encryption_key_store.remember(
+        host,
+        original_key,
+    )
+
+    def remember_capability(
+        hostname,
+        capability,
+    ):
+        encryption_key_store.remember(
+            hostname,
+            capability.public_key.public_bytes_raw(),
+        )
+
+    queue = QueueManager()
+
+    item = QueueFactory.create(
+        message
+    )
+
+    queue.enqueue(
+        item
+    )
+
+    socks = FakeSocksClient()
+
+    onion_transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection:
+            ChangedKeySMTPClient()
+        ),
+        e2ee_capability_callback=(
+            remember_capability
+        ),
+    )
+
+    transport = TransportManager(
+        default_transport=onion_transport,
+    )
+
+    worker = QueueWorker(
+        queue=queue,
+        transport=transport,
+        retry_policy=FixedRetryPolicy(),
+    )
+
+    worker.start()
+    worker.tick()
+    worker.stop()
+
+    assert queue.size() == 1
+    assert queue.peek() is None
+
+    assert item.attempts == 1
+
+    assert (
+        item.last_error
+        == "TemporaryDeliveryError"
+    )
+
+    assert item.next_retry is not None
+
+    assert (
+        encryption_key_store.get(host)
+        == original_key
+    )
+
+    assert (
+        socks.connection.closed
+        is True
+    )
+    

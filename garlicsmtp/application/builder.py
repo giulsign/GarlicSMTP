@@ -107,6 +107,9 @@ from garlicsmtp.security.encryption_identity import (
 from garlicsmtp.security.encryption_capability import (
     EncryptionCapability,
 )
+from garlicsmtp.security.encryption_key_store import (
+    FileEncryptionKeyStore,
+)
 
 
 class ApplicationBuilder:
@@ -171,8 +174,13 @@ class ApplicationBuilder:
         store = self._build_store()
         queue = self._build_queue()
 
+        encryption_key_store = FileEncryptionKeyStore(
+            self.paths.root_dir / "encryption_keys.json"
+        )
+
         transport = self._build_transport(
-            settings
+            settings,
+            encryption_key_store=encryption_key_store,
         )
 
         pipeline = self._build_pipeline(
@@ -204,6 +212,10 @@ class ApplicationBuilder:
         trust_store = FileTrustStore(
             self.paths.root_dir / "trusted_keys.json"
         )
+
+        #encryption_key_store = FileEncryptionKeyStore(
+        #    self.paths.root_dir / "encryption_keys.json"
+        #)
 
         verifier = Ed25519MessageVerifier(
             trust_store=trust_store
@@ -289,6 +301,7 @@ class ApplicationBuilder:
             transport=transport,
             pipeline=pipeline,
             signer=signer,
+            encryption_key_store=encryption_key_store,
             verifier=verifier,
             smtp_server=smtp_server,
             imap_server=imap_server,
@@ -329,7 +342,19 @@ class ApplicationBuilder:
     def _build_transport(
         self,
         settings: ApplicationSettings,
+        *,
+        encryption_key_store: FileEncryptionKeyStore,
     ) -> TransportManager:
+
+        def remember_e2ee_capability(
+            hostname,
+            capability,
+        ) -> None:
+            encryption_key_store.remember(
+                hostname,
+                capability.public_key.public_bytes_raw(),
+            )
+
         default_transport = (
             self.default_transport
             or OnionTransport(
@@ -338,6 +363,9 @@ class ApplicationBuilder:
                 ),
                 socks_port=(
                     settings.tor.socks_port
+                ),
+                e2ee_capability_callback=(
+                    remember_e2ee_capability
                 ),
             )
         )

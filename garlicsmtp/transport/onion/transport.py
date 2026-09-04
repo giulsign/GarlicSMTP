@@ -21,6 +21,9 @@ from garlicsmtp.transport.onion.validator import OnionValidator
 from garlicsmtp.transport.smtp.client import SMTPClient
 from garlicsmtp.transport.smtp.connection import SMTPConnection
 from garlicsmtp.transport.smtp.exceptions import SMTPClientError
+from garlicsmtp.security.encryption_capability import (
+    EncryptionCapability,
+)
 
 
 class OnionTransport(Transport):
@@ -32,6 +35,7 @@ class OnionTransport(Transport):
         socks_port: int = 9050,
         destination_port: int = 25,
         smtp_client_factory=None,
+        e2ee_capability_callback=None,
     ):
         self.validator = OnionValidator()
         self.destination_port = destination_port
@@ -46,6 +50,10 @@ class OnionTransport(Transport):
         self.smtp_client_factory = (
             smtp_client_factory
             or self._build_smtp_client
+        )
+
+        self.e2ee_capability_callback = (
+            e2ee_capability_callback
         )
 
     def deliver(self, item: QueueItem) -> bool:
@@ -96,9 +104,41 @@ class OnionTransport(Transport):
                 socks_connection,
             )
 
-            return smtp_client.deliver(
+            capability = (
+                smtp_client.discover_e2ee_capability()
+            )
+
+            if capability is not None:
+                try:
+                    parsed_capability = (
+                        EncryptionCapability.parse(
+                            capability
+                        )
+                    )
+                except ValueError as exc:
+                    raise TemporaryDeliveryError(
+                        "Invalid E2EE capability"
+                    ) from exc
+
+                if (
+                    self.e2ee_capability_callback
+                    is not None
+                ):
+                    try:
+                        self.e2ee_capability_callback(
+                            destination_host,
+                            parsed_capability,
+                        )
+                    except ValueError as exc:
+                        raise TemporaryDeliveryError(
+                            "E2EE key rejected"
+                        ) from exc
+
+            delivered = smtp_client.deliver(
                 message,
             )
+
+            return delivered
 
         except (
             Socks5ConnectionError,
