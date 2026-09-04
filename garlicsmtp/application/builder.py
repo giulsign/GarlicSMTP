@@ -110,6 +110,9 @@ from garlicsmtp.security.encryption_capability import (
 from garlicsmtp.security.encryption_key_store import (
     FileEncryptionKeyStore,
 )
+from garlicsmtp.security.encryptor import (
+    MessageEncryptor,
+)
 
 
 class ApplicationBuilder:
@@ -188,6 +191,10 @@ class ApplicationBuilder:
             store=store,
             queue=queue,
             local_domains=local_domains,
+            encryption_key_store=(
+                encryption_key_store
+            ),
+            transport=transport,    
         )
 
         signing_identity = SigningIdentity(
@@ -355,9 +362,21 @@ class ApplicationBuilder:
                 capability.public_key.public_bytes_raw(),
             )
 
-        default_transport = (
-            self.default_transport
-            or OnionTransport(
+        if self.default_transport is not None:
+            default_transport = (
+                self.default_transport
+            )
+
+            if isinstance(
+                default_transport,
+                OnionTransport,
+            ):
+                default_transport.e2ee_capability_callback = (
+                    remember_e2ee_capability
+                )
+
+        else:
+            default_transport = OnionTransport(
                 socks_host=(
                     settings.tor.socks_host
                 ),
@@ -368,7 +387,6 @@ class ApplicationBuilder:
                     remember_e2ee_capability
                 ),
             )
-        )
 
         return TransportManager(
             default_transport=default_transport
@@ -381,6 +399,8 @@ class ApplicationBuilder:
         store: MessageStore,
         queue: QueueManager,
         local_domains: set[str],
+        encryption_key_store,
+        transport: TransportManager,
     ) -> Pipeline:
         queue_stage = QueueStage(
             queue
@@ -392,11 +412,28 @@ class ApplicationBuilder:
             LoggerStage()
         )
 
+        default_transport = (
+            transport.default_transport
+        )
+
+        discover_encryption_key = getattr(
+            default_transport,
+            "discover_e2ee_capability",
+            None,
+)
+
         pipeline.add(
             DeliveryStage(
                 store=store,
                 queue_stage=queue_stage,
                 local_domains=local_domains,
+                encryptor=MessageEncryptor(),
+                encryption_key_store=(
+                    encryption_key_store
+                ),
+                discover_encryption_key=(
+                    discover_encryption_key
+                ),
             )
         )
 

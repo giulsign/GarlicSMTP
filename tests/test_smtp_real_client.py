@@ -10,11 +10,35 @@ import time
 from garlicsmtp.core.engine import Bootstrap
 from garlicsmtp.core.engine import GarlicSMTPConfig
 from garlicsmtp.transport.base import Transport
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+)
 
 class SpyTransport(Transport):
 
     def __init__(self):
         self.delivered = []
+        self.discovered = []
+        self.encryption_key_store = None
+
+        self.private_key = (
+            X25519PrivateKey.generate()
+        )
+
+    def discover_e2ee_capability(
+        self,
+        hostname,
+    ):
+        self.discovered.append(
+            hostname
+        )
+
+        self.encryption_key_store.remember(
+            hostname,
+            self.private_key
+            .public_key()
+            .public_bytes_raw(),
+        )
 
     def deliver(self, item):
         self.delivered.append(item)
@@ -44,6 +68,11 @@ def test_smtp_real_client_delivers_to_queue(tmp_path):
     )
 
     app = bootstrap.build()
+
+    spy.encryption_key_store = (
+        bootstrap.build_context()
+        .encryption_key_store
+    )
 
     thread = threading.Thread(
         target=run_app,
@@ -79,8 +108,21 @@ def test_smtp_real_client_delivers_to_queue(tmp_path):
 
         assert item.message.envelope.sender == "alice@test.onion"
         assert item.message.envelope.recipients == ["bob@test.onion"]
-        assert item.message.headers.get("Subject") == "Real Client"
-        assert item.message.body == "Hello"
+        assert (
+            item.message.headers.get(
+                "X-GarlicSMTP-Encryption"
+            )
+            is not None
+        )
+
+        assert "Real Client" not in (
+            str(item.message.headers.fields)
+        )
+
+        assert "Hello" not in item.message.body
+        assert spy.discovered == [
+            "test.onion"
+        ]
 
     finally:
         app.stop()

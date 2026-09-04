@@ -108,31 +108,10 @@ class OnionTransport(Transport):
                 smtp_client.discover_e2ee_capability()
             )
 
-            if capability is not None:
-                try:
-                    parsed_capability = (
-                        EncryptionCapability.parse(
-                            capability
-                        )
-                    )
-                except ValueError as exc:
-                    raise TemporaryDeliveryError(
-                        "Invalid E2EE capability"
-                    ) from exc
-
-                if (
-                    self.e2ee_capability_callback
-                    is not None
-                ):
-                    try:
-                        self.e2ee_capability_callback(
-                            destination_host,
-                            parsed_capability,
-                        )
-                    except ValueError as exc:
-                        raise TemporaryDeliveryError(
-                            "E2EE key rejected"
-                        ) from exc
+            self._process_e2ee_capability(
+                destination_host,
+                capability,
+            )
 
             delivered = smtp_client.deliver(
                 message,
@@ -166,3 +145,78 @@ class OnionTransport(Transport):
         return SMTPClient(
             connection=smtp_connection,
         )
+
+    def discover_e2ee_capability(
+        self,
+        destination_host: str,
+    ) -> EncryptionCapability | None:
+        socks_connection = None
+
+        try:
+            socks_connection = self.socks_client.connect(
+                destination_host,
+                self.destination_port,
+            )
+
+            smtp_client = self.smtp_client_factory(
+                socks_connection,
+            )
+
+            capability = (
+                smtp_client.discover_e2ee_capability()
+            )
+
+            return self._process_e2ee_capability(
+                destination_host,
+                capability,
+            )
+
+        except (
+            Socks5ConnectionError,
+            Socks5HandshakeError,
+            SMTPClientError,
+            OSError,
+            TimeoutError,
+        ) as exc:
+            raise TemporaryDeliveryError(
+                f"Onion discovery failed: {exc}"
+            ) from exc
+
+        finally:
+            if socks_connection is not None:
+                socks_connection.close()
+
+    def _process_e2ee_capability(
+        self,
+        destination_host: str,
+        capability: str | None,
+    ) -> EncryptionCapability | None:
+        if capability is None:
+            return None
+
+        try:
+            parsed_capability = (
+                EncryptionCapability.parse(
+                    capability
+                )
+            )
+        except ValueError as exc:
+            raise TemporaryDeliveryError(
+                "Invalid E2EE capability"
+            ) from exc
+
+        if (
+            self.e2ee_capability_callback
+            is not None
+        ):
+            try:
+                self.e2ee_capability_callback(
+                    destination_host,
+                    parsed_capability,
+                )
+            except ValueError as exc:
+                raise TemporaryDeliveryError(
+                    "E2EE key rejected"
+                ) from exc
+
+        return parsed_capability

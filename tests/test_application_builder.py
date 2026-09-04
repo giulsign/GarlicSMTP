@@ -31,6 +31,36 @@ from garlicsmtp.security.encryption_identity import (
 from garlicsmtp.security.encryption_key_store import (
     FileEncryptionKeyStore,
 )
+from cryptography.hazmat.primitives.asymmetric.x25519 import (
+    X25519PrivateKey,
+)
+
+from garlicsmtp.core.pipeline import (
+    PipelineContext,
+)
+
+from garlicsmtp.security.decryptor import (
+    MessageDecryptor,
+)
+
+from garlicsmtp.security.encryptor import (
+    ENCRYPTION_HEADER,
+)
+import sqlite3
+from garlicsmtp.transport.onion.transport import (
+    OnionTransport,
+)
+import sqlite3
+
+from garlicsmtp.security.encryption_capability import (
+    EncryptionCapability,
+)
+from garlicsmtp.security.decryptor import (
+    MessageDecryptor,
+)
+from garlicsmtp.security.encryptor import (
+    ENCRYPTION_HEADER,
+)
 
 
 def test_application_builder_creates_context(
@@ -601,3 +631,583 @@ def test_application_builder_pins_discovered_e2ee_key(
     )
 
     context.queue.backend.close()
+
+
+def test_application_builder_wires_remote_encryption_before_queue(
+        tmp_path,
+        message,
+    ):
+        paths = ApplicationPaths(
+            root_dir=tmp_path,
+        )
+
+        settings = ApplicationSettings()
+        settings.tor.enabled = False
+
+        context = ApplicationBuilder(
+            paths=paths,
+            settings=settings,
+        ).build()
+
+        host = "b" * 56 + ".onion"
+
+        message.envelope.recipients = [
+            f"bob@{host}"
+        ]
+
+        message.headers.add(
+            "Subject",
+            "Builder secret",
+        )
+
+        message.body = (
+            "BUILDER-QUEUE-PLAINTEXT-SENTINEL"
+        )
+
+        recipient_private_key = (
+            X25519PrivateKey.generate()
+        )
+
+        context.encryption_key_store.remember(
+            host,
+            recipient_private_key
+            .public_key()
+            .public_bytes_raw(),
+        )
+
+        try:
+            result = context.pipeline.execute(
+                PipelineContext(
+                    message=message,
+                )
+            )
+
+            assert result.accepted is True
+            assert context.queue.size() == 1
+
+            item = context.queue.dequeue()
+            encrypted = item.message
+
+            assert (
+                encrypted.headers.get(
+                    ENCRYPTION_HEADER
+                )
+                is not None
+            )
+
+            assert (
+                "BUILDER-QUEUE-PLAINTEXT-SENTINEL"
+                not in encrypted.body
+            )
+
+            decrypted = MessageDecryptor().decrypt(
+                encrypted,
+                recipient_private_key,
+            )
+
+            assert decrypted.body == (
+                "BUILDER-QUEUE-PLAINTEXT-SENTINEL"
+            )
+
+            assert decrypted.headers.get(
+                "Subject"
+            ) == "Builder secret"
+
+        finally:
+            context.queue.backend.close()
+            context.store.backend.close()
+
+
+def test_application_queue_persists_remote_message_as_ciphertext(
+    tmp_path,
+    message,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    host = "c" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    message.headers.add(
+        "Subject",
+        "SQLite secret",
+    )
+
+    sentinel = (
+        "SQLITE-QUEUE-PLAINTEXT-SENTINEL"
+    )
+
+    message.body = sentinel
+
+    recipient_private_key = (
+        X25519PrivateKey.generate()
+    )
+
+    context.encryption_key_store.remember(
+        host,
+        recipient_private_key
+        .public_key()
+        .public_bytes_raw(),
+    )
+
+    try:
+        result = context.pipeline.execute(
+            PipelineContext(
+                message=message,
+            )
+        )
+
+        assert result.accepted is True
+        assert context.queue.size() == 1
+
+        connection = sqlite3.connect(
+            paths.queue_database
+        )
+
+        try:
+            row = connection.execute(
+                """
+                SELECT payload
+                FROM queue_items
+                """
+            ).fetchone()
+        finally:
+            connection.close()
+
+        assert row is not None
+
+        payload = row[0]
+
+        assert sentinel not in payload
+        assert "SQLite secret" not in payload
+
+        restored = context.queue.peek()
+
+        assert restored is not None
+
+        assert (
+            restored.message.headers.get(
+                ENCRYPTION_HEADER
+            )
+            is not None
+        )
+
+        decrypted = MessageDecryptor().decrypt(
+            restored.message,
+            recipient_private_key,
+        )
+
+        assert decrypted.body == sentinel
+
+        assert decrypted.headers.get(
+            "Subject"
+        ) == "SQLite secret"
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_wires_first_contact_discovery_before_queue(
+    tmp_path,
+    message,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    host = "d" * 56 + ".onion"
+
+    recipient_private_key = (
+        X25519PrivateKey.generate()
+    )
+
+    class DiscoveryTransport:
+        def __init__(self):
+            self.discovered = []
+            self.key_store = None
+
+        def discover_e2ee_capability(
+            self,
+            hostname,
+        ):
+            self.discovered.append(
+                hostname
+            )
+
+            self.key_store.remember(
+                hostname,
+                recipient_private_key
+                .public_key()
+                .public_bytes_raw(),
+            )
+
+        def deliver(self, item):
+            raise AssertionError(
+                "delivery must not happen "
+                "during enqueue"
+            )
+
+    transport = DiscoveryTransport()
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        default_transport=transport,
+    ).build()
+
+    transport.key_store = (
+        context.encryption_key_store
+    )
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    sentinel = (
+        "FIRST-CONTACT-BUILDER-SENTINEL"
+    )
+
+    message.body = sentinel
+
+    try:
+        result = context.pipeline.execute(
+            PipelineContext(
+                message=message,
+            )
+        )
+
+        assert result.accepted is True
+
+        assert transport.discovered == [
+            host
+        ]
+
+        assert context.queue.size() == 1
+
+        item = context.queue.peek()
+
+        assert item is not None
+        assert sentinel not in item.message.body
+
+        decrypted = MessageDecryptor().decrypt(
+            item.message,
+            recipient_private_key,
+        )
+
+        assert decrypted.body == sentinel
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_first_contact_pins_discovered_onion_key(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    host = "e" * 56 + ".onion"
+
+    recipient_private_key = (
+        X25519PrivateKey.generate()
+    )
+
+    capability = EncryptionCapability(
+        public_key=(
+            recipient_private_key
+            .public_key()
+        )
+    ).serialize()
+
+    class FakeConnection:
+        def __init__(self):
+            self.socket = object()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeSocksClient:
+        def __init__(self):
+            self.connection = (
+                FakeConnection()
+            )
+            self.connected = []
+
+        def connect(
+            self,
+            hostname,
+            port,
+        ):
+            self.connected.append(
+                (hostname, port)
+            )
+
+            return self.connection
+
+    class FakeSMTPClient:
+        def discover_e2ee_capability(
+            self,
+        ):
+            return capability
+
+        def deliver(
+            self,
+            message,
+        ):
+            raise AssertionError(
+                "first-contact discovery "
+                "must not deliver"
+            )
+
+    socks = FakeSocksClient()
+
+    onion = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection:
+            FakeSMTPClient()
+        ),
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        default_transport=onion,
+    ).build()
+
+    try:
+        assert (
+            context.encryption_key_store.get(
+                host
+            )
+            is None
+        )
+
+        onion.discover_e2ee_capability(
+            host
+        )
+
+        assert (
+            context.encryption_key_store.get(
+                host
+            )
+            == recipient_private_key
+            .public_key()
+            .public_bytes_raw()
+        )
+
+        assert socks.connected == [
+            (host, 25)
+        ]
+
+        assert (
+            socks.connection.closed
+            is True
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_first_contact_persists_ciphertext(
+    tmp_path,
+    message,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    host = "f" * 56 + ".onion"
+
+    recipient_private_key = (
+        X25519PrivateKey.generate()
+    )
+
+    capability = EncryptionCapability(
+        public_key=(
+            recipient_private_key
+            .public_key()
+        )
+    ).serialize()
+
+    class FakeConnection:
+        def __init__(self):
+            self.socket = object()
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeSocksClient:
+        def __init__(self):
+            self.connection = (
+                FakeConnection()
+            )
+            self.connected = []
+
+        def connect(
+            self,
+            hostname,
+            port,
+        ):
+            self.connected.append(
+                (hostname, port)
+            )
+            return self.connection
+
+    class FakeSMTPClient:
+        def discover_e2ee_capability(
+            self,
+        ):
+            return capability
+
+        def deliver(
+            self,
+            message,
+        ):
+            raise AssertionError(
+                "message must only be queued "
+                "during pipeline processing"
+            )
+
+    socks = FakeSocksClient()
+
+    onion = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection:
+            FakeSMTPClient()
+        ),
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        default_transport=onion,
+    ).build()
+
+    try:
+        message.envelope.recipients = [
+            f"bob@{host}"
+        ]
+
+        message.headers.fields[
+            "Subject"
+        ] = "FIRST-CONTACT-SUBJECT"
+
+        message.body = (
+            "FIRST-CONTACT-PLAINTEXT-SENTINEL"
+        )
+
+        result = context.pipeline.execute(
+            PipelineContext(
+                message=message,
+            )
+        )
+
+        assert result.accepted is True
+
+        assert (
+            context.encryption_key_store.get(
+                host
+            )
+            == recipient_private_key
+            .public_key()
+            .public_bytes_raw()
+        )
+
+        assert socks.connected == [
+            (host, 25)
+        ]
+
+        assert (
+            socks.connection.closed
+            is True
+        )
+
+        connection = sqlite3.connect(
+            paths.queue_database
+        )
+
+        try:
+            row = connection.execute(
+                """
+                SELECT payload
+                FROM queue_items
+                """
+            ).fetchone()
+        finally:
+            connection.close()
+
+        assert row is not None
+
+        payload = row[0]
+
+        assert (
+            "FIRST-CONTACT-PLAINTEXT-SENTINEL"
+            not in payload
+        )
+
+        assert (
+            "FIRST-CONTACT-SUBJECT"
+            not in payload
+        )
+
+        item = context.queue.peek()
+
+        assert item is not None
+
+        assert (
+            item.message.headers.get(
+                ENCRYPTION_HEADER
+            )
+            is not None
+        )
+
+        decrypted = MessageDecryptor().decrypt(
+            item.message,
+            recipient_private_key,
+        )
+
+        assert decrypted.body == (
+            "FIRST-CONTACT-PLAINTEXT-SENTINEL"
+        )
+
+        assert (
+            decrypted.headers.get(
+                "Subject"
+            )
+            == "FIRST-CONTACT-SUBJECT"
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+

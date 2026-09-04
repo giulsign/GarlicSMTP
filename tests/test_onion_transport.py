@@ -580,3 +580,181 @@ def test_onion_transport_discovers_e2ee_before_delivering(
         "discover",
         "deliver",
     ]
+
+
+def test_onion_transport_rejects_changed_key_before_smtp_envelope(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.sender = (
+        "alice@sender.onion"
+    )
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    message.body = "must not be sent"
+
+    item = QueueFactory.create(
+        message
+    )
+
+    socks = ScriptedSocksClient()
+
+    socks.connection.socket.responses = bytearray(
+        (
+            "220 mail.hidden ready\r\n"
+            "250-mail.hidden\r\n"
+            "250 GARLICSMTP-E2EE "
+            "v=1; alg=x25519; "
+            "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=\r\n"
+        ).encode("ascii")
+    )
+
+    def reject_changed_key(
+        hostname,
+        capability,
+    ):
+        raise ValueError(
+            "encryption key changed"
+        )
+
+    transport = OnionTransport(
+        socks_client=socks,
+        e2ee_capability_callback=(
+            reject_changed_key
+        ),
+    )
+
+    with pytest.raises(
+        TemporaryDeliveryError,
+        match="E2EE key rejected",
+    ):
+        transport.deliver(item)
+
+    sent = bytes(
+        socks.connection.socket.sent
+    ).decode("utf-8")
+
+    assert sent == (
+        "EHLO [127.0.0.1]\r\n"
+    )
+
+    assert "MAIL FROM:" not in sent
+    assert "RCPT TO:" not in sent
+    assert "DATA\r\n" not in sent
+    assert "must not be sent" not in sent
+
+    assert (
+        socks.connection.closed
+        is True
+    )
+
+
+def test_onion_transport_can_discover_e2ee_without_delivering(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    socks = FakeSocksClient()
+    smtp = FakeSMTPClient()
+
+    discovered = []
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+        e2ee_capability_callback=(
+            lambda hostname, capability:
+            discovered.append(
+                (hostname, capability)
+            )
+        ),
+    )
+
+    capability = (
+        transport.discover_e2ee_capability(
+            host
+        )
+    )
+
+    assert isinstance(
+        capability,
+        EncryptionCapability,
+    )
+
+    assert capability.serialize() == (
+        "v=1; alg=x25519; "
+        "key=AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="
+    )
+
+    assert len(discovered) == 1
+
+    discovered_host, discovered_capability = (
+        discovered[0]
+    )
+
+    assert discovered_host == host
+
+    assert (
+        discovered_capability.serialize()
+        == capability.serialize()
+    )
+
+    assert smtp.delivered == []
+
+    assert socks.connected == [
+        (host, 25)
+    ]
+
+    assert socks.connection.closed is True
+
+
+def test_onion_transport_deliver_uses_discovery_before_delivery(
+    message,
+):
+    host = "a" * 56 + ".onion"
+
+    message.envelope.recipients = [
+        f"bob@{host}"
+    ]
+
+    events = []
+
+    class OrderedSMTPClient(
+        FakeSMTPClient
+    ):
+        def discover_e2ee_capability(self):
+            events.append("discover")
+            return super().discover_e2ee_capability()
+
+        def deliver(self, message):
+            events.append("deliver")
+            return super().deliver(message)
+
+    socks = FakeSocksClient()
+    smtp = OrderedSMTPClient()
+
+    transport = OnionTransport(
+        socks_client=socks,
+        smtp_client_factory=(
+            lambda connection: smtp
+        ),
+    )
+
+    assert transport.deliver(
+        QueueFactory.create(message)
+    ) is True
+
+    assert events == [
+        "discover",
+        "deliver",
+    ]
