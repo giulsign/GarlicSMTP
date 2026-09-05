@@ -3,7 +3,13 @@
 #
 # See LICENSE for the full license terms.
 
+from cryptography.exceptions import InvalidTag
+
 from garlicsmtp.core.pipeline import Pipeline, PipelineContext
+from garlicsmtp.security.encryptor import (
+    ENCRYPTION_HEADER,
+)
+from garlicsmtp.security.verifier import MessageVerifier
 from garlicsmtp.smtp.connection import SMTPConnection
 from garlicsmtp.smtp.engine import SMTPEngine
 from garlicsmtp.smtp.handlers.register import create_dispatcher
@@ -14,9 +20,6 @@ from garlicsmtp.smtp.state import SMTPState
 from garlicsmtp.storage.entry import (
     VerificationStatus,
 )
-from garlicsmtp.security.verifier import MessageVerifier
-
-
 
 
 class SMTPProtocol:
@@ -31,6 +34,8 @@ class SMTPProtocol:
         pipeline: Pipeline | None = None,
         verifier: MessageVerifier | None = None,
         e2ee_capability: str | None = None,
+        decryptor=None,
+        encryption_private_key=None,
     ):
         if pipeline is None:
             raise ValueError(
@@ -46,6 +51,10 @@ class SMTPProtocol:
         self.engine = SMTPEngine()
         self.pipeline = pipeline
         self.verifier = verifier
+        self.decryptor = decryptor
+        self.encryption_private_key = (
+            encryption_private_key
+        )
 
     def send_greeting(self) -> None:
         reply = ReplyFactory.greeting(self.hostname)
@@ -76,16 +85,68 @@ class SMTPProtocol:
 
                     return True
 
+                message = self.session.message
+
+                if (
+                    message.headers.get(
+                        ENCRYPTION_HEADER
+                    )
+                    is not None
+                ):
+                    if self.decryptor is None:
+                        reply = (
+                            ReplyFactory
+                            .transaction_failed()
+                        )
+
+                        self.connection.send(
+                            reply.serialize()
+                        )
+
+                        return True
+
+                    if self.encryption_private_key is None:
+                        reply = (
+                            ReplyFactory
+                            .transaction_failed()
+                        )
+
+                        self.connection.send(
+                            reply.serialize()
+                        )
+
+                        return True
+
+                    try:
+                        message = self.decryptor.decrypt(
+                            message,
+                            self.encryption_private_key,
+                        )
+                    except (
+                        ValueError,
+                        InvalidTag,
+                    ):
+                        reply = (
+                            ReplyFactory
+                            .transaction_failed()
+                        )
+
+                        self.connection.send(
+                            reply.serialize()
+                        )
+
+                        return True
+
                 verification_status = (
                     self.verifier.verify(
-                        self.session.message
+                        message
                     )
                     if self.verifier is not None
                     else VerificationStatus.UNSIGNED
                 )
 
                 context = PipelineContext(
-                    message=self.session.message,
+                    message=message,
                     verification_status=verification_status,
                 )
 
@@ -104,6 +165,8 @@ class SMTPProtocol:
                     reply.serialize()
                 )
 
+            # Una riga appartenente a DATA non deve
+            # mai cadere nel parser dei comandi SMTP.
             return True
 
         command = SMTPParser.parse(line)

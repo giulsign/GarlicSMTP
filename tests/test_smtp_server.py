@@ -335,6 +335,8 @@ def test_smtp_server_passes_verifier_to_protocol(
     monkeypatch,
 ):
     verifier = object()
+    decryptor = object()
+    encryption_private_key = object()
     captured = {}
 
     class FakeClient:
@@ -352,6 +354,8 @@ def test_smtp_server_passes_verifier_to_protocol(
             pipeline,
             verifier,
             e2ee_capability,
+            decryptor,
+            encryption_private_key,
         ):
             captured["connection"] = connection
             captured["hostname"] = hostname
@@ -359,6 +363,10 @@ def test_smtp_server_passes_verifier_to_protocol(
             captured["verifier"] = verifier
             captured["e2ee_capability"] = (
                 e2ee_capability
+            )
+            captured["decryptor"] = decryptor
+            captured["encryption_private_key"] = (
+                encryption_private_key
             )
 
         def serve(self):
@@ -377,6 +385,10 @@ def test_smtp_server_passes_verifier_to_protocol(
         hostname="test.onion",
         pipeline=pipeline,
         verifier=verifier,
+        decryptor=decryptor,
+        encryption_private_key=(
+            encryption_private_key
+        ),
     )
 
     client = FakeClient()
@@ -394,3 +406,8 @@ def test_smtp_server_passes_verifier_to_protocol(
         is None
     )
     assert captured["served"] is True
+    assert captured["decryptor"] is decryptor
+    assert (
+        captured["encryption_private_key"]
+        is encryption_private_key
+    )

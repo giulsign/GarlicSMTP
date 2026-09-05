@@ -113,6 +113,9 @@ from garlicsmtp.security.encryption_key_store import (
 from garlicsmtp.security.encryptor import (
     MessageEncryptor,
 )
+from garlicsmtp.security.decryptor import (
+    MessageDecryptor,
+)
 
 
 class ApplicationBuilder:
@@ -220,10 +223,6 @@ class ApplicationBuilder:
             self.paths.root_dir / "trusted_keys.json"
         )
 
-        #encryption_key_store = FileEncryptionKeyStore(
-        #    self.paths.root_dir / "encryption_keys.json"
-        #)
-
         verifier = Ed25519MessageVerifier(
             trust_store=trust_store
         )
@@ -252,6 +251,9 @@ class ApplicationBuilder:
             logger=logger,
             verifier=verifier,
             e2ee_capability=e2ee_capability,
+            encryption_private_key=(
+                encryption_identity.private_key
+            ),
         )
 
         imap_server = self._build_imap_server(
@@ -452,6 +454,7 @@ class ApplicationBuilder:
         logger: Logger,
         verifier: Ed25519MessageVerifier,
         e2ee_capability: str,
+        encryption_private_key,
     ) -> SMTPServer:
         return SMTPServer(
             pipeline=pipeline,
@@ -461,7 +464,11 @@ class ApplicationBuilder:
             logger=logger,
             verifier=verifier,
             e2ee_capability=e2ee_capability,
-    )
+            decryptor=MessageDecryptor(),
+            encryption_private_key=(
+                encryption_private_key
+            ),
+        )
 
     @staticmethod
     def _build_imap_server(

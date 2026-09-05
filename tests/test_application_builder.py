@@ -61,6 +61,28 @@ from garlicsmtp.security.decryptor import (
 from garlicsmtp.security.encryptor import (
     ENCRYPTION_HEADER,
 )
+from garlicsmtp.models import (
+    Envelope,
+    MailHeaders,
+    MailMessage,
+)
+from garlicsmtp.security.encryptor import (
+    MessageEncryptor,
+)
+from garlicsmtp.transport.smtp.client import (
+    SMTPClient,
+)
+from cryptography.hazmat.primitives.asymmetric.ed25519 import (
+    Ed25519PrivateKey,
+)
+
+from garlicsmtp.security.signer import (
+    MessageSigner,
+)
+
+from garlicsmtp.storage.entry import (
+    VerificationStatus,
+)
 
 
 def test_application_builder_creates_context(
@@ -1211,3 +1233,491 @@ def test_application_builder_first_contact_persists_ciphertext(
         context.store.backend.close()
 
 
+def test_application_builder_wires_inbound_e2ee_decryption(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    try:
+        assert isinstance(
+            context.smtp_server.decryptor,
+            MessageDecryptor,
+        )
+
+        expected_identity = EncryptionIdentity(
+            paths.root_dir / "encryption.key"
+        )
+
+        assert (
+            context.smtp_server
+            .encryption_private_key
+            .private_bytes_raw()
+            == expected_identity
+            .private_key
+            .private_bytes_raw()
+        )
+
+        capability = EncryptionCapability.parse(
+            context.smtp_server.e2ee_capability
+        )
+
+        assert (
+            capability.public_key
+            .public_bytes_raw()
+            == context.smtp_server
+            .encryption_private_key
+            .public_key()
+            .public_bytes_raw()
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_delivers_inbound_e2ee_plaintext_to_mailbox(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    try:
+        recipient = (
+            f"bob@{settings.local_domain}"
+        )
+
+        plaintext = MailMessage(
+            envelope=Envelope(
+                sender="alice@sender.onion",
+                recipients=[
+                    recipient,
+                ],
+            ),
+            headers=MailHeaders(
+                fields={
+                    "Subject": (
+                        "INBOUND-E2EE-SECRET-SUBJECT"
+                    ),
+                }
+            ),
+            body=(
+                "INBOUND-E2EE-SECRET-BODY"
+            ),
+        )
+
+        encrypted = MessageEncryptor().encrypt(
+            plaintext,
+            context.smtp_server
+            .encryption_private_key
+            .public_key(),
+        )
+
+        serialized = SMTPClient.serialize_message(
+            encrypted
+        )
+
+        class DataSocket:
+            def __init__(self):
+                self.sent = b""
+
+                data_lines = [
+                    line.encode("utf-8")
+                    + b"\r\n"
+                    for line in serialized.split(
+                        "\r\n"
+                    )
+                ]
+
+                self.buffer = [
+                    b"EHLO sender.onion\r\n",
+                    (
+                        b"MAIL FROM:"
+                        b"<alice@sender.onion>\r\n"
+                    ),
+                    (
+                        f"RCPT TO:<{recipient}>\r\n"
+                        .encode("utf-8")
+                    ),
+                    b"DATA\r\n",
+                    *data_lines,
+                    b".\r\n",
+                    b"QUIT\r\n",
+                ]
+
+            def sendall(self, data: bytes):
+                self.sent += data
+
+            def recv(self, size):
+                if self.buffer:
+                    return self.buffer.pop(0)
+
+                return b""
+
+            def close(self):
+                pass
+
+        client = DataSocket()
+
+        context.smtp_server.handle_connection(
+            client,
+            ("127.0.0.1", 10000),
+        )
+
+        ids = context.store.list_messages(
+            recipient
+        )
+
+        assert len(ids) == 1
+
+        stored = context.store.get(
+            recipient,
+            ids[0],
+        )
+
+        assert stored is not None
+
+        assert (
+            stored.headers.get(
+                "Subject"
+            )
+            == "INBOUND-E2EE-SECRET-SUBJECT"
+        )
+
+        assert (
+            stored.body
+            == "INBOUND-E2EE-SECRET-BODY"
+        )
+
+        assert (
+            stored.envelope.sender
+            == "alice@sender.onion"
+        )
+
+        assert (
+            stored.envelope.recipients
+            == [
+                recipient,
+            ]
+        )
+
+        assert (
+            b"250 Message accepted"
+            in client.sent
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_verifies_signed_inbound_e2ee_message(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    try:
+        sender = "alice@sender.onion"
+        recipient = (
+            f"bob@{settings.local_domain}"
+        )
+
+        signing_private_key = (
+            Ed25519PrivateKey.generate()
+        )
+
+        context.smtp_server.verifier.trust_store.trust(
+            sender,
+            signing_private_key
+            .public_key()
+            .public_bytes_raw(),
+        )
+
+        plaintext = MailMessage(
+            envelope=Envelope(
+                sender=sender,
+                recipients=[
+                    recipient,
+                ],
+            ),
+            headers=MailHeaders(
+                fields={
+                    "Subject": (
+                        "SIGNED-E2EE-SUBJECT"
+                    ),
+                }
+            ),
+            body="SIGNED-E2EE-BODY",
+        )
+
+        MessageSigner(
+            signing_private_key
+        ).sign(plaintext)
+
+        encrypted = MessageEncryptor().encrypt(
+            plaintext,
+            context.smtp_server
+            .encryption_private_key
+            .public_key(),
+        )
+
+        serialized = SMTPClient.serialize_message(
+            encrypted
+        )
+
+        class DataSocket:
+            def __init__(self):
+                self.sent = b""
+
+                data_lines = [
+                    line.encode("utf-8")
+                    + b"\r\n"
+                    for line in serialized.split(
+                        "\r\n"
+                    )
+                ]
+
+                self.buffer = [
+                    b"EHLO sender.onion\r\n",
+                    (
+                        b"MAIL FROM:"
+                        b"<alice@sender.onion>\r\n"
+                    ),
+                    (
+                        f"RCPT TO:<{recipient}>\r\n"
+                        .encode("utf-8")
+                    ),
+                    b"DATA\r\n",
+                    *data_lines,
+                    b".\r\n",
+                    b"QUIT\r\n",
+                ]
+
+            def sendall(self, data: bytes):
+                self.sent += data
+
+            def recv(self, size):
+                if self.buffer:
+                    return self.buffer.pop(0)
+
+                return b""
+
+            def close(self):
+                pass
+
+        client = DataSocket()
+
+        context.smtp_server.handle_connection(
+            client,
+            ("127.0.0.1", 10000),
+        )
+
+        entries = context.store.list_entries(
+            recipient
+        )
+
+        assert len(entries) == 1
+
+        assert (
+            entries[0].verification_status
+            == VerificationStatus.VERIFIED
+        )
+
+        ids = context.store.list_messages(
+            recipient
+        )
+
+        assert len(ids) == 1
+
+        stored = context.store.get(
+            recipient,
+            ids[0],
+        )
+
+        assert stored is not None
+
+        assert (
+            stored.headers.get("Subject")
+            == "SIGNED-E2EE-SUBJECT"
+        )
+
+        assert (
+            stored.body
+            == "SIGNED-E2EE-BODY"
+        )
+
+        assert (
+            stored.envelope.sender
+            == sender
+        )
+
+        assert (
+            stored.envelope.recipients
+            == [recipient]
+        )
+
+        assert (
+            b"250 Message accepted"
+            in client.sent
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_preserves_plaintext_smtp_inbound_delivery(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    try:
+        sender = "alice@sender.onion"
+        recipient = (
+            f"bob@{settings.local_domain}"
+        )
+
+        plaintext = MailMessage(
+            envelope=Envelope(
+                sender=sender,
+                recipients=[
+                    recipient,
+                ],
+            ),
+            headers=MailHeaders(
+                fields={
+                    "Subject": (
+                        "PLAINTEXT-INBOUND-SUBJECT"
+                    ),
+                }
+            ),
+            body="PLAINTEXT-INBOUND-BODY",
+        )
+
+        serialized = SMTPClient.serialize_message(
+            plaintext
+        )
+
+        class DataSocket:
+            def __init__(self):
+                self.sent = b""
+
+                data_lines = [
+                    line.encode("utf-8")
+                    + b"\r\n"
+                    for line in serialized.split(
+                        "\r\n"
+                    )
+                ]
+
+                self.buffer = [
+                    b"EHLO sender.onion\r\n",
+                    (
+                        f"MAIL FROM:<{sender}>\r\n"
+                        .encode("utf-8")
+                    ),
+                    (
+                        f"RCPT TO:<{recipient}>\r\n"
+                        .encode("utf-8")
+                    ),
+                    b"DATA\r\n",
+                    *data_lines,
+                    b".\r\n",
+                    b"QUIT\r\n",
+                ]
+
+            def sendall(self, data: bytes):
+                self.sent += data
+
+            def recv(self, size):
+                if self.buffer:
+                    return self.buffer.pop(0)
+
+                return b""
+
+            def close(self):
+                pass
+
+        client = DataSocket()
+
+        context.smtp_server.handle_connection(
+            client,
+            ("127.0.0.1", 10000),
+        )
+
+        ids = context.store.list_messages(
+            recipient
+        )
+
+        assert len(ids) == 1
+
+        stored = context.store.get(
+            recipient,
+            ids[0],
+        )
+
+        assert stored is not None
+
+        assert (
+            stored.headers.get("Subject")
+            == "PLAINTEXT-INBOUND-SUBJECT"
+        )
+
+        assert (
+            stored.body
+            == "PLAINTEXT-INBOUND-BODY"
+        )
+
+        assert stored.envelope.sender == sender
+
+        assert (
+            stored.envelope.recipients
+            == [recipient]
+        )
+
+        assert (
+            b"250 Message accepted"
+            in client.sent
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()

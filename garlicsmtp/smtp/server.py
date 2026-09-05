@@ -28,6 +28,8 @@ class SMTPServer(Service, Tickable):
         logger=None,
         verifier: MessageVerifier | None = None,
         e2ee_capability: str | None = None,
+        decryptor=None,
+        encryption_private_key=None,
     ):
         self.server = TCPServer(
             host,
@@ -42,8 +44,13 @@ class SMTPServer(Service, Tickable):
         self.pipeline = pipeline
         self.verifier = verifier
         self.e2ee_capability = e2ee_capability
+        self.decryptor = decryptor
+        self.encryption_private_key = (
+            encryption_private_key
+        )
         self._connection_threads = set()
         self._threads_lock = threading.Lock()
+        
 
     def start(self) -> None:
         self.server.start()
@@ -85,6 +92,10 @@ class SMTPServer(Service, Tickable):
             pipeline=self.pipeline,
             verifier=self.verifier,
             e2ee_capability=self.e2ee_capability,
+            decryptor=self.decryptor,
+            encryption_private_key=(
+                self.encryption_private_key
+            ),
         )
 
         protocol.serve()
