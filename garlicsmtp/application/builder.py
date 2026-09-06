@@ -116,6 +116,7 @@ from garlicsmtp.security.encryptor import (
 from garlicsmtp.security.decryptor import (
     MessageDecryptor,
 )
+from garlicsmtp.security.auth import Authenticator
 
 
 class ApplicationBuilder:
@@ -130,6 +131,7 @@ class ApplicationBuilder:
         queue_backend=None,
         message_store_backend: MessageStoreBackend | None = None,
         logger: Logger | None = None,
+        imap_authenticator: Authenticator | None = None,
     ) -> None:
         self.paths = (
             paths
@@ -149,6 +151,7 @@ class ApplicationBuilder:
             message_store_backend
         )
         self.logger = logger
+        self.imap_authenticator = imap_authenticator
 
     def build(
         self,
@@ -259,6 +262,7 @@ class ApplicationBuilder:
         imap_server = self._build_imap_server(
             settings=settings,
             store=store,
+            authenticator=self.imap_authenticator,
         )
 
         queue_worker = self._build_queue_worker(
@@ -475,11 +479,13 @@ class ApplicationBuilder:
         *,
         settings: ApplicationSettings,
         store: MessageStore,
+        authenticator: Authenticator | None = None,
     ) -> IMAPServer:
         return IMAPServer(
             host=settings.imap.host,
             port=settings.imap.port,
             hostname=settings.hostname,
+            authenticator=authenticator,
             store=store,
         )
 
