@@ -245,3 +245,103 @@ def test_build_view_model_connects_composer_to_context_signer(
         .verifier
         is verifier
     )
+
+
+def test_real_gui_composer_delivers_to_local_mailbox(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.application import (
+        ApplicationBuilder,
+    )
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+        ApplicationSettings,
+    )
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    real_builder = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    )
+
+    class TestBuilder:
+
+        def build(
+            self,
+        ):
+            return real_builder.build()
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        TestBuilder,
+    )
+
+    view_model = (
+        gui_application.build_view_model()
+    )
+
+    context = (
+        view_model.controller.context
+    )
+
+    try:
+        view_model.compose.sender = (
+            "alice@test.onion"
+        )
+        view_model.compose.recipient = (
+            "bob@test.onion"
+        )
+        view_model.compose.subject = (
+            "GUI real integration"
+        )
+        view_model.compose.body = (
+            "Delivered through the real pipeline"
+        )
+
+        assert (
+            view_model.compose.send()
+            is True
+        )
+
+        entries = context.store.list_entries(
+            "bob@test.onion"
+        )
+
+        assert len(entries) == 1
+
+        message = entries[0].message
+
+        assert (
+            message.envelope.sender
+            == "alice@test.onion"
+        )
+
+        assert (
+            message.envelope.recipients
+            == [
+                "bob@test.onion",
+            ]
+        )
+
+        assert (
+            message.headers.get(
+                "Subject"
+            )
+            == "GUI real integration"
+        )
+
+        assert (
+            message.body
+            == "Delivered through the real pipeline"
+        )
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
