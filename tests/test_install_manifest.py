@@ -170,9 +170,34 @@ def test_install_manifest_rejects_missing_operating_system():
 def test_install_manifest_declares_ubuntu_24_04_profile():
     manifest = load_install_manifest()
 
-    assert manifest["platform"]["profiles"] == [
-        {
-            "id": "ubuntu",
-            "version_id": "24.04",
-        },
-    ]
+    profile = manifest["platform"]["profiles"][0]
+
+    assert profile["id"] == "ubuntu"
+    assert profile["version_id"] == "24.04"
+
+
+def test_ubuntu_24_04_profile_declares_package_manager():
+    manifest = load_install_manifest()
+
+    profile = manifest["platform"]["profiles"][0]
+
+    assert profile["package_manager"] == "apt-get"
+
+
+def test_ubuntu_24_04_profile_declares_tor_system_prerequisite():
+    manifest = load_install_manifest()
+
+    profile = manifest["platform"]["profiles"][0]
+
+    assert profile["system_prerequisites"]["tor"]["required"] is True
+
+
+def test_tor_prerequisite_declares_detection_command():
+    manifest = load_install_manifest()
+
+    tor = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]
+    )
+
+    assert tor["command"] == "tor"

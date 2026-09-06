@@ -6,3 +6,8 @@ os = "linux"
 [[platform.profiles]]
 id = "ubuntu"
 version_id = "24.04"
+package_manager = "apt-get"
+
+[platform.profiles.system_prerequisites.tor]
+required = true
+command = "tor"
