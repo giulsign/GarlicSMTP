@@ -165,3 +165,14 @@ def test_install_manifest_rejects_missing_operating_system():
     assert validate_manifest(manifest) == [
         "manifest platform.os is required",
     ]
+
+
+def test_install_manifest_declares_ubuntu_24_04_profile():
+    manifest = load_install_manifest()
+
+    assert manifest["platform"]["profiles"] == [
+        {
+            "id": "ubuntu",
+            "version_id": "24.04",
+        },
+    ]

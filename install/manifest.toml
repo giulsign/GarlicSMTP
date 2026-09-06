@@ -2,3 +2,7 @@ schema_version = 1
 
 [platform]
 os = "linux"
+
+[[platform.profiles]]
+id = "ubuntu"
+version_id = "24.04"
