@@ -6,8 +6,12 @@
 from install.prerequisites import (
     build_installation_plan,
     check_prerequisite,
+    command_exists_on_path,
     is_python_venv_available,
     is_python_version_compatible,
+    detect_python_version,
+    probe_python_version,
+    probe_python_venv_available,
 )
 from pathlib import Path
 import pytest
@@ -253,3 +257,114 @@ def test_real_repository_metadata_builds_plan_for_missing_tor_and_python_venv():
     assert plan == {
         "packages": ["tor", "python3-venv"],
     }
+
+
+def test_command_exists_on_path_uses_which_result():
+    assert command_exists_on_path(
+        "tor",
+        which=lambda command: "/usr/bin/tor"
+        if command == "tor"
+        else None,
+    ) is True
+
+
+def test_command_exists_on_path_returns_false_when_command_is_missing():
+    assert command_exists_on_path(
+        "tor",
+        which=lambda command: None,
+    ) is False
+
+
+def test_detect_python_version_uses_selected_interpreter():
+    calls = []
+
+    def run_version_check(executable):
+        calls.append(executable)
+        return (3, 12, 3)
+
+    version = detect_python_version(
+        "/usr/bin/python3",
+        run_version_check=run_version_check,
+    )
+
+    assert version == (3, 12, 3)
+    assert calls == ["/usr/bin/python3"]
+
+
+def test_probe_python_version_queries_selected_interpreter():
+    calls = []
+
+    class Result:
+        stdout = "3.12.3\n"
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    version = probe_python_version(
+        "/usr/bin/python3",
+        run=run,
+    )
+
+    assert version == (3, 12, 3)
+    assert calls == [
+        (
+            [
+                "/usr/bin/python3",
+                "-c",
+                (
+                    "import sys; "
+                    "print('.'.join(str(part) "
+                    "for part in sys.version_info[:3]))"
+                ),
+            ],
+            {
+                "check": True,
+                "capture_output": True,
+                "text": True,
+            },
+        )
+    ]
+
+
+def test_probe_python_venv_available_queries_selected_interpreter():
+    calls = []
+
+    class Result:
+        returncode = 0
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    available = probe_python_venv_available(
+        "/usr/bin/python3",
+        run=run,
+    )
+
+    assert available is True
+    assert calls == [
+        (
+            [
+                "/usr/bin/python3",
+                "-c",
+                "import venv",
+            ],
+            {
+                "capture_output": True,
+                "text": True,
+            },
+        )
+    ]
+
+
+def test_probe_python_venv_available_returns_false_when_import_fails():
+    class Result:
+        returncode = 1
+
+    available = probe_python_venv_available(
+        "/usr/bin/python3",
+        run=lambda command, **kwargs: Result(),
+    )
+
+    assert available is False

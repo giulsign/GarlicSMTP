@@ -227,3 +227,11 @@ def test_ubuntu_24_04_profile_declares_python_venv_prerequisite():
         "command": "python3",
         "package": "python3-venv",
     }
+
+
+def test_ubuntu_24_04_profile_declares_system_python_executable():
+    manifest = load_install_manifest()
+
+    profile = manifest["platform"]["profiles"][0]
+
+    assert profile["python"]["executable"] == "/usr/bin/python3"

@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+import shutil
+import subprocess
 
 def check_prerequisite(
     prerequisite: dict,
@@ -81,3 +83,59 @@ def is_python_venv_available(
     module_available,
 ) -> bool:
     return module_available("venv")
+
+
+def command_exists_on_path(
+    command: str,
+    which=shutil.which,
+) -> bool:
+    return which(command) is not None
+
+
+def detect_python_version(
+    executable: str,
+    run_version_check,
+) -> tuple[int, ...]:
+    return run_version_check(executable)
+
+
+def probe_python_version(
+    executable: str,
+    run=subprocess.run,
+) -> tuple[int, ...]:
+    result = run(
+        [
+            executable,
+            "-c",
+            (
+                "import sys; "
+                "print('.'.join(str(part) "
+                "for part in sys.version_info[:3]))"
+            ),
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    return tuple(
+        int(part)
+        for part in result.stdout.strip().split(".")
+    )
+
+
+def probe_python_venv_available(
+    executable: str,
+    run=subprocess.run,
+) -> bool:
+    result = run(
+        [
+            executable,
+            "-c",
+            "import venv",
+        ],
+        capture_output=True,
+        text=True,
+    )
+
+    return result.returncode == 0

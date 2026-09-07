@@ -8,6 +8,9 @@ id = "ubuntu"
 version_id = "24.04"
 package_manager = "apt-get"
 
+[platform.profiles.python]
+executable = "/usr/bin/python3"
+
 [platform.profiles.system_prerequisites.tor]
 required = true
 command = "tor"
