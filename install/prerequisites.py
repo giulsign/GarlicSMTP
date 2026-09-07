@@ -139,3 +139,28 @@ def probe_python_venv_available(
     )
 
     return result.returncode == 0
+
+
+def build_detected_installation_plan(
+    profile: dict,
+    project_metadata: dict,
+    command_exists=command_exists_on_path,
+    python_version=probe_python_version,
+    python_venv_available=probe_python_venv_available,
+) -> dict:
+    executable = profile["python"]["executable"]
+
+    detected_python_version = python_version(executable)
+    detected_python_venv_available = python_venv_available(
+        executable
+    )
+
+    return build_installation_plan(
+        profile["system_prerequisites"],
+        command_exists=command_exists,
+        python_venv_available=(
+            lambda: detected_python_venv_available
+        ),
+        python_version=detected_python_version,
+        python_requirement=project_metadata["requires-python"],
+    )

@@ -11,6 +11,7 @@ from install.prerequisites import (
     is_python_version_compatible,
     detect_python_version,
     probe_python_version,
+    build_detected_installation_plan,
     probe_python_venv_available,
 )
 from pathlib import Path
@@ -368,3 +369,130 @@ def test_probe_python_venv_available_returns_false_when_import_fails():
     )
 
     assert available is False
+
+
+def test_detected_installation_plan_uses_profile_and_project_metadata():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    calls = []
+
+    def command_exists(command):
+        calls.append(("command", command))
+        return command == "tor"
+
+    def python_version(executable):
+        calls.append(("version", executable))
+        return (3, 12, 3)
+
+    def python_venv_available(executable):
+        calls.append(("venv", executable))
+        return True
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=python_version,
+        python_venv_available=python_venv_available,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+    assert calls == [
+        ("version", "/usr/bin/python3"),
+        ("venv", "/usr/bin/python3"),
+        ("command", "tor"),
+    ]
+
+
+def test_detected_installation_plan_requires_missing_tor_and_python_venv():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: False,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: False,
+    )
+
+    assert plan == {
+        "packages": ["tor", "python3-venv"],
+    }
+
+
+def test_detected_installation_plan_propagates_python_probe_failure():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    def python_version(executable):
+        raise RuntimeError("Python version probe failed")
+
+    with pytest.raises(
+        RuntimeError,
+        match="Python version probe failed",
+    ):
+        build_detected_installation_plan(
+            profile,
+            project_metadata,
+            command_exists=lambda command: True,
+            python_version=python_version,
+            python_venv_available=lambda executable: True,
+        )
