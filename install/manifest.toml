@@ -11,3 +11,9 @@ package_manager = "apt-get"
 [platform.profiles.system_prerequisites.tor]
 required = true
 command = "tor"
+package = "tor"
+
+[platform.profiles.system_prerequisites.python_venv]
+required = true
+command = "python3"
+package = "python3-venv"

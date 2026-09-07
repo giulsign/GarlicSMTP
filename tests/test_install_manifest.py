@@ -201,3 +201,29 @@ def test_tor_prerequisite_declares_detection_command():
     )
 
     assert tor["command"] == "tor"
+
+
+def test_tor_prerequisite_declares_ubuntu_package():
+    manifest = load_install_manifest()
+
+    tor = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]
+    )
+
+    assert tor["package"] == "tor"
+
+
+def test_ubuntu_24_04_profile_declares_python_venv_prerequisite():
+    manifest = load_install_manifest()
+
+    python_venv = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["python_venv"]
+    )
+
+    assert python_venv == {
+        "required": True,
+        "command": "python3",
+        "package": "python3-venv",
+    }
