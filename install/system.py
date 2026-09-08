@@ -3,6 +3,8 @@
 # See LICENSE for the full license terms.
 
 import subprocess
+from install.platform import detect_platform_profile
+from install.prerequisites import build_detected_installation_plan
 
 def build_package_install_action(
     profile: dict,
@@ -105,4 +107,31 @@ def execute_profile_system_action(
         action,
         run=run,
         elevate=elevate,
+    )
+
+
+def build_machine_system_install_action(
+    manifest: dict,
+    project_metadata: dict,
+    os_release: str,
+    command_exists,
+    python_version,
+    python_venv_available,
+) -> dict | None:
+    profile = detect_platform_profile(
+        os_release,
+        manifest["platform"]["profiles"],
+    )
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=python_version,
+        python_venv_available=python_venv_available,
+    )
+
+    return build_package_install_action(
+        profile,
+        plan,
     )

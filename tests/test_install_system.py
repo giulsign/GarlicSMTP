@@ -10,6 +10,7 @@ from install.system import (
     build_profile_privilege_elevator,
     execute_system_action,
     execute_profile_system_action,
+    build_machine_system_install_action,
 )
 
 
@@ -405,3 +406,107 @@ def test_execute_profile_system_action_uses_subprocess_run_by_default(
             },
         ),
     ]
+
+
+def test_build_machine_system_install_action_connects_profile_plan_and_action():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    action = build_machine_system_install_action(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: command != "tor",
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert action == {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+
+def test_build_machine_system_install_action_returns_none_when_satisfied():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    action = build_machine_system_install_action(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert action is None
