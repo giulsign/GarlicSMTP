@@ -44,3 +44,24 @@ def build_package_install_action(
         ],
         "requires_privileges": True,
     }
+
+
+def execute_system_action(
+    action: dict,
+    run,
+    elevate=None,
+) -> None:
+    command = action["command"]
+
+    if action["requires_privileges"]:
+        if elevate is None:
+            raise ValueError(
+                "privileged system action requires explicit elevation"
+            )
+
+        command = elevate(command)
+
+    run(
+        command,
+        check=True,
+    )

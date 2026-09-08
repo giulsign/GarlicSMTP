@@ -3,7 +3,7 @@
 # See LICENSE for the full license terms.
 
 import pytest
-from install.system import build_package_install_action
+from install.system import build_package_install_action, execute_system_action
 
 
 def test_build_package_install_action_uses_profile_package_manager_and_plan():
@@ -132,3 +132,129 @@ def test_build_package_install_action_rejects_missing_system_prerequisites():
             profile,
             plan,
         )
+
+
+def test_execute_system_action_invokes_runner_with_command_and_check():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    def elevate(command):
+        return ["elevate", *command]
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=elevate,
+    )
+
+    assert calls == [
+        (
+            [
+                "elevate",
+                "apt-get",
+                "install",
+                "-y",
+                "tor",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_system_action_propagates_runner_failure():
+    def run(command, **kwargs):
+        raise RuntimeError("system command failed")
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="system command failed",
+    ):
+        execute_system_action(
+            action,
+            run=run,
+            elevate=lambda command: command,
+        )
+
+
+def test_execute_system_action_rejects_privileged_action_without_elevation():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="privileged system action requires explicit elevation",
+    ):
+        execute_system_action(
+            action,
+            run=run,
+        )
+
+    assert calls == []
+
+
+def test_execute_system_action_runs_unprivileged_action_without_elevation():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    action = {
+        "command": [
+            "example-command",
+            "--check",
+        ],
+        "requires_privileges": False,
+    }
+
+    execute_system_action(
+        action,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "example-command",
+                "--check",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
