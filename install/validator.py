@@ -11,6 +11,8 @@ SUPPORTED_SCHEMA_VERSION = 1
 
 SUPPORTED_OPERATING_SYSTEM = "linux"
 
+SUPPORTED_PRIVILEGE_ELEVATION = "sudo"
+
 PROJECT_METADATA_KEYS = (
     "version",
     "requires-python",
@@ -49,6 +51,17 @@ def validate_manifest(manifest: dict) -> list[str]:
 
     platform = manifest.get("platform", {})
     operating_system = platform.get("os")
+
+    for profile in platform.get("profiles", []):
+        privilege_elevation = profile.get("privilege_elevation")
+
+        if privilege_elevation is None:
+            errors.append("profile privilege_elevation is required")
+        elif privilege_elevation != SUPPORTED_PRIVILEGE_ELEVATION:
+            errors.append(
+                "unsupported privilege_elevation: "
+                f"{privilege_elevation}"
+            )
 
     if operating_system is None:
         errors.append("manifest platform.os is required")

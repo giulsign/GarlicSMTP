@@ -5,6 +5,10 @@
 
 from pathlib import Path
 import tomllib
+from install.validator import (
+    load_install_manifest,
+    validate_manifest,
+)
 
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -235,3 +239,35 @@ def test_ubuntu_24_04_profile_declares_system_python_executable():
     profile = manifest["platform"]["profiles"][0]
 
     assert profile["python"]["executable"] == "/usr/bin/python3"
+
+
+def test_ubuntu_24_04_profile_declares_privilege_elevation():
+    manifest = load_install_manifest()
+
+    profile = manifest["platform"]["profiles"][0]
+
+    assert profile["privilege_elevation"] == "sudo"
+
+
+def test_manifest_rejects_unsupported_privilege_elevation():
+    manifest = load_install_manifest()
+
+    manifest["platform"]["profiles"][0]["privilege_elevation"] = "unknown"
+
+    errors = validate_manifest(manifest)
+
+    assert errors == [
+        "unsupported privilege_elevation: unknown"
+    ]
+
+
+def test_manifest_requires_privilege_elevation():
+    manifest = load_install_manifest()
+
+    del manifest["platform"]["profiles"][0]["privilege_elevation"]
+
+    errors = validate_manifest(manifest)
+
+    assert errors == [
+        "profile privilege_elevation is required"
+    ]
