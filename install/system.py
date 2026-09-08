@@ -65,3 +65,26 @@ def execute_system_action(
         command,
         check=True,
     )
+
+
+def build_privilege_elevator(
+    privilege_elevation: str,
+):
+    if privilege_elevation == "sudo":
+        def elevate(command):
+            return ["sudo", *command]
+
+        return elevate
+
+    raise ValueError(
+        "unsupported privilege elevation: "
+        f"{privilege_elevation}"
+    )
+
+
+def build_profile_privilege_elevator(
+    profile: dict,
+):
+    return build_privilege_elevator(
+        profile["privilege_elevation"]
+    )

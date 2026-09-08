@@ -3,7 +3,13 @@
 # See LICENSE for the full license terms.
 
 import pytest
-from install.system import build_package_install_action, execute_system_action
+
+from install.system import (
+    build_package_install_action,
+    build_privilege_elevator,
+    build_profile_privilege_elevator,
+    execute_system_action,
+)
 
 
 def test_build_package_install_action_uses_profile_package_manager_and_plan():
@@ -258,3 +264,60 @@ def test_execute_system_action_runs_unprivileged_action_without_elevation():
             },
         ),
     ]
+
+
+def test_build_privilege_elevator_builds_sudo_command():
+    elevate = build_privilege_elevator("sudo")
+
+    command = elevate([
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ])
+
+    assert command == [
+        "sudo",
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ]
+
+
+def test_build_privilege_elevator_rejects_unsupported_strategy():
+    with pytest.raises(
+        ValueError,
+        match="unsupported privilege elevation: unknown",
+    ):
+        build_privilege_elevator("unknown")
+
+
+def test_build_profile_privilege_elevator_uses_profile_policy():
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    elevate = build_profile_privilege_elevator(profile)
+
+    command = elevate([
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ])
+
+    assert command == [
+        "sudo",
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ]
+
+
+def test_build_profile_privilege_elevator_requires_profile_policy():
+    profile = {}
+
+    with pytest.raises(KeyError):
+        build_profile_privilege_elevator(profile)
