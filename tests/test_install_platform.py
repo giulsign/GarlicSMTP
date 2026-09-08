@@ -3,7 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
-from install.platform import is_supported_platform, parse_os_release
+import pytest
+from install.platform import is_supported_platform, parse_os_release, select_platform_profile, detect_platform_profile, read_os_release
 
 
 def test_parse_os_release_extracts_linux_distribution_identity():
@@ -91,3 +92,125 @@ VERSION_CODENAME=noble
         platform,
         manifest["platform"]["profiles"],
     ) is True
+
+
+def test_select_platform_profile_returns_exact_matching_profile():
+    platform = {
+        "id": "ubuntu",
+        "id_like": ("debian",),
+        "version_id": "24.04",
+        "version_codename": "noble",
+    }
+
+    supported_profiles = [
+        {
+            "id": "ubuntu",
+            "version_id": "24.04",
+            "package_manager": "apt-get",
+        },
+    ]
+
+    profile = select_platform_profile(
+        platform,
+        supported_profiles,
+    )
+
+    assert profile == supported_profiles[0]
+
+
+def test_select_platform_profile_rejects_id_like_match():
+    platform = {
+        "id": "linuxmint",
+        "id_like": ("ubuntu", "debian"),
+        "version_id": "24.04",
+        "version_codename": None,
+    }
+
+    supported_profiles = [
+        {
+            "id": "ubuntu",
+            "version_id": "24.04",
+            "package_manager": "apt-get",
+        },
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match=r"unsupported platform: linuxmint 24\.04",
+    ):
+        select_platform_profile(
+            platform,
+            supported_profiles,
+        )
+
+
+def test_select_platform_profile_rejects_unsupported_version():
+    platform = {
+        "id": "ubuntu",
+        "id_like": ("debian",),
+        "version_id": "22.04",
+        "version_codename": "jammy",
+    }
+
+    supported_profiles = [
+        {
+            "id": "ubuntu",
+            "version_id": "24.04",
+            "package_manager": "apt-get",
+        },
+    ]
+
+    with pytest.raises(
+        ValueError,
+        match=r"unsupported platform: ubuntu 22\.04",
+    ):
+        select_platform_profile(
+            platform,
+            supported_profiles,
+        )
+
+
+def test_detect_platform_profile_parses_os_release_and_selects_profile():
+    os_release = """
+ID=ubuntu
+ID_LIKE=debian
+VERSION_ID="24.04"
+VERSION_CODENAME=noble
+"""
+
+    supported_profiles = [
+        {
+            "id": "ubuntu",
+            "version_id": "24.04",
+            "package_manager": "apt-get",
+        },
+    ]
+
+    profile = detect_platform_profile(
+        os_release,
+        supported_profiles,
+    )
+
+    assert profile == supported_profiles[0]
+
+
+def test_read_os_release_reads_declared_path():
+    calls = []
+
+    class OsReleasePath:
+        def read_text(self, encoding):
+            calls.append(encoding)
+            return (
+                "ID=ubuntu\n"
+                'VERSION_ID="24.04"\n'
+            )
+
+    content = read_os_release(
+        path=OsReleasePath(),
+    )
+
+    assert content == (
+        "ID=ubuntu\n"
+        'VERSION_ID="24.04"\n'
+    )
+    assert calls == ["utf-8"]

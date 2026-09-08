@@ -13,6 +13,7 @@ from install.prerequisites import (
     probe_python_version,
     build_detected_installation_plan,
     probe_python_venv_available,
+    build_machine_installation_plan,
 )
 from pathlib import Path
 import pytest
@@ -496,3 +497,54 @@ def test_detected_installation_plan_propagates_python_probe_failure():
             python_version=python_version,
             python_venv_available=lambda executable: True,
         )
+
+
+def test_build_machine_installation_plan_selects_profile_and_builds_plan():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+    os_release = (
+        "ID=ubuntu\n"
+        'VERSION_ID="24.04"\n'
+        "ID_LIKE=debian\n"
+        "VERSION_CODENAME=noble\n"
+    )
+
+    plan = build_machine_installation_plan(
+        manifest,
+        project_metadata,
+        os_release=os_release,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert plan == {
+        "packages": [],
+    }

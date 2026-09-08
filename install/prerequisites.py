@@ -5,6 +5,7 @@
 
 import shutil
 import subprocess
+from install.platform import detect_platform_profile
 
 def check_prerequisite(
     prerequisite: dict,
@@ -163,4 +164,26 @@ def build_detected_installation_plan(
         ),
         python_version=detected_python_version,
         python_requirement=project_metadata["requires-python"],
+    )
+
+
+def build_machine_installation_plan(
+    manifest: dict,
+    project_metadata: dict,
+    os_release: str,
+    command_exists=command_exists_on_path,
+    python_version=probe_python_version,
+    python_venv_available=probe_python_venv_available,
+) -> dict:
+    profile = detect_platform_profile(
+        os_release,
+        manifest["platform"]["profiles"],
+    )
+
+    return build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=python_version,
+        python_venv_available=python_venv_available,
     )
