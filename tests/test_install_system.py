@@ -9,6 +9,7 @@ from install.system import (
     build_privilege_elevator,
     build_profile_privilege_elevator,
     execute_system_action,
+    execute_profile_system_action,
 )
 
 
@@ -321,3 +322,86 @@ def test_build_profile_privilege_elevator_requires_profile_policy():
 
     with pytest.raises(KeyError):
         build_profile_privilege_elevator(profile)
+
+
+def test_execute_profile_system_action_uses_profile_elevation_and_runner():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    execute_profile_system_action(
+        profile,
+        action,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "tor",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_profile_system_action_uses_subprocess_run_by_default(
+    monkeypatch,
+):
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    monkeypatch.setattr(
+        "install.system.subprocess.run",
+        run,
+    )
+
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    action = {
+        "command": [
+            "true",
+        ],
+        "requires_privileges": False,
+    }
+
+    execute_profile_system_action(
+        profile,
+        action,
+    )
+
+    assert calls == [
+        (
+            [
+                "true",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]

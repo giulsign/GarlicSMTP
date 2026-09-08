@@ -2,6 +2,7 @@
 #
 # See LICENSE for the full license terms.
 
+import subprocess
 
 def build_package_install_action(
     profile: dict,
@@ -87,4 +88,21 @@ def build_profile_privilege_elevator(
 ):
     return build_privilege_elevator(
         profile["privilege_elevation"]
+    )
+
+
+def execute_profile_system_action(
+    profile: dict,
+    action: dict,
+    run=None,
+) -> None:
+    if run is None:
+        run = subprocess.run
+
+    elevate = build_profile_privilege_elevator(profile)
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=elevate,
     )
