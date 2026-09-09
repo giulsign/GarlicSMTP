@@ -90,6 +90,16 @@ def validate_manifest(manifest: dict) -> list[str]:
                 "Tor Control authentication must be safecookie"
             )
 
+        cookie_path_source = control.get("cookie_path_source")
+
+        if (
+            cookie_path_source is not None
+            and cookie_path_source != "protocolinfo"
+        ):
+            errors.append(
+                "Tor Control cookie path source must be protocolinfo"
+            )
+
     if operating_system is None:
         errors.append("manifest platform.os is required")
     elif operating_system != SUPPORTED_OPERATING_SYSTEM:

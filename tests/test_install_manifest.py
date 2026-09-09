@@ -328,3 +328,31 @@ def test_manifest_rejects_non_safecookie_tor_control_authentication():
     assert errors == [
         "Tor Control authentication must be safecookie"
     ]
+
+
+def test_ubuntu_24_04_profile_uses_tor_advertised_cookie_path():
+    manifest = load_install_manifest()
+
+    control = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]["control"]
+    )
+
+    assert control["cookie_path_source"] == "protocolinfo"
+
+
+def test_manifest_rejects_non_protocolinfo_tor_cookie_path_source():
+    manifest = load_install_manifest()
+
+    control = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]["control"]
+    )
+
+    control["cookie_path_source"] = "configured"
+
+    errors = validate_manifest(manifest)
+
+    assert errors == [
+        "Tor Control cookie path source must be protocolinfo"
+    ]
