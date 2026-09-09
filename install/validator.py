@@ -100,6 +100,17 @@ def validate_manifest(manifest: dict) -> list[str]:
                 "Tor Control cookie path source must be protocolinfo"
             )
 
+        cookie_access = control.get("cookie_access", {})
+
+        runtime_user_rootless = cookie_access.get(
+            "runtime_user_rootless"
+        )
+
+        if runtime_user_rootless is False:
+            errors.append(
+                "Tor Control cookie access must be rootless at runtime"
+            )
+
     if operating_system is None:
         errors.append("manifest platform.os is required")
     elif operating_system != SUPPORTED_OPERATING_SYSTEM:

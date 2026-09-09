@@ -356,3 +356,33 @@ def test_manifest_rejects_non_protocolinfo_tor_cookie_path_source():
     assert errors == [
         "Tor Control cookie path source must be protocolinfo"
     ]
+
+
+def test_ubuntu_24_04_profile_declares_tor_cookie_access_policy():
+    manifest = load_install_manifest()
+
+    control = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]["control"]
+    )
+
+    assert control["cookie_access"] == {
+        "runtime_user_rootless": True,
+    }
+
+
+def test_manifest_rejects_root_required_tor_cookie_access():
+    manifest = load_install_manifest()
+
+    cookie_access = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]["control"]["cookie_access"]
+    )
+
+    cookie_access["runtime_user_rootless"] = False
+
+    errors = validate_manifest(manifest)
+
+    assert errors == [
+        "Tor Control cookie access must be rootless at runtime"
+    ]

@@ -23,6 +23,9 @@ port = 9051
 authentication = "safecookie"
 cookie_path_source = "protocolinfo"
 
+[platform.profiles.system_prerequisites.tor.control.cookie_access]
+runtime_user_rootless = true
+
 [platform.profiles.system_prerequisites.python_venv]
 required = true
 command = "python3"
