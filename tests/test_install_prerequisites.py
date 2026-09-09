@@ -14,6 +14,7 @@ from install.prerequisites import (
     build_detected_installation_plan,
     probe_python_venv_available,
     build_machine_installation_plan,
+    detect_tor_configuration_state,
 )
 from pathlib import Path
 import pytest
@@ -548,3 +549,230 @@ def test_build_machine_installation_plan_selects_profile_and_builds_plan():
     assert plan == {
         "packages": [],
     }
+
+
+def test_tor_configuration_state_is_absent_when_tor_is_missing():
+    state = detect_tor_configuration_state(
+        tor_present=lambda: False,
+        configuration_compatible=lambda: True,
+    )
+
+    assert state == "absent"
+
+
+def test_tor_configuration_state_is_compatible_when_detector_confirms_it():
+    state = detect_tor_configuration_state(
+        tor_present=lambda: True,
+        configuration_compatible=lambda: True,
+    )
+
+    assert state == "compatible"
+
+
+def test_tor_configuration_state_requires_configuration_when_detector_rejects_it():
+    state = detect_tor_configuration_state(
+        tor_present=lambda: True,
+        configuration_compatible=lambda: False,
+    )
+
+    assert state == "configuration_required"
+
+
+def test_tor_configuration_state_does_not_probe_configuration_when_tor_is_missing():
+    def configuration_compatible():
+        raise AssertionError(
+            "Tor configuration must not be probed when Tor is absent"
+        )
+
+    state = detect_tor_configuration_state(
+        tor_present=lambda: False,
+        configuration_compatible=configuration_compatible,
+    )
+
+    assert state == "absent"
+
+
+def test_detected_installation_plan_reports_tor_configuration_when_required():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: False,
+    )
+
+    assert plan == {
+        "packages": [],
+        "tor_configuration_required": True,
+    }
+
+
+def test_detected_installation_plan_reuses_compatible_tor_configuration():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: True,
+    )
+
+    assert plan == {
+        "packages": [],
+        "tor_configuration_required": False,
+    }
+
+
+def test_detected_installation_plan_does_not_probe_tor_configuration_when_tor_is_missing():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    def command_exists(command):
+        return command != "tor"
+
+    def tor_configuration_compatible():
+        raise AssertionError(
+            "Tor configuration must not be probed when Tor is absent"
+        )
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=tor_configuration_compatible,
+    )
+
+    assert plan == {
+        "packages": ["tor"],
+        "tor_configuration_required": False,
+    }
+
+
+def test_tor_configuration_state_rejects_ambiguous_configuration():
+    def configuration_state():
+        return "ambiguous"
+
+    with pytest.raises(
+        ValueError,
+        match="Tor configuration state is incompatible or ambiguous",
+    ):
+        detect_tor_configuration_state(
+            tor_present=lambda: True,
+            configuration_compatible=lambda: False,
+            configuration_state=configuration_state,
+        )
+
+
+def test_tor_configuration_state_rejects_incompatible_configuration():
+    def configuration_state():
+        return "incompatible"
+
+    with pytest.raises(
+        ValueError,
+        match="Tor configuration state is incompatible or ambiguous",
+    ):
+        detect_tor_configuration_state(
+            tor_present=lambda: True,
+            configuration_compatible=lambda: False,
+            configuration_state=configuration_state,
+        )
+
+
+def test_detected_installation_plan_rejects_ambiguous_tor_configuration():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Tor configuration state is incompatible or ambiguous",
+    ):
+        build_detected_installation_plan(
+            profile,
+            project_metadata,
+            command_exists=lambda command: True,
+            python_version=lambda executable: (3, 12, 3),
+            python_venv_available=lambda executable: True,
+            tor_configuration_compatible=lambda: False,
+            tor_configuration_state=lambda: "ambiguous",
+        )

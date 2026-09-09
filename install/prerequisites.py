@@ -142,12 +142,36 @@ def probe_python_venv_available(
     return result.returncode == 0
 
 
+def detect_tor_configuration_state(
+    tor_present,
+    configuration_compatible,
+    configuration_state=None,
+) -> str:
+    if not tor_present():
+        return "absent"
+
+    if configuration_state is not None:
+        state = configuration_state()
+
+        if state in {"incompatible", "ambiguous"}:
+            raise ValueError(
+                "Tor configuration state is incompatible or ambiguous"
+            )
+
+    if configuration_compatible():
+        return "compatible"
+
+    return "configuration_required"
+
+
 def build_detected_installation_plan(
     profile: dict,
     project_metadata: dict,
     command_exists=command_exists_on_path,
     python_version=probe_python_version,
     python_venv_available=probe_python_venv_available,
+    tor_configuration_compatible=None,
+    tor_configuration_state=None,
 ) -> dict:
     executable = profile["python"]["executable"]
 
@@ -156,7 +180,7 @@ def build_detected_installation_plan(
         executable
     )
 
-    return build_installation_plan(
+    plan = build_installation_plan(
         profile["system_prerequisites"],
         command_exists=command_exists,
         python_venv_available=(
@@ -165,6 +189,27 @@ def build_detected_installation_plan(
         python_version=detected_python_version,
         python_requirement=project_metadata["requires-python"],
     )
+
+    if tor_configuration_compatible is None:
+        return plan
+
+    tor = profile["system_prerequisites"]["tor"]
+
+    if tor["package"] in plan["packages"]:
+        plan["tor_configuration_required"] = False
+        return plan
+
+    tor_state = detect_tor_configuration_state(
+        tor_present=lambda: True,
+        configuration_compatible=tor_configuration_compatible,
+        configuration_state=tor_configuration_state,
+    )
+
+    plan["tor_configuration_required"] = (
+        tor_state == "configuration_required"
+    )
+
+    return plan
 
 
 def build_machine_installation_plan(
