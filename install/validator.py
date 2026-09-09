@@ -80,6 +80,16 @@ def validate_manifest(manifest: dict) -> list[str]:
                 "Tor Control host must be local loopback"
             )
 
+        control_authentication = control.get("authentication")
+
+        if (
+            control_authentication is not None
+            and control_authentication != "safecookie"
+        ):
+            errors.append(
+                "Tor Control authentication must be safecookie"
+            )
+
     if operating_system is None:
         errors.append("manifest platform.os is required")
     elif operating_system != SUPPORTED_OPERATING_SYSTEM:
