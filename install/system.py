@@ -135,3 +135,40 @@ def build_machine_system_install_action(
         profile,
         plan,
     )
+
+
+def execute_machine_system_installation(
+    manifest: dict,
+    project_metadata: dict,
+    os_release: str,
+    command_exists,
+    python_version,
+    python_venv_available,
+    run,
+) -> None:
+    profile = detect_platform_profile(
+        os_release,
+        manifest["platform"]["profiles"],
+    )
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=python_version,
+        python_venv_available=python_venv_available,
+    )
+
+    action = build_package_install_action(
+        profile,
+        plan,
+    )
+
+    if action is None:
+        return
+
+    execute_profile_system_action(
+        profile,
+        action,
+        run=run,
+    )

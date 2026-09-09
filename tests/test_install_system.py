@@ -11,6 +11,7 @@ from install.system import (
     execute_system_action,
     execute_profile_system_action,
     build_machine_system_install_action,
+    execute_machine_system_installation,
 )
 
 
@@ -510,3 +511,124 @@ def test_build_machine_system_install_action_returns_none_when_satisfied():
     )
 
     assert action is None
+
+
+def test_execute_machine_system_installation_connects_plan_action_and_executor():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: command != "tor",
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "tor",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_machine_system_installation_skips_runner_when_satisfied():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        run=run,
+    )
+
+    assert calls == []
