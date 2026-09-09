@@ -17,6 +17,10 @@ required = true
 command = "tor"
 package = "tor"
 
+[platform.profiles.system_prerequisites.tor.control]
+host = "127.0.0.1"
+port = 9051
+
 [platform.profiles.system_prerequisites.python_venv]
 required = true
 command = "python3"

@@ -271,3 +271,34 @@ def test_manifest_requires_privilege_elevation():
     assert errors == [
         "profile privilege_elevation is required"
     ]
+
+
+def test_ubuntu_24_04_profile_declares_local_tor_control_endpoint():
+    manifest = load_install_manifest()
+
+    tor = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]
+    )
+
+    assert tor["control"] == {
+        "host": "127.0.0.1",
+        "port": 9051,
+    }
+
+
+def test_manifest_rejects_non_local_tor_control_host():
+    manifest = load_install_manifest()
+
+    tor = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]
+    )
+
+    tor["control"]["host"] = "0.0.0.0"
+
+    errors = validate_manifest(manifest)
+
+    assert errors == [
+        "Tor Control host must be local loopback"
+    ]

@@ -63,6 +63,23 @@ def validate_manifest(manifest: dict) -> list[str]:
                 f"{privilege_elevation}"
             )
 
+        tor = (
+            profile.get("system_prerequisites", {})
+            .get("tor", {})
+        )
+
+        control = tor.get("control", {})
+
+        control_host = control.get("host")
+
+        if (
+            control_host is not None
+            and control_host != "127.0.0.1"
+        ):
+            errors.append(
+                "Tor Control host must be local loopback"
+            )
+
     if operating_system is None:
         errors.append("manifest platform.os is required")
     elif operating_system != SUPPORTED_OPERATING_SYSTEM:
