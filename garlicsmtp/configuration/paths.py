@@ -96,6 +96,15 @@ class ApplicationPaths:
         return self.config_dir / "settings.toml"
 
     @property
+    def imap_credentials_file(
+        self,
+    ) -> Path:
+        return (
+            self.state_dir
+            / "imap-credentials.json"
+        )
+
+    @property
     def mailbox_database(self) -> Path:
         return self.data_dir / "mailboxes.db"
 

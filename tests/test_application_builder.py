@@ -84,6 +84,9 @@ from garlicsmtp.storage.entry import (
     VerificationStatus,
 )
 from garlicsmtp.security.auth import MemoryAuthenticator
+from garlicsmtp.security.auth.persistent_imap_authenticator import (
+    PersistentImapAuthenticator,
+)
 
 
 def test_application_builder_creates_context(
@@ -1750,6 +1753,36 @@ def test_application_builder_wires_imap_authenticator(
         assert (
             context.imap_server.authenticator
             is authenticator
+        )
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_uses_persistent_imap_authenticator_by_default(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    try:
+        assert isinstance(
+            context.imap_server.authenticator,
+            PersistentImapAuthenticator,
+        )
+
+        assert (
+            context.imap_server.authenticator.path
+            == paths.imap_credentials_file
         )
     finally:
         context.queue.backend.close()

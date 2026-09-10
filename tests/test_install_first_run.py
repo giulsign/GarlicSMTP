@@ -9,6 +9,15 @@ from pathlib import Path
 import pytest
 
 from install.first_run import verify_tor_first_run
+from install.first_run import (
+    provision_imap_credentials,
+)
+from garlicsmtp.configuration.paths import (
+    ApplicationPaths,
+)
+from garlicsmtp.security.auth.persistent_imap_authenticator import (
+    PersistentImapAuthenticator,
+)
 
 
 class FakeOnionServiceManager:
@@ -114,3 +123,55 @@ def test_tor_first_run_rejects_missing_onion_identity(
         verify_tor_first_run(
             onion_service=onion_service,
         )
+
+
+def test_first_run_provisions_imap_credentials(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    provision_imap_credentials(
+        paths=paths,
+        password="secret-password",
+    )
+
+    assert paths.imap_credentials_file.exists()
+
+    authenticator = PersistentImapAuthenticator(
+        path=paths.imap_credentials_file,
+    )
+
+    assert authenticator.authenticate(
+        "garlicsmtp",
+        "secret-password",
+    ) is True
+
+
+def test_first_run_does_not_regenerate_existing_imap_credentials(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    provision_imap_credentials(
+        paths=paths,
+        password="first-password",
+    )
+
+    original = paths.imap_credentials_file.read_bytes()
+
+    with pytest.raises(
+        FileExistsError,
+    ):
+        provision_imap_credentials(
+            paths=paths,
+            password="second-password",
+        )
+
+    assert (
+        paths.imap_credentials_file.read_bytes()
+        == original
+    )

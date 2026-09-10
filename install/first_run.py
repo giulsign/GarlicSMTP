@@ -5,6 +5,12 @@
 
 
 import re
+from garlicsmtp.configuration.paths import (
+    ApplicationPaths,
+)
+from garlicsmtp.security.auth.imap_credentials import (
+    ImapCredentialStore,
+)
 
 
 _ONION_V3_HOSTNAME = re.compile(
@@ -31,3 +37,16 @@ def verify_tor_first_run(
         raise RuntimeError(
             "Tor first-run did not persist the Onion identity"
         )
+
+
+def provision_imap_credentials(
+    *,
+    paths: ApplicationPaths,
+    password: str,
+) -> None:
+    ImapCredentialStore(
+        path=paths.imap_credentials_file,
+    ).create(
+        username="garlicsmtp",
+        password=password,
+    )

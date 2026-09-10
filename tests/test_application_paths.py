@@ -154,3 +154,17 @@ def test_application_paths_exposes_onion_identity_file(
             / "onion-service.key"
         )
     )
+
+
+def test_application_paths_derive_imap_credentials_file(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    assert (
+        paths.imap_credentials_file
+        == paths.state_dir
+        / "imap-credentials.json"
+    )

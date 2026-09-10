@@ -117,6 +117,9 @@ from garlicsmtp.security.decryptor import (
     MessageDecryptor,
 )
 from garlicsmtp.security.auth import Authenticator
+from garlicsmtp.security.auth.persistent_imap_authenticator import (
+    PersistentImapAuthenticator,
+)
 
 
 class ApplicationBuilder:
@@ -259,10 +262,17 @@ class ApplicationBuilder:
             ),
         )
 
+        imap_authenticator = (
+            self.imap_authenticator
+            or PersistentImapAuthenticator(
+                path=self.paths.imap_credentials_file,
+            )
+        )
+
         imap_server = self._build_imap_server(
             settings=settings,
             store=store,
-            authenticator=self.imap_authenticator,
+            authenticator=imap_authenticator,
         )
 
         queue_worker = self._build_queue_worker(
