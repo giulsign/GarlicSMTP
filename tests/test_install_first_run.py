@@ -175,3 +175,130 @@ def test_first_run_does_not_regenerate_existing_imap_credentials(
         paths.imap_credentials_file.read_bytes()
         == original
     )
+
+
+def test_run_first_run_provisions_imap_then_verifies_tor(
+    tmp_path,
+    monkeypatch,
+):
+    from install.first_run import run_first_run
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+    calls = []
+
+    def provision(*, paths, password):
+        calls.append(
+            ("imap", paths, password)
+        )
+
+    def verify(*, onion_service):
+        calls.append(
+            ("tor", onion_service)
+        )
+
+    onion_service = object()
+
+    monkeypatch.setattr(
+        "install.first_run.provision_imap_credentials",
+        provision,
+    )
+    monkeypatch.setattr(
+        "install.first_run.verify_tor_first_run",
+        verify,
+    )
+
+    run_first_run(
+        paths=paths,
+        password="secret-password",
+        onion_service=onion_service,
+    )
+
+    assert calls == [
+        (
+            "imap",
+            paths,
+            "secret-password",
+        ),
+        (
+            "tor",
+            onion_service,
+        ),
+    ]
+
+
+def test_run_first_run_stops_before_tor_when_imap_provisioning_fails(
+    tmp_path,
+    monkeypatch,
+):
+    from install.first_run import run_first_run
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+    tor_calls = []
+
+    def provision(*, paths, password):
+        raise FileExistsError(
+            paths.imap_credentials_file
+        )
+
+    def verify(*, onion_service):
+        tor_calls.append(onion_service)
+
+    monkeypatch.setattr(
+        "install.first_run.provision_imap_credentials",
+        provision,
+    )
+    monkeypatch.setattr(
+        "install.first_run.verify_tor_first_run",
+        verify,
+    )
+
+    with pytest.raises(FileExistsError):
+        run_first_run(
+            paths=paths,
+            password="secret-password",
+            onion_service=object(),
+        )
+
+    assert tor_calls == []
+
+
+def test_run_first_run_propagates_tor_verification_failure(
+    tmp_path,
+    monkeypatch,
+):
+    from install.first_run import run_first_run
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    def provision(*, paths, password):
+        return None
+
+    def verify(*, onion_service):
+        raise RuntimeError(
+            "Tor first-run verification failed"
+        )
+
+    monkeypatch.setattr(
+        "install.first_run.provision_imap_credentials",
+        provision,
+    )
+    monkeypatch.setattr(
+        "install.first_run.verify_tor_first_run",
+        verify,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Tor first-run verification failed",
+    ):
+        run_first_run(
+            paths=paths,
+            password="secret-password",
+            onion_service=object(),
+        )

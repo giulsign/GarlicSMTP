@@ -50,3 +50,19 @@ def provision_imap_credentials(
         username="garlicsmtp",
         password=password,
     )
+
+
+def run_first_run(
+    *,
+    paths: ApplicationPaths,
+    password: str,
+    onion_service,
+) -> None:
+    provision_imap_credentials(
+        paths=paths,
+        password=password,
+    )
+
+    verify_tor_first_run(
+        onion_service=onion_service,
+    )

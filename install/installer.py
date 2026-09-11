@@ -3,6 +3,7 @@
 
 # See LICENSE for the full license terms.
 
+
 from pathlib import Path
 
 from install.environment import (
@@ -11,6 +12,7 @@ from install.environment import (
 )
 from install.platform import detect_platform_profile
 from install.system import execute_machine_system_installation
+from install.first_run import run_first_run
 
 
 def execute_installation(
@@ -25,6 +27,9 @@ def execute_installation(
     python_venv_available,
     system_run,
     environment_run,
+    application_context=None,
+    password: str | None = None,
+    first_run=run_first_run,
 ) -> None:
     execute_machine_system_installation(
         manifest,
@@ -51,3 +56,15 @@ def execute_installation(
         actions,
         run=environment_run,
     )
+
+    if application_context is not None:
+        if password is None:
+            raise ValueError(
+                "IMAP password is required for first-run"
+            )
+
+        first_run(
+            paths=application_context.paths,
+            password=password,
+            onion_service=application_context.onion_service,
+        )
