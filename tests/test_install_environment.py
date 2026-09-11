@@ -112,7 +112,11 @@ def test_build_verify_environment_action_uses_venv_python():
         "command": [
             str(venv_dir / "bin" / "python"),
             "-c",
-            "import garlicsmtp",
+            (
+                "import garlicsmtp; "
+                "import garlicsmtp.cli.__main__; "
+                "import garlicsmtp.gui.application"
+            ),
         ],
         "requires_privileges": False,
     }
@@ -164,8 +168,12 @@ def test_build_environment_actions_orders_create_install_and_verify():
             "command": [
                 str(venv_dir / "bin" / "python"),
                 "-c",
-                "import garlicsmtp",
-            ],
+                (
+                    "import garlicsmtp; "
+                    "import garlicsmtp.cli.__main__; "
+                    "import garlicsmtp.gui.application"
+                ),
+                        ],
             "requires_privileges": False,
         },
     ]
@@ -198,6 +206,55 @@ def test_execute_environment_actions_preserves_order():
         actions,
         run=run,
     )
+
+    assert calls == [
+        ["create"],
+        ["install"],
+        ["verify"],
+    ]
+
+
+def test_execute_environment_actions_stops_after_verification_failure():
+    from install.environment import execute_environment_actions
+
+    calls = []
+
+    def run(command, check):
+        calls.append(command)
+
+        if command == ["verify"]:
+            raise RuntimeError("environment verification failed")
+
+    actions = [
+        {
+            "command": ["create"],
+            "requires_privileges": False,
+        },
+        {
+            "command": ["install"],
+            "requires_privileges": False,
+        },
+        {
+            "command": ["verify"],
+            "requires_privileges": False,
+        },
+        {
+            "command": ["after-verify"],
+            "requires_privileges": False,
+        },
+    ]
+
+    try:
+        execute_environment_actions(
+            actions,
+            run=run,
+        )
+    except RuntimeError as exc:
+        assert str(exc) == "environment verification failed"
+    else:
+        raise AssertionError(
+            "expected environment verification failure"
+        )
 
     assert calls == [
         ["create"],

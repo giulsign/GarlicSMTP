@@ -56,7 +56,11 @@ def build_verify_environment_action(
         "command": [
             str(venv_dir / "bin" / "python"),
             "-c",
-            "import garlicsmtp",
+            (
+                "import garlicsmtp; "
+                "import garlicsmtp.cli.__main__; "
+                "import garlicsmtp.gui.application"
+            ),
         ],
         "requires_privileges": False,
     }

@@ -87,7 +87,11 @@ def test_execute_installation_runs_system_before_environment():
         [
             "/home/alice/.local/share/garlicsmtp/venv/bin/python",
             "-c",
-            "import garlicsmtp",
+            (
+                "import garlicsmtp; "
+                "import garlicsmtp.cli.__main__; "
+                "import garlicsmtp.gui.application"
+            ),
         ],
     ]
 
