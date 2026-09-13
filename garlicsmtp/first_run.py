@@ -1,10 +1,5 @@
-# Copyright (c) 2026 Giuliano Signorelli
-# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
-
-# See LICENSE for the full license terms.
-
-
 import re
+
 from garlicsmtp.configuration.paths import (
     ApplicationPaths,
 )
@@ -55,13 +50,19 @@ def provision_imap_credentials(
 def run_first_run(
     *,
     paths: ApplicationPaths,
-    password: str,
+    password: str | None,
     onion_service,
 ) -> None:
-    provision_imap_credentials(
-        paths=paths,
-        password=password,
-    )
+    if not paths.imap_credentials_file.exists():
+        if password is None:
+            raise ValueError(
+                "IMAP password is required for first-run"
+            )
+
+        provision_imap_credentials(
+            paths=paths,
+            password=password,
+        )
 
     verify_tor_first_run(
         onion_service=onion_service,

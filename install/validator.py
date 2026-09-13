@@ -68,6 +68,13 @@ def validate_manifest(manifest: dict) -> list[str]:
             .get("tor", {})
         )
 
+        torrc_path = tor.get("torrc_path")
+
+        if torrc_path is None:
+            errors.append(
+                "Tor torrc_path is required"
+            )
+
         control = tor.get("control", {})
 
         control_host = control.get("host")

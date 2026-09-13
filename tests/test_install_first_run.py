@@ -8,8 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from install.first_run import verify_tor_first_run
-from install.first_run import (
+from garlicsmtp.first_run import verify_tor_first_run
+from garlicsmtp.first_run import (
     provision_imap_credentials,
 )
 from garlicsmtp.configuration.paths import (
@@ -181,7 +181,7 @@ def test_run_first_run_provisions_imap_then_verifies_tor(
     tmp_path,
     monkeypatch,
 ):
-    from install.first_run import run_first_run
+    from garlicsmtp.first_run import run_first_run
 
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -201,11 +201,11 @@ def test_run_first_run_provisions_imap_then_verifies_tor(
     onion_service = object()
 
     monkeypatch.setattr(
-        "install.first_run.provision_imap_credentials",
+        "garlicsmtp.first_run.provision_imap_credentials",
         provision,
     )
     monkeypatch.setattr(
-        "install.first_run.verify_tor_first_run",
+        "garlicsmtp.first_run.verify_tor_first_run",
         verify,
     )
 
@@ -232,7 +232,7 @@ def test_run_first_run_stops_before_tor_when_imap_provisioning_fails(
     tmp_path,
     monkeypatch,
 ):
-    from install.first_run import run_first_run
+    from garlicsmtp.first_run import run_first_run
 
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -248,11 +248,11 @@ def test_run_first_run_stops_before_tor_when_imap_provisioning_fails(
         tor_calls.append(onion_service)
 
     monkeypatch.setattr(
-        "install.first_run.provision_imap_credentials",
+        "garlicsmtp.first_run.provision_imap_credentials",
         provision,
     )
     monkeypatch.setattr(
-        "install.first_run.verify_tor_first_run",
+        "garlicsmtp.first_run.verify_tor_first_run",
         verify,
     )
 
@@ -270,7 +270,7 @@ def test_run_first_run_propagates_tor_verification_failure(
     tmp_path,
     monkeypatch,
 ):
-    from install.first_run import run_first_run
+    from garlicsmtp.first_run import run_first_run
 
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -285,11 +285,11 @@ def test_run_first_run_propagates_tor_verification_failure(
         )
 
     monkeypatch.setattr(
-        "install.first_run.provision_imap_credentials",
+        "garlicsmtp.first_run.provision_imap_credentials",
         provision,
     )
     monkeypatch.setattr(
-        "install.first_run.verify_tor_first_run",
+        "garlicsmtp.first_run.verify_tor_first_run",
         verify,
     )
 
@@ -300,5 +300,105 @@ def test_run_first_run_propagates_tor_verification_failure(
         run_first_run(
             paths=paths,
             password="secret-password",
+            onion_service=object(),
+        )
+
+
+def test_run_first_run_reuses_existing_imap_credentials(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.first_run import run_first_run
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+    paths.imap_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.imap_credentials_file.write_text(
+        "existing-credentials",
+        encoding="utf-8",
+    )
+
+    calls = []
+
+    def provision(*, paths, password):
+        calls.append("imap")
+
+    def verify(*, onion_service):
+        calls.append("tor")
+
+    monkeypatch.setattr(
+        "garlicsmtp.first_run.provision_imap_credentials",
+        provision,
+    )
+    monkeypatch.setattr(
+        "garlicsmtp.first_run.verify_tor_first_run",
+        verify,
+    )
+
+    run_first_run(
+        paths=paths,
+        password="new-password",
+        onion_service=object(),
+    )
+
+    assert calls == ["tor"]
+
+
+def test_run_first_run_reuses_existing_imap_credentials_without_password(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.first_run import run_first_run
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+    paths.imap_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.imap_credentials_file.write_text(
+        "existing-credentials",
+        encoding="utf-8",
+    )
+
+    tor_calls = []
+
+    monkeypatch.setattr(
+        "garlicsmtp.first_run.verify_tor_first_run",
+        lambda *, onion_service: tor_calls.append(onion_service),
+    )
+
+    onion_service = object()
+
+    run_first_run(
+        paths=paths,
+        password=None,
+        onion_service=onion_service,
+    )
+
+    assert tor_calls == [onion_service]
+
+
+def test_run_first_run_requires_password_when_imap_credentials_are_missing(
+    tmp_path,
+):
+    from garlicsmtp.first_run import run_first_run
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="IMAP password",
+    ):
+        run_first_run(
+            paths=paths,
+            password=None,
             onion_service=object(),
         )

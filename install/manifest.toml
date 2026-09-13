@@ -16,6 +16,7 @@ executable = "/usr/bin/python3"
 required = true
 command = "tor"
 package = "tor"
+torrc_path = "/etc/tor/torrc"
 
 [platform.profiles.system_prerequisites.tor.control]
 host = "127.0.0.1"

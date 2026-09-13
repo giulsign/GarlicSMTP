@@ -87,6 +87,7 @@ from garlicsmtp.security.auth import MemoryAuthenticator
 from garlicsmtp.security.auth.persistent_imap_authenticator import (
     PersistentImapAuthenticator,
 )
+import garlicsmtp.application.builder as builder_module
 
 
 def test_application_builder_creates_context(
@@ -364,6 +365,65 @@ def test_application_builder_builds_onion_service(
     assert onion_service.target_port == (
         settings.smtp.port
     )
+
+
+def test_application_builder_delegates_onion_service_creation(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+
+    expected_onion_service = object()
+    calls = []
+
+    def build_onion_service_manager(
+        *,
+        paths,
+        settings,
+        hostname_callback=None,
+    ):
+        calls.append(
+            {
+                "paths": paths,
+                "settings": settings,
+                "hostname_callback": hostname_callback,
+            }
+        )
+
+        return expected_onion_service
+
+    monkeypatch.setattr(
+        builder_module,
+        "build_onion_service_manager",
+        build_onion_service_manager,
+        raising=False,
+    )
+
+    builder = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    )
+
+    hostname_callback = object()
+
+    onion_service = builder._build_onion_service(
+        settings,
+        hostname_callback=hostname_callback,
+    )
+
+    assert onion_service is expected_onion_service
+
+    assert calls == [
+        {
+            "paths": paths,
+            "settings": settings,
+            "hostname_callback": hostname_callback,
+        }
+    ]
 
 
 def test_application_builder_disables_onion_service_when_tor_disabled(

@@ -12,7 +12,10 @@ from install.system import (
     execute_profile_system_action,
     build_machine_system_install_action,
     execute_machine_system_installation,
+    configure_profile_tor,
+    build_refreshed_user_action,
 )
+from pathlib import Path    
 
 
 def test_build_package_install_action_uses_profile_package_manager_and_plan():
@@ -632,3 +635,359 @@ def test_execute_machine_system_installation_skips_runner_when_satisfied():
     )
 
     assert calls == []
+
+
+def test_execute_system_action_forwards_input():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    action = {
+        "command": [
+            "tee",
+            "-a",
+            "/etc/tor/torrc",
+        ],
+        "requires_privileges": True,
+        "input": "ControlPort 127.0.0.1:9051\n",
+    }
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=lambda command: [
+            "sudo",
+            *command,
+        ],
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "tee",
+                "-a",
+                "/etc/tor/torrc",
+            ],
+            {
+                "check": True,
+                "input": (
+                    "ControlPort "
+                    "127.0.0.1:9051\n"
+                ),
+                "text": True,
+            },
+        ),
+    ]
+
+
+def _machine_installation_inputs():
+    return {
+        "manifest": {
+            "platform": {
+                "os": "linux",
+                "profiles": [
+                    {
+                        "id": "ubuntu",
+                        "version_id": "24.04",
+                        "package_manager": "apt-get",
+                        "privilege_elevation": "sudo",
+                        "python": {
+                            "executable": "/usr/bin/python3",
+                        },
+                        "system_prerequisites": {
+                            "tor": {
+                                "required": True,
+                                "command": "tor",
+                                "package": "tor",
+                                "control": {
+                                    "host": "127.0.0.1",
+                                    "port": 9051,
+                                    "authentication": "safecookie",
+                                    "cookie_path_source": "protocolinfo",
+                                    "cookie_access": {
+                                        "runtime_user_rootless": True,
+                                    },
+                                },
+                            },
+                            "python_venv": {
+                                "required": True,
+                                "command": "python3",
+                                "package": "python3-venv",
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+        "project_metadata": {
+            "requires-python": ">=3.12",
+        },
+        "os_release": (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+    }
+
+
+def test_machine_system_installation_redetects_tor_after_package_install():
+    inputs = _machine_installation_inputs()
+
+    states = []
+    commands = []
+
+    def command_exists(command):
+        if command == "tor":
+            states.append("tor-probe")
+            return len(states) > 1
+        return True
+
+    def run(command, **kwargs):
+        commands.append(command)
+
+    execute_machine_system_installation(
+        **inputs,
+        command_exists=command_exists,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: True,
+        run=run,
+    )
+
+    assert states == [
+        "tor-probe",
+        "tor-probe",
+    ]
+
+
+def test_machine_system_installation_provisions_tor_after_redetection():
+    inputs = _machine_installation_inputs()
+
+    tor_present = False
+    configuration_calls = []
+
+    def command_exists(command):
+        nonlocal tor_present
+
+        if command == "tor":
+            if not tor_present:
+                tor_present = True
+                return False
+            return True
+
+        return True
+
+    def configure_tor(**kwargs):
+        configuration_calls.append(kwargs)
+
+    runner = lambda command, **kwargs: None
+    torrc_path = Path("/etc/tor/torrc")
+
+    execute_machine_system_installation(
+        **inputs,
+        command_exists=command_exists,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: False,
+        runtime_user="alice",
+        torrc_path=torrc_path,
+        configure_tor=configure_tor,
+        run=runner,
+    )
+
+    profile = inputs["manifest"]["platform"]["profiles"][0]
+
+    assert configuration_calls == [
+        {
+            "profile": profile,
+            "runtime_user": "alice",
+            "torrc_path": torrc_path,
+            "run": runner,
+        },
+    ]
+
+
+def test_machine_system_installation_does_not_configure_compatible_tor():
+    inputs = _machine_installation_inputs()
+
+    configuration_calls = []
+
+    execute_machine_system_installation(
+        **inputs,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: True,
+        runtime_user="alice",
+        configure_tor=lambda **kwargs: (
+            configuration_calls.append(kwargs)
+        ),
+        run=lambda command, **kwargs: None,
+    )
+
+    assert configuration_calls == []
+
+
+def test_configure_profile_tor_uses_manifest_control_endpoint():
+    profile = _machine_installation_inputs()[
+        "manifest"
+    ]["platform"]["profiles"][0]
+
+    calls = []
+
+    def build_plan(**kwargs):
+        calls.append(("build", kwargs))
+        return {"tor-plan": True}
+
+    def execute_plan(plan, **kwargs):
+        calls.append(
+            ("execute", plan, kwargs)
+        )
+
+    runner = object()
+
+    configure_profile_tor(
+        profile=profile,
+        runtime_user="alice",
+        torrc_path=Path("/etc/tor/torrc"),
+        run=runner,
+        build_plan=build_plan,
+        execute_plan=execute_plan,
+        execute_action=lambda *args: None,
+    )
+
+    assert calls[0] == (
+        "build",
+        {
+            "tor_state": "configuration_required",
+            "torrc_path": Path("/etc/tor/torrc"),
+            "runtime_user": "alice",
+            "control_host": "127.0.0.1",
+            "control_port": 9051,
+        },
+    )
+
+
+def test_configure_profile_tor_delegates_plan_execution():
+    profile = _machine_installation_inputs()[
+        "manifest"
+    ]["platform"]["profiles"][0]
+
+    plan = {"tor-plan": True}
+    runner = object()
+    execute_action = object()
+
+    calls = []
+
+    def execute_plan(plan_arg, **kwargs):
+        calls.append(
+            (plan_arg, kwargs)
+        )
+
+    configure_profile_tor(
+        profile=profile,
+        runtime_user="alice",
+        torrc_path=Path("/etc/tor/torrc"),
+        run=runner,
+        build_plan=lambda **kwargs: plan,
+        execute_plan=execute_plan,
+        execute_action=execute_action,
+    )
+
+    assert calls == [
+        (
+            plan,
+            {
+                "profile": profile,
+                "run": runner,
+                "execute_action": execute_action,
+            },
+        ),
+    ]
+
+
+def test_machine_system_installation_requires_torrc_path_for_tor_configuration():
+    inputs = _machine_installation_inputs()
+
+    with pytest.raises(
+        ValueError,
+        match="torrc_path is required for Tor configuration",
+    ):
+        execute_machine_system_installation(
+            **inputs,
+            command_exists=lambda command: True,
+            python_version=lambda executable: (3, 12, 3),
+            python_venv_available=lambda executable: True,
+            tor_configuration_compatible=lambda: False,
+            runtime_user="alice",
+            run=lambda command, **kwargs: None,
+        )
+
+
+def test_build_refreshed_user_action_runs_command_as_runtime_user():
+    action = build_refreshed_user_action(
+        runtime_user="alice",
+        command=[
+            "/home/alice/.local/share/garlicsmtp/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+    )
+
+    assert action == {
+        "command": [
+            "sudo",
+            "-u",
+            "alice",
+            "--",
+            "/home/alice/.local/share/garlicsmtp/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+        "requires_privileges": False,
+    }
+
+
+def test_execute_refreshed_user_action_does_not_add_second_sudo():
+    action = build_refreshed_user_action(
+        runtime_user="alice",
+        command=[
+            "/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+    )
+
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(
+            (command, kwargs)
+        )
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=lambda command: [
+            "sudo",
+            *command,
+        ],
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                "/venv/bin/python",
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+            },
+        )
+    ]

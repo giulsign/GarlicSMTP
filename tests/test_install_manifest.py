@@ -386,3 +386,31 @@ def test_manifest_rejects_root_required_tor_cookie_access():
     assert errors == [
         "Tor Control cookie access must be rootless at runtime"
     ]
+
+
+def test_ubuntu_24_04_profile_declares_torrc_path():
+    manifest = load_install_manifest()
+
+    tor = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]
+    )
+
+    assert tor["torrc_path"] == "/etc/tor/torrc"
+
+
+def test_manifest_requires_torrc_path():
+    manifest = load_install_manifest()
+
+    tor = (
+        manifest["platform"]["profiles"][0]
+        ["system_prerequisites"]["tor"]
+    )
+
+    del tor["torrc_path"]
+
+    errors = validate_manifest(manifest)
+
+    assert errors == [
+        "Tor torrc_path is required"
+    ]
