@@ -6,7 +6,14 @@
 
 from pathlib import Path
 
-from install.environment import build_create_venv_action
+from install.environment import (
+    build_create_venv_action,
+    execute_environment_action,
+    build_install_project_action,
+    build_verify_environment_action,
+    build_environment_actions,
+    execute_environment_actions,
+)
 
 
 def test_build_create_venv_action_uses_profile_python():
@@ -55,8 +62,6 @@ def test_execute_environment_action_runs_without_privilege_elevation():
         "requires_privileges": False,
     }
 
-    from install.environment import execute_environment_action
-
     execute_environment_action(
         action,
         run=run,
@@ -71,7 +76,7 @@ def test_execute_environment_action_runs_without_privilege_elevation():
 
 
 def test_build_install_project_action_uses_venv_python():
-    from install.environment import build_install_project_action
+
 
     venv_dir = Path(
         "/home/alice/.local/share/garlicsmtp/venv"
@@ -98,8 +103,6 @@ def test_build_install_project_action_uses_venv_python():
 
 
 def test_build_verify_environment_action_uses_venv_python():
-    from install.environment import build_verify_environment_action
-
     venv_dir = Path(
         "/home/alice/.local/share/garlicsmtp/venv"
     )
@@ -115,7 +118,9 @@ def test_build_verify_environment_action_uses_venv_python():
             (
                 "import garlicsmtp; "
                 "import garlicsmtp.cli.__main__; "
-                "import garlicsmtp.gui.application"
+                "import garlicsmtp.gui.application; "
+                "import garlicsmtp.install_runtime_config; "
+                "import garlicsmtp.install_first_run"
             ),
         ],
         "requires_privileges": False,
@@ -123,7 +128,6 @@ def test_build_verify_environment_action_uses_venv_python():
 
 
 def test_build_environment_actions_orders_create_install_and_verify():
-    from install.environment import build_environment_actions
 
     profile = {
         "python": {
@@ -171,16 +175,17 @@ def test_build_environment_actions_orders_create_install_and_verify():
                 (
                     "import garlicsmtp; "
                     "import garlicsmtp.cli.__main__; "
-                    "import garlicsmtp.gui.application"
+                    "import garlicsmtp.gui.application; "
+                    "import garlicsmtp.install_runtime_config; "
+                    "import garlicsmtp.install_first_run"
                 ),
-                        ],
+            ],
             "requires_privileges": False,
-        },
+        }
     ]
 
 
 def test_execute_environment_actions_preserves_order():
-    from install.environment import execute_environment_actions
 
     calls = []
 
@@ -215,7 +220,6 @@ def test_execute_environment_actions_preserves_order():
 
 
 def test_execute_environment_actions_stops_after_verification_failure():
-    from install.environment import execute_environment_actions
 
     calls = []
 

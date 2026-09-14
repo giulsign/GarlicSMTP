@@ -11,12 +11,16 @@ import pytest
 from garlicsmtp.first_run import verify_tor_first_run
 from garlicsmtp.first_run import (
     provision_imap_credentials,
+    run_first_run,
 )
 from garlicsmtp.configuration.paths import (
     ApplicationPaths,
 )
 from garlicsmtp.security.auth.persistent_imap_authenticator import (
     PersistentImapAuthenticator,
+)
+from garlicsmtp.security.auth.imap_credentials import (
+    ImapCredentialStore,
 )
 
 
@@ -308,18 +312,16 @@ def test_run_first_run_reuses_existing_imap_credentials(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.first_run import run_first_run
+    
 
     paths = ApplicationPaths(
         root_dir=tmp_path,
     )
-    paths.imap_credentials_file.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-    paths.imap_credentials_file.write_text(
-        "existing-credentials",
-        encoding="utf-8",
+    ImapCredentialStore(
+        path=paths.imap_credentials_file,
+    ).create(
+        username="garlicsmtp",
+        password="existing-password",
     )
 
     calls = []
@@ -352,18 +354,16 @@ def test_run_first_run_reuses_existing_imap_credentials_without_password(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.first_run import run_first_run
 
     paths = ApplicationPaths(
         root_dir=tmp_path,
     )
-    paths.imap_credentials_file.parent.mkdir(
-        parents=True,
-        exist_ok=True,
-    )
-    paths.imap_credentials_file.write_text(
-        "existing-credentials",
-        encoding="utf-8",
+    
+    ImapCredentialStore(
+        path=paths.imap_credentials_file,
+    ).create(
+        username="garlicsmtp",
+        password="existing-password",
     )
 
     tor_calls = []
@@ -401,4 +401,125 @@ def test_run_first_run_requires_password_when_imap_credentials_are_missing(
             paths=paths,
             password=None,
             onion_service=object(),
+        )
+
+
+def test_run_first_run_validates_existing_imap_credentials(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.imap_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.imap_credentials_file.write_text(
+        "existing-credentials",
+        encoding="utf-8",
+    )
+
+    calls = []
+
+    class FakeStore:
+        def __init__(self, path):
+            calls.append(
+                (
+                    "init",
+                    path,
+                )
+            )
+
+        def validate(self):
+            calls.append(
+                (
+                    "validate",
+                )
+            )
+
+    monkeypatch.setattr(
+        "garlicsmtp.first_run.ImapCredentialStore",
+        FakeStore,
+    )
+
+    class OnionService:
+        hostname = (
+            "a" * 56
+            + ".onion"
+        )
+        identity_file = tmp_path / "onion.key"
+
+        def start(self):
+            self.identity_file.write_text(
+                "identity",
+                encoding="utf-8",
+            )
+
+    run_first_run(
+        paths=paths,
+        password=None,
+        onion_service=OnionService(),
+    )
+
+    assert calls == [
+        (
+            "init",
+            paths.imap_credentials_file,
+        ),
+        (
+            "validate",
+        ),
+    ]
+
+
+def test_run_first_run_stops_when_existing_imap_credentials_are_invalid(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.imap_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.imap_credentials_file.write_text(
+        "existing-credentials",
+        encoding="utf-8",
+    )
+
+    class FakeStore:
+        def __init__(self, path):
+            self.path = path
+
+        def validate(self):
+            raise ValueError(
+                "Invalid IMAP credentials"
+            )
+
+    monkeypatch.setattr(
+        "garlicsmtp.first_run.ImapCredentialStore",
+        FakeStore,
+    )
+
+    class OnionService:
+        hostname = None
+        identity_file = tmp_path / "onion.key"
+
+        def start(self):
+            raise AssertionError(
+                "Tor first-run must not start"
+            )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        run_first_run(
+            paths=paths,
+            password=None,
+            onion_service=OnionService(),
         )

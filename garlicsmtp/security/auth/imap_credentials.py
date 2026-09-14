@@ -71,7 +71,35 @@ class ImapCredentialStore:
                 self.path
             )
 
-        file_stat = self.path.stat()
+        self.validate()
+
+        data = {
+            "username": "garlicsmtp",
+            "password_hash": (
+                PasswordHasher().hash_password(
+                    password
+                )
+            ),
+        }
+
+        self.path.write_text(
+            json.dumps(data),
+            encoding="utf-8",
+        )
+
+        self.path.chmod(0o600)
+
+    def validate(
+        self,
+    ) -> None:
+        file_stat = self.path.lstat()
+
+        if stat.S_ISLNK(
+            file_stat.st_mode
+        ):
+            raise ValueError(
+                "Invalid IMAP credentials"
+            )
 
         mode = stat.S_IMODE(
             file_stat.st_mode
@@ -101,6 +129,11 @@ class ImapCredentialStore:
                 "Invalid IMAP credentials"
             )
 
+        if data["username"] != "garlicsmtp":
+            raise ValueError(
+                "Invalid IMAP credentials"
+            )
+
         password_hash = data["password_hash"]
 
         if (
@@ -118,24 +151,3 @@ class ImapCredentialStore:
             raise ValueError(
                 "Invalid IMAP credentials"
             )
-
-        if data["username"] != "garlicsmtp":
-            raise ValueError(
-                "Invalid IMAP credentials"
-            )
-
-        data = {
-            "username": "garlicsmtp",
-            "password_hash": (
-                PasswordHasher().hash_password(
-                    password
-                )
-            ),
-        }
-
-        self.path.write_text(
-            json.dumps(data),
-            encoding="utf-8",
-        )
-
-        self.path.chmod(0o600)

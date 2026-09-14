@@ -42,6 +42,12 @@ classifiers = [
     "Topic :: Security",
 ]
 
+[project.scripts]
+garlicsmtp = "garlicsmtp.cli:main"
+
+[project.gui-scripts]
+garlicsmtp-gui = "garlicsmtp.gui.application:main"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["garlicsmtp*"]

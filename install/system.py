@@ -1,6 +1,8 @@
-# Copyright (c) Giuliano Signorelli
-#
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
 # See LICENSE for the full license terms.
+
 
 import subprocess
 from install.platform import detect_platform_profile
@@ -106,8 +108,9 @@ def build_refreshed_user_action(
     *,
     runtime_user: str,
     command: list[str],
+    input: str | None = None,
 ) -> dict:
-    return {
+    action = {
         "command": [
             "sudo",
             "-u",
@@ -117,6 +120,11 @@ def build_refreshed_user_action(
         ],
         "requires_privileges": False,
     }
+
+    if input is not None:
+        action["input"] = input
+
+    return action
 
 
 def build_profile_privilege_elevator(

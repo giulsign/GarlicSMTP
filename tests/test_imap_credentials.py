@@ -360,3 +360,246 @@ def test_imap_credential_store_reset_rejects_insecure_permissions(
         )
 
     assert path.read_bytes() == original
+
+
+def test_imap_credential_store_validate_rejects_symlink(
+    tmp_path,
+):
+    target = tmp_path / "credentials-target.json"
+
+    target.write_text(
+        json.dumps(
+            {
+                "username": "garlicsmtp",
+                "password_hash": (
+                    PasswordHasher().hash_password(
+                        "secret-password"
+                    )
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+    target.chmod(0o600)
+
+    path = tmp_path / "imap-credentials.json"
+    path.symlink_to(target)
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.validate()
+
+
+def test_imap_credential_store_validate_rejects_insecure_permissions(
+    tmp_path,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    path.write_text(
+        json.dumps(
+            {
+                "username": "garlicsmtp",
+                "password_hash": (
+                    PasswordHasher().hash_password(
+                        "secret-password"
+                    )
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o644)
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        PermissionError,
+        match="Insecure IMAP credentials permissions",
+    ):
+        store.validate()
+
+
+def test_imap_credential_store_validate_rejects_corrupt_credentials(
+    tmp_path,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    path.write_text(
+        "{not-valid-json",
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.validate()
+
+
+def test_imap_credential_store_validate_rejects_structurally_invalid_credentials(
+    tmp_path,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    path.write_text(
+        json.dumps(
+            {
+                "username": "garlicsmtp",
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.validate()
+
+
+def test_imap_credential_store_validate_rejects_noncanonical_username(
+    tmp_path,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    path.write_text(
+        json.dumps(
+            {
+                "username": "alice",
+                "password_hash": (
+                    PasswordHasher().hash_password(
+                        "secret-password"
+                    )
+                ),
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.validate()
+
+
+def test_imap_credential_store_validate_rejects_malformed_password_hash(
+    tmp_path,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    path.write_text(
+        json.dumps(
+            {
+                "username": "garlicsmtp",
+                "password_hash": "not-a-valid-password-hash",
+            }
+        ),
+        encoding="utf-8",
+    )
+    path.chmod(0o600)
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.validate()
+
+
+def test_imap_credential_store_reset_validates_existing_credentials(
+    tmp_path,
+    monkeypatch,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    store.create(
+        username="garlicsmtp",
+        password="old-password",
+    )
+
+    calls = []
+
+    def validate():
+        calls.append("validate")
+        raise ValueError(
+            "Invalid IMAP credentials"
+        )
+
+    monkeypatch.setattr(
+        store,
+        "validate",
+        validate,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.reset_password(
+            password="new-password",
+        )
+
+    assert calls == [
+        "validate",
+    ]
+
+
+def test_imap_credential_store_reset_rejects_symlink(
+    tmp_path,
+):
+    target = tmp_path / "credentials-target.json"
+    path = tmp_path / "imap-credentials.json"
+
+    ImapCredentialStore(
+        path=target,
+    ).create(
+        username="garlicsmtp",
+        password="old-password",
+    )
+
+    path.symlink_to(
+        target,
+    )
+
+    store = ImapCredentialStore(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        store.reset_password(
+            password="new-password",
+        )

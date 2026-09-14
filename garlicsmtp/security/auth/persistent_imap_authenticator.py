@@ -16,6 +16,9 @@ from garlicsmtp.security.auth.authenticator import (
 from garlicsmtp.security.auth.password_hasher import (
     PasswordHasher,
 )
+from garlicsmtp.security.auth.imap_credentials import (
+    ImapCredentialStore,
+)
 
 
 class PersistentImapAuthenticator(
@@ -33,70 +36,20 @@ class PersistentImapAuthenticator(
         username: str,
         password: str,
     ) -> bool:
-        file_stat = self.path.lstat()
+        ImapCredentialStore(
+            path=self.path,
+        ).validate()
 
-        if stat.S_ISLNK(
-            file_stat.st_mode
-        ):
-            raise ValueError(
-                "Invalid IMAP credentials"
+        data = json.loads(
+            self.path.read_text(
+                encoding="utf-8",
             )
-
-        mode = stat.S_IMODE(
-            file_stat.st_mode
         )
-
-        if mode != 0o600:
-            raise PermissionError(
-                "Insecure IMAP credentials permissions"
-            )
-
-        try:
-            data = json.loads(
-                self.path.read_text(
-                    encoding="utf-8",
-                )
-            )
-        except json.JSONDecodeError as exc:
-            raise ValueError(
-                "Invalid IMAP credentials"
-            ) from exc
-
-        if (
-            "username" not in data
-            or "password_hash" not in data
-        ):
-            raise ValueError(
-                "Invalid IMAP credentials"
-            )
-
-        if data["username"] != "garlicsmtp":
-            raise ValueError(
-                "Invalid IMAP credentials"
-            )
-
-        password_hash = data["password_hash"]
-
-        if (
-            not isinstance(
-                password_hash,
-                str,
-            )
-            or len(
-                password_hash.split("$")
-            ) != 7
-            or not password_hash.startswith(
-                "scrypt$"
-            )
-        ):
-            raise ValueError(
-                "Invalid IMAP credentials"
-            )
 
         if username != data["username"]:
             return False
 
         return PasswordHasher().verify_password(
             password,
-            password_hash,
+            data["password_hash"],
         )

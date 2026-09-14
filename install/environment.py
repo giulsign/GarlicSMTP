@@ -59,7 +59,9 @@ def build_verify_environment_action(
             (
                 "import garlicsmtp; "
                 "import garlicsmtp.cli.__main__; "
-                "import garlicsmtp.gui.application"
+                "import garlicsmtp.gui.application; "
+                "import garlicsmtp.install_runtime_config; "
+                "import garlicsmtp.install_first_run"
             ),
         ],
         "requires_privileges": False,

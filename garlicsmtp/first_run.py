@@ -63,6 +63,10 @@ def run_first_run(
             paths=paths,
             password=password,
         )
+    else:
+        ImapCredentialStore(
+            path=paths.imap_credentials_file,
+        ).validate()
 
     verify_tor_first_run(
         onion_service=onion_service,

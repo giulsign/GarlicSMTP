@@ -7,6 +7,7 @@ import pytest
 from pathlib import Path
 
 from install.installer import execute_installation
+from garlicsmtp.configuration import ApplicationPaths
 
 
 def _manifest():
@@ -101,8 +102,10 @@ def test_execute_installation_runs_system_before_environment():
             (
                 "import garlicsmtp; "
                 "import garlicsmtp.cli.__main__; "
-                "import garlicsmtp.gui.application"
-            ),
+                "import garlicsmtp.gui.application; "
+                "import garlicsmtp.install_runtime_config; "
+                "import garlicsmtp.install_first_run"
+            )
         ],
     ]
 
@@ -171,25 +174,40 @@ def test_execute_installation_runs_first_run_after_environment(
 ):
     calls = []
 
-    class Paths:
-        settings_file = tmp_path / "settings.toml"
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.settings_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.settings_file.write_text(
+        "[tor]\n",
+        encoding="utf-8",
+    )
 
     class Context:
-        paths = Paths()
-        onion_service = object()    
+        onion_service = object()
 
     context = Context()
+    context.paths = paths
 
-    def run(command, **kwargs):
-        calls.append(("environment", command))
-
-    def first_run(*, paths, password, onion_service):
+    def environment_run(command, **kwargs):
         calls.append(
             (
-                "first-run",
-                paths,
-                password,
-                onion_service,
+                "environment",
+                command,
+                kwargs,
+            )
+        )
+
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                "system",
+                command,
+                kwargs,
             )
         )
 
@@ -202,45 +220,57 @@ def test_execute_installation_runs_first_run_after_environment(
         command_exists=lambda command: True,
         python_version=lambda executable: (3, 12, 3),
         python_venv_available=lambda executable: True,
-        system_run=run,
-        environment_run=run,
+        system_run=system_run,
+        environment_run=environment_run,
+        runtime_user="alice",
+        system_installation=lambda *args, **kwargs: None,
         application_context=context,
         password="secret-password",
-        first_run=first_run,
-        detect_tor_runtime=lambda **kwargs: {
-            "control_host": "127.0.0.1",
-            "control_port": 9051,
-            "cookie_file": "/run/tor/control.authcookie",
-        },
-        create_runtime_config=lambda **kwargs: None,
-        )
-
-    assert calls[-1] == (
-        "first-run",
-        context.paths,
-        "secret-password",
-        context.onion_service,
     )
 
+    assert calls[-1][0] == "system"
+    assert calls[-1][1] == [
+        "sudo",
+        "-u",
+        "alice",
+        "--",
+        str(tmp_path / "venv" / "bin" / "python"),
+        "-m",
+        "garlicsmtp.install_first_run",
+    ]
 
-def test_execute_installation_passes_context_state_to_first_run(
+
+def test_execute_installation_passes_password_to_first_run_stdin(
     tmp_path,
 ):
-    received = {}
+    calls = []
 
-    class Paths:
-        settings_file = tmp_path / "settings.toml"
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.settings_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.settings_file.write_text(
+        "[tor]\n",
+        encoding="utf-8",
+    )
 
     class Context:
-        paths = Paths()
         onion_service = object()
 
     context = Context()
+    context.paths = paths
 
-    def first_run(*, paths, password, onion_service):
-        received["paths"] = paths
-        received["password"] = password
-        received["onion_service"] = onion_service
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
 
     execute_installation(
         manifest=_manifest(),
@@ -251,30 +281,51 @@ def test_execute_installation_passes_context_state_to_first_run(
         command_exists=lambda command: True,
         python_version=lambda executable: (3, 12, 3),
         python_venv_available=lambda executable: True,
-        system_run=lambda command, **kwargs: None,
+        system_run=system_run,
         environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        system_installation=lambda *args, **kwargs: None,
         application_context=context,
         password="secret-password",
-        first_run=first_run,
-        detect_tor_runtime=lambda **kwargs: {
-            "control_host": "127.0.0.1",
-            "control_port": 9051,
-            "cookie_file": "/run/tor/control.authcookie",
-        },
-        create_runtime_config=lambda **kwargs: None,
     )
 
-    assert received == {
-        "paths": context.paths,
-        "password": "secret-password",
-        "onion_service": context.onion_service,
-    }
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_runtime_config",
+            ],
+            {
+                "check": True,
+            },
+        ),
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+                "input": "secret-password\n",
+                "text": True,
+            },
+        ),
+    ]
 
 
 def test_execute_installation_does_not_run_first_run_when_environment_fails(
     tmp_path,
 ):
-    first_run_calls = []
 
     class Context:
         paths = object()
@@ -284,9 +335,6 @@ def test_execute_installation_does_not_run_first_run_when_environment_fails(
         raise RuntimeError(
             "environment installation failed"
         )
-
-    def first_run(**kwargs):
-        first_run_calls.append(kwargs)
 
     with pytest.raises(
         RuntimeError,
@@ -305,10 +353,7 @@ def test_execute_installation_does_not_run_first_run_when_environment_fails(
             environment_run=environment_run,
             application_context=Context(),
             password="secret-password",
-            first_run=first_run,
         )
-
-    assert first_run_calls == []
 
 
 def test_execute_installation_requires_password_for_first_run(
@@ -464,28 +509,23 @@ def test_execute_installation_creates_runtime_configuration_before_first_run(
 ):
     calls = []
 
-    class Paths:
-        settings_file = tmp_path / "settings.toml"
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
 
     class ApplicationContext:
-        paths = Paths()
         onion_service = object()
 
-    detected_tor_configuration = {
-        "control_host": "127.0.0.1",
-        "control_port": 9051,
-        "cookie_file": "/run/tor/control.authcookie",
-    }
+    context = ApplicationContext()
+    context.paths = paths
 
-    def detect_tor_runtime_configuration(**kwargs):
-        calls.append(("detect_tor_runtime", kwargs))
-        return detected_tor_configuration
-
-    def create_runtime_configuration(**kwargs):
-        calls.append(("create_runtime_config", kwargs))
-
-    def first_run(**kwargs):
-        calls.append(("first_run", kwargs))
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
 
     execute_installation(
         manifest=_manifest(),
@@ -496,35 +536,46 @@ def test_execute_installation_creates_runtime_configuration_before_first_run(
         command_exists=lambda command: True,
         python_version=lambda executable: (3, 12, 3),
         python_venv_available=lambda executable: True,
-        system_run=lambda command, **kwargs: None,
+        system_run=system_run,
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
-        torrc_path=Path("/etc/tor/torrc"),
-        tor_configuration_compatible=lambda: True,
-        application_context=ApplicationContext(),
+        system_installation=lambda *args, **kwargs: None,
+        application_context=context,
         password="secret",
-        detect_tor_runtime=detect_tor_runtime_configuration,
-        create_runtime_config=create_runtime_configuration,
-        first_run=first_run,
     )
 
-    assert calls[0] == (
-        "detect_tor_runtime",
-        {
-            "control_host": "127.0.0.1",
-            "control_port": 9051,
-        },
-    )
-
-    assert calls[1] == (
-        "create_runtime_config",
-        {
-            "settings_file": tmp_path / "settings.toml",
-            "tor_configuration": detected_tor_configuration,
-        },
-    )
-
-    assert calls[2][0] == "first_run"
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_runtime_config",
+            ],
+            {
+                "check": True,
+            },
+        ),
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+                "input": "secret\n",
+                "text": True,
+            },
+        ),
+    ]
 
 
 def test_execute_installation_reuses_existing_runtime_configuration(
@@ -532,30 +583,33 @@ def test_execute_installation_reuses_existing_runtime_configuration(
 ):
     calls = []
 
-    settings_file = tmp_path / "settings.toml"
-    settings_file.write_text(
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.settings_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.settings_file.write_text(
         "[tor]\n"
         "control_enabled = true\n",
         encoding="utf-8",
     )
 
-    class Paths:
-        pass
-
-    Paths.settings_file = settings_file
-
     class ApplicationContext:
-        paths = Paths()
         onion_service = object()
 
-    def detect_tor_runtime(**kwargs):
-        calls.append("detect")
+    context = ApplicationContext()
+    context.paths = paths
 
-    def create_runtime_config(**kwargs):
-        calls.append("create")
-
-    def first_run(**kwargs):
-        calls.append("first-run")
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
 
     execute_installation(
         manifest=_manifest(),
@@ -566,50 +620,89 @@ def test_execute_installation_reuses_existing_runtime_configuration(
         command_exists=lambda command: True,
         python_version=lambda executable: (3, 12, 3),
         python_venv_available=lambda executable: True,
-        system_run=lambda command, **kwargs: None,
+        system_run=system_run,
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
-        torrc_path=Path("/etc/tor/torrc"),
-        tor_configuration_compatible=lambda: True,
-        application_context=ApplicationContext(),
+        system_installation=lambda *args, **kwargs: None,
+        application_context=context,
         password="secret",
-        detect_tor_runtime=detect_tor_runtime,
-        create_runtime_config=create_runtime_config,
-        first_run=first_run,
     )
 
-    assert calls == ["first-run"]
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_runtime_config",
+            ],
+            {
+                "check": True,
+            },
+        ),
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+                "input": "secret\n",
+                "text": True,
+            },
+        ),
+    ]
 
 
 def test_execute_installation_resumes_existing_first_run_without_password(
     tmp_path,
 ):
-    settings_file = tmp_path / "settings.toml"
-    settings_file.write_text(
-        "[tor]\ncontrol_enabled = true\n",
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.settings_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.settings_file.write_text(
+        "[tor]\n"
+        "control_enabled = true\n",
         encoding="utf-8",
     )
 
-    credentials_file = tmp_path / "imap-credentials.json"
-    credentials_file.write_text(
+    paths.imap_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.imap_credentials_file.write_text(
         "existing-credentials",
         encoding="utf-8",
     )
 
-    class Paths:
-        pass
-
-    Paths.settings_file = settings_file
-    Paths.imap_credentials_file = credentials_file
-
     class ApplicationContext:
-        paths = Paths()
         onion_service = object()
 
-    received = {}
+    context = ApplicationContext()
+    context.paths = paths
 
-    def first_run(**kwargs):
-        received.update(kwargs)
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
 
     execute_installation(
         manifest=_manifest(),
@@ -620,14 +713,256 @@ def test_execute_installation_resumes_existing_first_run_without_password(
         command_exists=lambda command: True,
         python_version=lambda executable: (3, 12, 3),
         python_venv_available=lambda executable: True,
-        system_run=lambda command, **kwargs: None,
+        system_run=system_run,
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
-        torrc_path=Path("/etc/tor/torrc"),
-        tor_configuration_compatible=lambda: True,
-        application_context=ApplicationContext(),
+        system_installation=lambda *args, **kwargs: None,
+        application_context=context,
         password=None,
-        first_run=first_run,
     )
 
-    assert received["password"] is None
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_runtime_config",
+            ],
+            {
+                "check": True,
+            },
+        ),
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(tmp_path / "venv" / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+                "input": "",
+                "text": True,
+            },
+        ),
+    ]
+
+
+def test_execute_installation_runs_first_run_in_refreshed_user_process(
+    tmp_path,
+):
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.settings_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.settings_file.write_text(
+        "[tor]\n",
+        encoding="utf-8",
+    )
+
+    class ApplicationContext:
+        onion_service = object()
+
+    context = ApplicationContext()
+    context.paths = paths
+
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
+
+    execute_installation(
+        manifest=_manifest(),
+        project_metadata=_project_metadata(),
+        os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+        venv_dir=tmp_path / "venv",
+        project_root=tmp_path / "project",
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        system_run=system_run,
+        environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        system_installation=lambda *args, **kwargs: None,
+        application_context=context,
+        password="secret-password",
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(
+                    tmp_path
+                    / "venv"
+                    / "bin"
+                    / "python"
+                ),
+                "-m",
+                "garlicsmtp.install_runtime_config",
+            ],
+            {
+                "check": True,
+            },
+        ),
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                str(
+                    tmp_path
+                    / "venv"
+                    / "bin"
+                    / "python"
+                ),
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+                "input": "secret-password\n",
+                "text": True,
+            },
+        ),
+    ]
+
+
+def test_execute_installation_runs_runtime_config_in_refreshed_user_process(
+    tmp_path,
+):
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    class ApplicationContext:
+        onion_service = object()
+
+    context = ApplicationContext()
+    context.paths = paths
+
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
+
+    execute_installation(
+        manifest=_manifest(),
+        project_metadata=_project_metadata(),
+        os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+        venv_dir=tmp_path / "venv",
+        project_root=tmp_path / "project",
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        system_run=system_run,
+        environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        system_installation=lambda *args, **kwargs: None,
+        application_context=context,
+        password="secret-password",
+    )
+
+    assert calls[0] == (
+        [
+            "sudo",
+            "-u",
+            "alice",
+            "--",
+            str(tmp_path / "venv" / "bin" / "python"),
+            "-m",
+            "garlicsmtp.install_runtime_config",
+        ],
+        {
+            "check": True,
+        },
+    ) 
+
+
+def test_execute_installation_does_not_run_first_run_when_runtime_config_fails(
+    tmp_path,
+):
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    paths.settings_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.settings_file.write_text(
+        "[tor]\n",
+        encoding="utf-8",
+    )
+
+    class ApplicationContext:
+        onion_service = object()
+
+    context = ApplicationContext()
+    context.paths = paths
+
+    def system_run(command, **kwargs):
+        calls.append(
+            (
+                command,
+                kwargs,
+            )
+        )
+
+        if command[-1] == "garlicsmtp.install_runtime_config":
+            raise RuntimeError(
+                "runtime configuration invalid"
+            )
+
+    with pytest.raises(
+        RuntimeError,
+        match="runtime configuration invalid",
+    ):
+        execute_installation(
+            manifest=_manifest(),
+            project_metadata=_project_metadata(),
+            os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+            venv_dir=tmp_path / "venv",
+            project_root=tmp_path / "project",
+            command_exists=lambda command: True,
+            python_version=lambda executable: (3, 12, 3),
+            python_venv_available=lambda executable: True,
+            system_run=system_run,
+            environment_run=lambda command, **kwargs: None,
+            runtime_user="alice",
+            system_installation=lambda *args, **kwargs: None,
+            application_context=context,
+            password="secret-password",
+        )
+
+    assert len(calls) == 1
+    assert calls[0][0][-1] == (
+        "garlicsmtp.install_runtime_config"
+    )

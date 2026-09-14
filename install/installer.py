@@ -13,9 +13,10 @@ from install.environment import (
 )
 from install.platform import detect_platform_profile
 from install.system import execute_machine_system_installation
-from garlicsmtp.first_run import run_first_run
-from install.runtime_config import create_runtime_configuration
-from install.tor_runtime import detect_tor_runtime_configuration
+from install.system import (
+    build_refreshed_user_action,
+    execute_system_action,
+)
 
 
 def execute_installation(
@@ -37,9 +38,6 @@ def execute_installation(
     system_installation=execute_machine_system_installation,
     application_context=None,
     password: str | None = None,
-    detect_tor_runtime=detect_tor_runtime_configuration,
-    create_runtime_config=create_runtime_configuration,
-    first_run=run_first_run,
 ) -> None:
 
     profile = detect_platform_profile(
@@ -101,23 +99,36 @@ def execute_installation(
 
         settings_file = application_context.paths.settings_file
 
-        if not settings_file.exists():
-            tor_control = (
-                profile["system_prerequisites"]["tor"]["control"]
+        
+        runtime_config_action = build_refreshed_user_action(
+                runtime_user=runtime_user,
+                command=[
+                    str(venv_dir / "bin" / "python"),
+                    "-m",
+                    "garlicsmtp.install_runtime_config",
+                ],
             )
 
-            tor_configuration = detect_tor_runtime(
-                control_host=tor_control["host"],
-                control_port=tor_control["port"],
+        execute_system_action(
+                runtime_config_action,
+                run=system_run,
             )
 
-            create_runtime_config(
-                settings_file=settings_file,
-                tor_configuration=tor_configuration,
-            )
+        first_run_action = build_refreshed_user_action(
+            runtime_user=runtime_user,
+            command=[
+                str(venv_dir / "bin" / "python"),
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            input=(
+                f"{password}\n"
+                if password is not None
+                else ""
+            ),
+        )
 
-        first_run(
-            paths=application_context.paths,
-            password=password,
-            onion_service=application_context.onion_service,
+        execute_system_action(
+            first_run_action,
+            run=system_run,
         )

@@ -270,3 +270,64 @@ def test_persistent_imap_authenticator_rejects_noncanonical_stored_username(
             "garlicsmtp",
             "secret-password",
         )
+
+
+def test_persistent_imap_authenticator_validates_credentials_with_store(
+    tmp_path,
+    monkeypatch,
+):
+    path = tmp_path / "imap-credentials.json"
+
+    path.write_text(
+        "existing-credentials",
+        encoding="utf-8",
+    )
+
+    calls = []
+
+    class FakeStore:
+        def __init__(self, path):
+            calls.append(
+                (
+                    "init",
+                    path,
+                )
+            )
+
+        def validate(self):
+            calls.append(
+                (
+                    "validate",
+                )
+            )
+            raise ValueError(
+                "Invalid IMAP credentials"
+            )
+
+    monkeypatch.setattr(
+        "garlicsmtp.security.auth.persistent_imap_authenticator.ImapCredentialStore",
+        FakeStore,
+    )
+
+    authenticator = PersistentImapAuthenticator(
+        path=path,
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="Invalid IMAP credentials",
+    ):
+        authenticator.authenticate(
+            "garlicsmtp",
+            "secret-password",
+        )
+
+    assert calls == [
+        (
+            "init",
+            path,
+        ),
+        (
+            "validate",
+        ),
+    ]

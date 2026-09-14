@@ -1,6 +1,8 @@
-# Copyright (c) Giuliano Signorelli
-#
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
 # See LICENSE for the full license terms.
+
 
 import pytest
 
@@ -991,3 +993,29 @@ def test_execute_refreshed_user_action_does_not_add_second_sudo():
             },
         )
     ]
+
+
+def test_build_refreshed_user_action_forwards_input():
+    action = build_refreshed_user_action(
+        runtime_user="alice",
+        command=[
+            "/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+        input="secret-password\n",
+    )
+
+    assert action == {
+        "command": [
+            "sudo",
+            "-u",
+            "alice",
+            "--",
+            "/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+        "requires_privileges": False,
+        "input": "secret-password\n",
+    }
