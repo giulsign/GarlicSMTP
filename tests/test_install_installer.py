@@ -5,8 +5,18 @@
 
 import pytest
 from pathlib import Path
+import subprocess
 
-from install.installer import execute_installation
+from install.prerequisites import (
+        command_exists_on_path,
+        probe_python_version,
+        probe_python_venv_available,
+    )
+from install.installer import (
+    execute_installation,
+    run_installation,
+    main,
+)
 from garlicsmtp.configuration import ApplicationPaths
 
 
@@ -187,11 +197,6 @@ def test_execute_installation_runs_first_run_after_environment(
         encoding="utf-8",
     )
 
-    class Context:
-        onion_service = object()
-
-    context = Context()
-    context.paths = paths
 
     def environment_run(command, **kwargs):
         calls.append(
@@ -224,7 +229,7 @@ def test_execute_installation_runs_first_run_after_environment(
         environment_run=environment_run,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password="secret-password",
     )
 
@@ -258,11 +263,6 @@ def test_execute_installation_passes_password_to_first_run_stdin(
         encoding="utf-8",
     )
 
-    class Context:
-        onion_service = object()
-
-    context = Context()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -285,7 +285,7 @@ def test_execute_installation_passes_password_to_first_run_stdin(
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password="secret-password",
     )
 
@@ -327,9 +327,9 @@ def test_execute_installation_does_not_run_first_run_when_environment_fails(
     tmp_path,
 ):
 
-    class Context:
-        paths = object()
-        onion_service = object()
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
 
     def environment_run(command, **kwargs):
         raise RuntimeError(
@@ -351,7 +351,7 @@ def test_execute_installation_does_not_run_first_run_when_environment_fails(
             python_venv_available=lambda executable: True,
             system_run=lambda command, **kwargs: None,
             environment_run=environment_run,
-            application_context=Context(),
+            application_paths=paths,
             password="secret-password",
         )
 
@@ -359,9 +359,9 @@ def test_execute_installation_does_not_run_first_run_when_environment_fails(
 def test_execute_installation_requires_password_for_first_run(
     tmp_path,
 ):
-    class Context:
-        paths = object()
-        onion_service = object()
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
 
     with pytest.raises(
         ValueError,
@@ -378,7 +378,7 @@ def test_execute_installation_requires_password_for_first_run(
             python_venv_available=lambda executable: True,
             system_run=lambda command, **kwargs: None,
             environment_run=lambda command, **kwargs: None,
-            application_context=Context(),
+            application_paths=paths,
         )
 
 
@@ -513,11 +513,6 @@ def test_execute_installation_creates_runtime_configuration_before_first_run(
         home=tmp_path,
     )
 
-    class ApplicationContext:
-        onion_service = object()
-
-    context = ApplicationContext()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -540,7 +535,7 @@ def test_execute_installation_creates_runtime_configuration_before_first_run(
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password="secret",
     )
 
@@ -597,11 +592,6 @@ def test_execute_installation_reuses_existing_runtime_configuration(
         encoding="utf-8",
     )
 
-    class ApplicationContext:
-        onion_service = object()
-
-    context = ApplicationContext()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -624,7 +614,7 @@ def test_execute_installation_reuses_existing_runtime_configuration(
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password="secret",
     )
 
@@ -690,11 +680,6 @@ def test_execute_installation_resumes_existing_first_run_without_password(
         encoding="utf-8",
     )
 
-    class ApplicationContext:
-        onion_service = object()
-
-    context = ApplicationContext()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -717,7 +702,7 @@ def test_execute_installation_resumes_existing_first_run_without_password(
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password=None,
     )
 
@@ -773,11 +758,6 @@ def test_execute_installation_runs_first_run_in_refreshed_user_process(
         encoding="utf-8",
     )
 
-    class ApplicationContext:
-        onion_service = object()
-
-    context = ApplicationContext()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -800,7 +780,7 @@ def test_execute_installation_runs_first_run_in_refreshed_user_process(
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password="secret-password",
     )
 
@@ -857,11 +837,6 @@ def test_execute_installation_runs_runtime_config_in_refreshed_user_process(
         home=tmp_path,
     )
 
-    class ApplicationContext:
-        onion_service = object()
-
-    context = ApplicationContext()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -884,7 +859,7 @@ def test_execute_installation_runs_runtime_config_in_refreshed_user_process(
         environment_run=lambda command, **kwargs: None,
         runtime_user="alice",
         system_installation=lambda *args, **kwargs: None,
-        application_context=context,
+        application_paths=paths,
         password="secret-password",
     )
 
@@ -922,11 +897,6 @@ def test_execute_installation_does_not_run_first_run_when_runtime_config_fails(
         encoding="utf-8",
     )
 
-    class ApplicationContext:
-        onion_service = object()
-
-    context = ApplicationContext()
-    context.paths = paths
 
     def system_run(command, **kwargs):
         calls.append(
@@ -958,7 +928,7 @@ def test_execute_installation_does_not_run_first_run_when_runtime_config_fails(
             environment_run=lambda command, **kwargs: None,
             runtime_user="alice",
             system_installation=lambda *args, **kwargs: None,
-            application_context=context,
+            application_paths=paths,
             password="secret-password",
         )
 
@@ -966,3 +936,192 @@ def test_execute_installation_does_not_run_first_run_when_runtime_config_fails(
     assert calls[0][0][-1] == (
         "garlicsmtp.install_runtime_config"
     )
+
+
+def test_run_installation_loads_repository_and_machine_inputs(
+    tmp_path,
+):
+    from install.installer import run_installation
+
+    received = {}
+
+    def installation(**kwargs):
+        received.update(kwargs)
+
+    run_installation(
+        project_root=tmp_path / "project",
+        venv_dir=tmp_path / "venv",
+        load_manifest=lambda path: {"manifest": str(path)},
+        load_metadata=lambda path: {"metadata": str(path)},
+        read_platform=lambda: 'ID=ubuntu\nVERSION_ID="24.04"\n',
+        installation=installation,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        system_run=lambda command, **kwargs: None,
+        environment_run=lambda command, **kwargs: None,
+    )
+
+    assert received["manifest"] == {
+        "manifest": str(
+            tmp_path / "project" / "install" / "manifest.toml"
+        ),
+    }
+    assert received["project_metadata"] == {
+        "metadata": str(
+            tmp_path / "project" / "pyproject.toml"
+        ),
+    }
+    assert received["os_release"] == (
+        'ID=ubuntu\nVERSION_ID="24.04"\n'
+    )
+    assert received["project_root"] == tmp_path / "project"
+    assert received["venv_dir"] == tmp_path / "venv"
+
+
+def test_run_installation_uses_production_adapters_by_default(
+    tmp_path,
+):
+    received = {}
+
+    def installation(**kwargs):
+        received.update(kwargs)
+
+    run_installation(
+        project_root=tmp_path / "project",
+        venv_dir=tmp_path / "venv",
+        load_manifest=lambda path: {},
+        load_metadata=lambda path: {},
+        read_platform=lambda: "",
+        installation=installation,
+    )
+
+    assert received["command_exists"] is command_exists_on_path
+    assert received["python_version"] is probe_python_version
+    assert (
+        received["python_venv_available"]
+        is probe_python_venv_available
+    )
+    assert received["system_run"] is subprocess.run
+    assert received["environment_run"] is subprocess.run
+
+
+def test_run_installation_passes_user_paths_and_password(
+    tmp_path,
+):
+    received = {}
+
+    def installation(**kwargs):
+        received.update(kwargs)
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path / "home",
+    )
+
+    run_installation(
+        project_root=tmp_path / "project",
+        venv_dir=tmp_path / "venv",
+        load_manifest=lambda path: {},
+        load_metadata=lambda path: {},
+        read_platform=lambda: "",
+        installation=installation,
+        paths_factory=lambda: paths,
+        password="secret-password",
+    )
+
+    assert received["application_paths"] is paths
+    assert received["password"] == "secret-password"
+
+
+def test_execute_installation_accepts_application_paths(
+    tmp_path,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path / "home",
+    )
+
+    execute_installation(
+        manifest=_manifest(),
+        project_metadata=_project_metadata(),
+        os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+        venv_dir=tmp_path / "venv",
+        project_root=tmp_path / "project",
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        system_run=lambda command, **kwargs: None,
+        environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        system_installation=lambda *args, **kwargs: None,
+        application_paths=paths,
+        password="secret-password",
+    )
+
+
+def test_main_runs_installation_with_user_venv(
+    tmp_path,
+):
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path / "home",
+    )
+
+    def paths_factory():
+        return paths
+
+    def installation(**kwargs):
+        calls.append(kwargs)
+
+    main(
+        project_root=tmp_path / "project",
+        paths_factory=paths_factory,
+        installation=installation,
+        password_reader=lambda prompt: "secret-password",
+    )
+
+    assert calls == [
+        {
+            "project_root": tmp_path / "project",
+            "venv_dir": paths.root_dir / "venv",
+            "paths_factory": paths_factory,
+            "password": "secret-password",
+        }
+    ]
+
+
+def test_main_discovers_project_root(
+    tmp_path,
+):
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path / "home",
+    )
+
+    def paths_factory():
+        return paths
+
+    def installation(**kwargs):
+        calls.append(kwargs)
+
+    main(
+        paths_factory=paths_factory,
+        installation=installation,
+        password_reader=lambda prompt: "secret-password",
+    )
+
+    assert calls[0]["project_root"] == (
+        Path(__file__).resolve().parents[1]
+    )
+
+
+def test_installer_module_has_main_guard():
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "install"
+        / "installer.py"
+    ).read_text(encoding="utf-8")
+
+    assert 'if __name__ == "__main__":' in source
+    assert "    main()" in source
