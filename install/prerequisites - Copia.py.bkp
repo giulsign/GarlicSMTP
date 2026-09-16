@@ -132,9 +132,8 @@ def probe_python_venv_available(
     result = run(
         [
             executable,
-            "-m",
-            "ensurepip",
-            "--version",
+            "-c",
+            "import venv",
         ],
         capture_output=True,
         text=True,

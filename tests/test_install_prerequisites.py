@@ -350,8 +350,9 @@ def test_probe_python_venv_available_queries_selected_interpreter():
         (
             [
                 "/usr/bin/python3",
-                "-c",
-                "import venv",
+                "-m",
+                "ensurepip",
+                "--version",
             ],
             {
                 "capture_output": True,
@@ -371,6 +372,32 @@ def test_probe_python_venv_available_returns_false_when_import_fails():
     )
 
     assert available is False
+
+
+def test_probe_python_venv_available_requires_ensurepip():
+    calls = []
+
+    class Result:
+        returncode = 1
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return Result()
+
+    available = probe_python_venv_available(
+        "/usr/bin/python3",
+        run=run,
+    )
+
+    assert available is False
+    assert calls == [
+        [
+            "/usr/bin/python3",
+            "-m",
+            "ensurepip",
+            "--version",
+        ]
+    ]
 
 
 def test_detected_installation_plan_uses_profile_and_project_metadata():
