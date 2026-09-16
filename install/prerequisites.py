@@ -131,7 +131,7 @@ def probe_python_venv_available(
 ) -> bool:
     result = run(
         [
-            executable,
+            executable, 
             "-m",
             "ensurepip",
             "--version",
@@ -141,6 +141,24 @@ def probe_python_venv_available(
     )
 
     return result.returncode == 0
+
+
+def probe_tor_configuration_compatible(
+    *,
+    torrc_path,
+    control_host: str,
+    control_port: int,
+) -> bool:
+    if not torrc_path.exists():
+        return False
+
+    expected_control_port = (
+        f"ControlPort {control_host}:{control_port}"
+    )
+
+    return expected_control_port in torrc_path.read_text(
+        encoding="utf-8",
+    ).splitlines()
 
 
 def detect_tor_configuration_state(

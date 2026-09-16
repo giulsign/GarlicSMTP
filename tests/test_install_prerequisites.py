@@ -15,6 +15,7 @@ from install.prerequisites import (
     probe_python_venv_available,
     build_machine_installation_plan,
     detect_tor_configuration_state,
+    probe_tor_configuration_compatible,
 )
 from pathlib import Path
 import pytest
@@ -617,6 +618,42 @@ def test_tor_configuration_state_does_not_probe_configuration_when_tor_is_missin
     )
 
     assert state == "absent"
+
+
+def test_probe_tor_configuration_compatible_requires_expected_control_port(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "SocksPort 9050\n",
+        encoding="utf-8",
+    )
+
+    compatible = probe_tor_configuration_compatible(
+        torrc_path=torrc_path,
+        control_host="127.0.0.1",
+        control_port=9051,
+    )
+
+    assert compatible is False
+
+
+def test_probe_tor_configuration_compatible_accepts_expected_control_port(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "ControlPort 127.0.0.1:9051\n",
+        encoding="utf-8",
+    )
+
+    compatible = probe_tor_configuration_compatible(
+        torrc_path=torrc_path,
+        control_host="127.0.0.1",
+        control_port=9051,
+    )
+
+    assert compatible is True
 
 
 def test_detected_installation_plan_reports_tor_configuration_when_required():

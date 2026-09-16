@@ -13,6 +13,7 @@ from install.prerequisites import (
         command_exists_on_path,
         probe_python_version,
         probe_python_venv_available,
+        probe_tor_configuration_compatible,
     )
 from install.environment import (
     build_environment_actions,
@@ -22,8 +23,8 @@ from install.platform import (
     detect_platform_profile,
     read_os_release,
 )
-from install.system import execute_machine_system_installation
 from install.system import (
+    execute_machine_system_installation,
     build_refreshed_user_action,
     execute_system_action,
 )
@@ -66,7 +67,16 @@ def execute_installation(
         torrc_path = Path(
             profile["system_prerequisites"]["tor"]["torrc_path"]
         )
+    if tor_configuration_compatible is None:
+        tor_control = profile["system_prerequisites"]["tor"]["control"]
 
+        tor_configuration_compatible = lambda: (
+            probe_tor_configuration_compatible(
+                torrc_path=torrc_path,
+                control_host=tor_control["host"],
+                control_port=tor_control["port"],
+            )
+        )
     system_installation(
         manifest,
         project_metadata,

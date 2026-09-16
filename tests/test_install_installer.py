@@ -10,7 +10,7 @@ import subprocess
 from install.prerequisites import (
         command_exists_on_path,
         probe_python_version,
-        probe_python_venv_available,
+        probe_python_venv_available,    
     )
 from install.installer import (
     execute_installation,
@@ -140,6 +140,7 @@ def test_execute_installation_runs_environment_when_system_is_satisfied():
         python_venv_available=lambda executable: True,
         system_run=system_run,
         environment_run=environment_run,
+        tor_configuration_compatible=lambda: True,
     )
 
     assert [kind for kind, command in calls] == [
@@ -1125,3 +1126,36 @@ def test_installer_module_has_main_guard():
 
     assert 'if __name__ == "__main__":' in source
     assert "    main()" in source
+
+
+def test_execute_installation_builds_default_tor_configuration_probe(
+    tmp_path,
+):
+    received = {}
+
+    def system_installation(*args, **kwargs):
+        received.update(kwargs)
+
+    execute_installation(
+        manifest=_manifest(),
+        project_metadata=_project_metadata(),
+        os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+        venv_dir=tmp_path / "venv",
+        project_root=tmp_path / "project",
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        system_run=lambda command, **kwargs: None,
+        environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        torrc_path=tmp_path / "torrc",
+        system_installation=system_installation,
+    )
+
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "ControlPort 127.0.0.1:9051\n",
+        encoding="utf-8",
+    )
+
+    assert received["tor_configuration_compatible"]() is True
