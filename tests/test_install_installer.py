@@ -10,7 +10,8 @@ import subprocess
 from install.prerequisites import (
         command_exists_on_path,
         probe_python_version,
-        probe_python_venv_available,    
+        probe_python_venv_available,
+        shared_library_exists, 
     )
 from install.installer import (
     execute_installation,
@@ -1159,3 +1160,59 @@ def test_execute_installation_builds_default_tor_configuration_probe(
     )
 
     assert received["tor_configuration_compatible"]() is True
+
+
+def test_execute_installation_passes_shared_library_detector_to_system(
+    tmp_path,
+):
+    received = {}
+
+    def system_installation(*args, **kwargs):
+        received.update(kwargs)
+
+    shared_library_available = lambda library: True
+
+    execute_installation(
+        manifest=_manifest(),
+        project_metadata=_project_metadata(),
+        os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+        venv_dir=tmp_path / "venv",
+        project_root=tmp_path / "project",
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        shared_library_available=shared_library_available,
+        system_run=lambda command, **kwargs: None,
+        environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        tor_configuration_compatible=lambda: True,
+        system_installation=system_installation,
+    )
+
+    assert (
+        received["shared_library_available"]
+        is shared_library_available
+    )
+
+
+def test_run_installation_uses_production_shared_library_adapter_by_default(
+    tmp_path,
+):
+    received = {}
+
+    def installation(**kwargs):
+        received.update(kwargs)
+
+    run_installation(
+        project_root=tmp_path / "project",
+        venv_dir=tmp_path / "venv",
+        load_manifest=lambda path: {},
+        load_metadata=lambda path: {},
+        read_platform=lambda: "",
+        installation=installation,
+    )
+
+    assert (
+        received["shared_library_available"]
+        is shared_library_exists
+    )

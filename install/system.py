@@ -6,9 +6,10 @@
 
 import subprocess
 from install.platform import detect_platform_profile
-from install.prerequisites import build_detected_installation_plan
 from install.prerequisites import (
+    build_detected_installation_plan,
     detect_tor_configuration_state,
+    shared_library_exists,
 )
 from pathlib import Path
 
@@ -217,6 +218,7 @@ def execute_machine_system_installation(
     python_version,
     python_venv_available,
     run,
+    shared_library_available=shared_library_exists,
     tor_configuration_compatible=None,
     tor_configuration_state=None,
     runtime_user: str | None = None,
@@ -234,6 +236,7 @@ def execute_machine_system_installation(
         command_exists=command_exists,
         python_version=python_version,
         python_venv_available=python_venv_available,
+        shared_library_available=shared_library_available,
         tor_configuration_compatible=(
             tor_configuration_compatible
         ),

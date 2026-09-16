@@ -16,6 +16,7 @@ from install.prerequisites import (
     build_machine_installation_plan,
     detect_tor_configuration_state,
     probe_tor_configuration_compatible,
+    shared_library_exists
 )
 from pathlib import Path
 import pytest
@@ -231,6 +232,7 @@ def test_real_repository_metadata_builds_empty_plan_when_prerequisites_are_satis
         python_venv_available=lambda: True,
         python_version=(3, 12, 3),
         python_requirement=metadata["requires-python"],
+        shared_library_available=lambda library: True,
     )
 
     assert plan == {
@@ -256,6 +258,7 @@ def test_real_repository_metadata_builds_plan_for_missing_tor_and_python_venv():
         python_venv_available=lambda: False,
         python_version=(3, 12, 3),
         python_requirement=metadata["requires-python"],
+        shared_library_available=lambda library: True,
     )
 
     assert plan == {
@@ -840,3 +843,96 @@ def test_detected_installation_plan_rejects_ambiguous_tor_configuration():
             tor_configuration_compatible=lambda: False,
             tor_configuration_state=lambda: "ambiguous",
         )
+
+
+def test_shared_library_exists_when_library_is_available():
+    def find_library(name):
+        assert name == "xcb-cursor"
+        return "libxcb-cursor.so.0"
+
+    assert shared_library_exists(
+        "xcb-cursor",
+        find_library=find_library,
+    ) is True
+
+
+def test_shared_library_exists_when_library_is_missing():
+    def find_library(name):
+        assert name == "xcb-cursor"
+        return None
+
+    assert shared_library_exists(
+        "xcb-cursor",
+        find_library=find_library,
+    ) is False
+
+
+def test_installation_plan_requires_package_when_shared_library_is_missing():
+    prerequisites = {
+        "qt_xcb_cursor": {
+            "required": True,
+            "library": "xcb-cursor",
+            "package": "libxcb-cursor0",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        shared_library_available=lambda library: False,
+    )
+
+    assert plan == {
+        "packages": ["libxcb-cursor0"],
+    }
+
+
+def test_installation_plan_requires_no_package_when_shared_library_is_available():
+    prerequisites = {
+        "qt_xcb_cursor": {
+            "required": True,
+            "library": "xcb-cursor",
+            "package": "libxcb-cursor0",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        shared_library_available=lambda library: True,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_build_detected_installation_plan_detects_shared_library_prerequisite():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "qt_xcb_cursor": {
+                "required": True,
+                "library": "xcb-cursor",
+                "package": "libxcb-cursor0",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        shared_library_available=lambda library: False,
+    )
+
+    assert plan == {
+        "packages": ["libxcb-cursor0"],
+    }

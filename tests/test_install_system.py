@@ -585,6 +585,69 @@ def test_execute_machine_system_installation_connects_plan_action_and_executor()
     ]
 
 
+def test_execute_machine_system_installation_installs_missing_shared_library():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "qt_xcb_cursor": {
+                            "required": True,
+                            "library": "xcb-cursor",
+                            "package": "libxcb-cursor0",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        shared_library_available=lambda library: False,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "libxcb-cursor0",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
 def test_execute_machine_system_installation_skips_runner_when_satisfied():
     calls = []
 

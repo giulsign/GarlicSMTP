@@ -31,3 +31,8 @@ runtime_user_rootless = true
 required = true
 command = "python3"
 package = "python3-venv"
+
+[platform.profiles.system_prerequisites.qt_xcb_cursor]
+required = true
+library = "xcb-cursor"
+package = "libxcb-cursor0"

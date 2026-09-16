@@ -6,6 +6,7 @@
 import shutil
 import subprocess
 from install.platform import detect_platform_profile
+from ctypes.util import find_library
 
 def check_prerequisite(
     prerequisite: dict,
@@ -25,6 +26,7 @@ def build_installation_plan(
     python_venv_available=None,
     python_version=None,
     python_requirement=None,
+    shared_library_available=None,
 ) -> dict:
     if (
         python_version is not None
@@ -48,6 +50,17 @@ def build_installation_plan(
                 )
 
             installation_required = not python_venv_available()
+
+        elif "library" in prerequisite:
+            if shared_library_available is None:
+                raise ValueError(
+                    "shared_library_available detector is required"
+                )
+
+            installation_required = not shared_library_available(
+                prerequisite["library"]
+            )
+
         else:
             result = check_prerequisite(
                 prerequisite,
@@ -91,6 +104,13 @@ def command_exists_on_path(
     which=shutil.which,
 ) -> bool:
     return which(command) is not None
+
+
+def shared_library_exists(
+    library: str,
+    find_library=find_library,
+) -> bool:
+    return find_library(library) is not None
 
 
 def detect_python_version(
@@ -189,6 +209,7 @@ def build_detected_installation_plan(
     command_exists=command_exists_on_path,
     python_version=probe_python_version,
     python_venv_available=probe_python_venv_available,
+    shared_library_available=shared_library_exists,
     tor_configuration_compatible=None,
     tor_configuration_state=None,
 ) -> dict:
@@ -207,6 +228,7 @@ def build_detected_installation_plan(
         ),
         python_version=detected_python_version,
         python_requirement=project_metadata["requires-python"],
+        shared_library_available=shared_library_available,
     )
 
     if tor_configuration_compatible is None:

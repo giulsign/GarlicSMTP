@@ -414,3 +414,15 @@ def test_manifest_requires_torrc_path():
     assert errors == [
         "Tor torrc_path is required"
     ]
+
+
+def test_ubuntu_24_04_profile_declares_qt_xcb_cursor_prerequisite():
+    manifest = load_install_manifest()
+
+    profile = manifest["platform"]["profiles"][0]
+
+    assert profile["system_prerequisites"]["qt_xcb_cursor"] == {
+        "required": True,
+        "library": "xcb-cursor",
+        "package": "libxcb-cursor0",
+    }
