@@ -182,7 +182,7 @@ def run_installation(
         manifest=load_manifest(
             project_root / "install" / "manifest.toml"
         ),
-        project_metadata=load_metadata(
+        project_metadata=load_metadata( 
             project_root / "pyproject.toml"
         ),
         os_release=read_platform(),

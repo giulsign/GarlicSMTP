@@ -36,11 +36,16 @@ from garlicsmtp.application import (
     ComposeViewModel,
     MailComposerService,
 )
+from garlicsmtp.configuration import (
+    ApplicationPaths,
+)
 
 
 def build_view_model(
 ) -> ApplicationViewModel:
-    context = ApplicationBuilder().build()
+    context = ApplicationBuilder(
+        paths=ApplicationPaths.for_user(),
+    ).build()
 
     controller = ApplicationController(
         context

@@ -75,6 +75,13 @@ def test_build_view_model_connects_composer_to_application_pipeline(
 
     class FakeBuilder:
 
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            pass
+        
         def build(
             self,
         ):
@@ -118,6 +125,13 @@ def test_build_view_model_composer_sends_through_pipeline(
     )
 
     class FakeBuilder:
+
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            pass
 
         def build(
             self,
@@ -211,6 +225,13 @@ def test_build_view_model_connects_composer_to_context_signer(
 
     class FakeBuilder:
 
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            pass
+
         def build(
             self,
         ):
@@ -272,6 +293,13 @@ def test_real_gui_composer_delivers_to_local_mailbox(
     )
 
     class TestBuilder:
+
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            pass
 
         def build(
             self,
@@ -345,3 +373,62 @@ def test_real_gui_composer_delivers_to_local_mailbox(
     finally:
         context.queue.backend.close()
         context.store.backend.close()
+
+
+def test_build_view_model_uses_user_application_paths(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+    )
+
+    expected_paths = (
+        ApplicationPaths.for_user(
+            home=tmp_path,
+        )
+    )
+
+    context = SimpleNamespace(
+        pipeline=FakePipeline(),
+        store=object(),
+        signer=None,
+    )
+
+    received = {}
+
+    class FakeBuilder:
+
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            received["paths"] = paths
+
+        def build(
+            self,
+        ):
+            return context
+
+    monkeypatch.setattr(
+        gui_application.ApplicationPaths,
+        "for_user",
+        lambda: expected_paths,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        FakeBuilder,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationController",
+        FakeController,
+    )
+
+    gui_application.build_view_model()
+
+    assert received["paths"] == expected_paths
