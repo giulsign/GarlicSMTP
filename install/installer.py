@@ -33,6 +33,9 @@ from install.validator import (
     load_install_manifest,
     load_project_metadata,
 )
+from install.desktop import (
+    install_user_desktop_launcher,
+)
 
 
 def execute_installation(
@@ -53,6 +56,7 @@ def execute_installation(
     tor_configuration_compatible=None,
     runtime_user_resolver=getpass.getuser,
     system_installation=execute_machine_system_installation,
+    desktop_installation=install_user_desktop_launcher,
     application_paths=None,
     password: str | None = None,
 ) -> None:
@@ -139,7 +143,7 @@ def execute_installation(
         execute_system_action(
                 runtime_config_action,
                 run=system_run,
-            )
+            )   
 
         first_run_action = build_refreshed_user_action(
             runtime_user=runtime_user,
@@ -158,6 +162,11 @@ def execute_installation(
         execute_system_action(
             first_run_action,
             run=system_run,
+        )
+
+        desktop_installation(
+            runtime_user=runtime_user,
+            venv_dir=venv_dir,
         )
 
 

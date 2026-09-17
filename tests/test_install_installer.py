@@ -67,6 +67,10 @@ def _project_metadata():
     }
 
 
+def _ignore_desktop_installation(**kwargs):
+    pass
+
+
 def test_execute_installation_runs_system_before_environment():
     calls = []
 
@@ -233,6 +237,7 @@ def test_execute_installation_runs_first_run_after_environment(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret-password",
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls[-1][0] == "system"
@@ -289,6 +294,7 @@ def test_execute_installation_passes_password_to_first_run_stdin(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret-password",
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls == [
@@ -539,6 +545,7 @@ def test_execute_installation_creates_runtime_configuration_before_first_run(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret",
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls == [
@@ -618,6 +625,7 @@ def test_execute_installation_reuses_existing_runtime_configuration(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret",
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls == [
@@ -706,6 +714,7 @@ def test_execute_installation_resumes_existing_first_run_without_password(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password=None,
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls == [
@@ -784,6 +793,7 @@ def test_execute_installation_runs_first_run_in_refreshed_user_process(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret-password",
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls == [
@@ -863,6 +873,7 @@ def test_execute_installation_runs_runtime_config_in_refreshed_user_process(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret-password",
+        desktop_installation=_ignore_desktop_installation,
     )
 
     assert calls[0] == (
@@ -1057,6 +1068,7 @@ def test_execute_installation_accepts_application_paths(
         system_installation=lambda *args, **kwargs: None,
         application_paths=paths,
         password="secret-password",
+        desktop_installation=_ignore_desktop_installation,
     )
 
 
@@ -1216,3 +1228,57 @@ def test_run_installation_uses_production_shared_library_adapter_by_default(
         received["shared_library_available"]
         is shared_library_exists
     )
+
+
+def test_execute_installation_installs_desktop_launcher_after_first_run(
+    tmp_path,
+):
+    calls = []
+
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    def system_run(command, **kwargs):
+        if (
+            "garlicsmtp.install_first_run"
+            in command
+        ):
+            calls.append("first-run")
+
+    def desktop_installation(**kwargs):
+        calls.append(
+            (
+                "desktop",
+                kwargs,
+            )
+        )
+
+    execute_installation(
+        manifest=_manifest(),
+        project_metadata=_project_metadata(),
+        os_release='ID=ubuntu\nVERSION_ID="24.04"\n',
+        venv_dir=tmp_path / "venv",
+        project_root=tmp_path / "project",
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        system_run=system_run,
+        environment_run=lambda command, **kwargs: None,
+        runtime_user="alice",
+        system_installation=lambda *args, **kwargs: None,
+        application_paths=paths,
+        password="secret",
+        desktop_installation=desktop_installation,
+    )
+
+    assert calls == [
+        "first-run",
+        (
+            "desktop",
+            {
+                "runtime_user": "alice",
+                "venv_dir": tmp_path / "venv",
+            },
+        ),
+    ]
