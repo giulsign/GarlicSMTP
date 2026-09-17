@@ -42,9 +42,11 @@ from garlicsmtp.configuration import (
 
 
 def build_view_model(
+    *,
+    paths=None,
 ) -> ApplicationViewModel:
     context = ApplicationBuilder(
-        paths=ApplicationPaths.for_user(),
+        paths=paths,
     ).build()
 
     controller = ApplicationController(
@@ -91,6 +93,8 @@ def build_view_model(
 
 def run_gui(
     argv: list[str] | None = None,
+    *,
+    paths=None,
 ) -> int:
     arguments = (
         argv
@@ -106,7 +110,13 @@ def run_gui(
         "GarlicSMTP"
     )
 
-    view_model = build_view_model()
+    view_model = build_view_model(
+        paths=(
+            paths
+            if paths is not None
+            else ApplicationPaths.for_user()
+        ),
+    )
 
     window = MainWindow(
         view_model

@@ -375,7 +375,92 @@ def test_real_gui_composer_delivers_to_local_mailbox(
         context.store.backend.close()
 
 
-def test_build_view_model_uses_user_application_paths(
+def test_run_gui_uses_user_application_paths(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+    )
+
+    expected_paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    received = {}
+
+    class FakeApplication:
+
+        def __init__(
+            self,
+            arguments,
+        ):
+            pass
+
+        def setApplicationName(
+            self,
+            name,
+        ):
+            pass
+
+        def exec(
+            self,
+        ):
+            return 0
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            view_model,
+        ):
+            pass
+
+        def show(
+            self,
+        ):
+            pass
+
+    def fake_build_view_model(
+        *,
+        paths=None,
+    ):
+        received["paths"] = paths
+        return object()
+
+    monkeypatch.setattr(
+        gui_application.ApplicationPaths,
+        "for_user",
+        lambda: expected_paths,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "QApplication",
+        FakeApplication,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fake_build_view_model,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+    )
+
+    assert result == 0
+    assert received["paths"] == expected_paths
+
+
+def test_run_gui_uses_provided_application_paths(
     tmp_path,
     monkeypatch,
 ):
@@ -384,7 +469,91 @@ def test_build_view_model_uses_user_application_paths(
     )
 
     expected_paths = (
-        ApplicationPaths.for_user(
+        ApplicationPaths.for_development(
+            project_root=tmp_path,
+            home=tmp_path,
+        )
+    )
+
+    received = {}
+
+    class FakeApplication:
+
+        def __init__(
+            self,
+            arguments,
+        ):
+            pass
+
+        def setApplicationName(
+            self,
+            name,
+        ):
+            pass
+
+        def exec(
+            self,
+        ):
+            return 0
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            view_model,
+        ):
+            pass
+
+        def show(
+            self,
+        ):
+            pass
+
+    def fake_build_view_model(
+        *,
+        paths=None,
+    ):
+        received["paths"] = paths
+        return object()
+
+    monkeypatch.setattr(
+        gui_application,
+        "QApplication",
+        FakeApplication,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fake_build_view_model,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=expected_paths,
+    )
+
+    assert result == 0
+    assert received["paths"] == expected_paths
+
+
+def test_build_view_model_uses_provided_application_paths(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+    )
+
+    expected_paths = (
+        ApplicationPaths.for_development(
+            project_root=tmp_path,
             home=tmp_path,
         )
     )
@@ -412,12 +581,6 @@ def test_build_view_model_uses_user_application_paths(
             return context
 
     monkeypatch.setattr(
-        gui_application.ApplicationPaths,
-        "for_user",
-        lambda: expected_paths,
-    )
-
-    monkeypatch.setattr(
         gui_application,
         "ApplicationBuilder",
         FakeBuilder,
@@ -429,6 +592,8 @@ def test_build_view_model_uses_user_application_paths(
         FakeController,
     )
 
-    gui_application.build_view_model()
+    gui_application.build_view_model(
+        paths=expected_paths,
+    )
 
     assert received["paths"] == expected_paths
