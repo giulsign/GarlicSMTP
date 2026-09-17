@@ -5,11 +5,13 @@
 
 import pwd
 from pathlib import Path
+import shutil
 
 
 def build_desktop_launcher(
     *,
     venv_dir: Path,
+    icon_path: Path,
 ) -> str:
     executable = (
         venv_dir
@@ -22,6 +24,7 @@ def build_desktop_launcher(
         "Type=Application\n"
         "Name=GarlicSMTP\n"
         f"Exec={executable}\n"
+        f"Icon={icon_path}\n"
         "Terminal=false\n"
     )
 
@@ -30,7 +33,19 @@ def install_desktop_launcher(
     *,
     desktop_dir: Path,
     venv_dir: Path,
+    icon_source: Path,
+    application_root: Path,
 ) -> Path:
+    installed_icon = (
+        application_root
+        / "garlicsmtp.ico"
+    )
+
+    shutil.copy2(
+        icon_source,
+        installed_icon,
+    )
+
     launcher_path = (
         desktop_dir
         / "GarlicSMTP.desktop"
@@ -39,6 +54,7 @@ def install_desktop_launcher(
     launcher_path.write_text(
         build_desktop_launcher(
             venv_dir=venv_dir,
+            icon_path=installed_icon,
         ),
         encoding="utf-8",
     )
@@ -105,6 +121,8 @@ def install_user_desktop_launcher(
     *,
     runtime_user: str,
     venv_dir: Path,
+    project_root: Path,
+    application_root: Path,
     get_user_account=None,
 ) -> Path:
     if get_user_account is None:
@@ -119,7 +137,16 @@ def install_user_desktop_launcher(
         user_home=user_home,
     )
 
+    icon_source = (
+        project_root
+        / "install"
+        / "assets"
+        / "garlicsmtp.ico"
+    )
+
     return install_desktop_launcher(
         desktop_dir=desktop_dir,
         venv_dir=venv_dir,
+        icon_source=icon_source,
+        application_root=application_root,
     )

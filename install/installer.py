@@ -167,6 +167,8 @@ def execute_installation(
         desktop_installation(
             runtime_user=runtime_user,
             venv_dir=venv_dir,
+            project_root=project_root,
+            application_root=application_paths.root_dir,
         )
 
 

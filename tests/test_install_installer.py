@@ -1279,6 +1279,8 @@ def test_execute_installation_installs_desktop_launcher_after_first_run(
             {
                 "runtime_user": "alice",
                 "venv_dir": tmp_path / "venv",
+                "project_root": tmp_path / "project",
+                "application_root": paths.root_dir,
             },
         ),
     ]
