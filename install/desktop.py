@@ -38,7 +38,7 @@ def install_desktop_launcher(
 ) -> Path:
     installed_icon = (
         application_root
-        / "garlicsmtp.ico"
+        / "garlicsmtp.png"
     )
 
     shutil.copy2(
@@ -141,7 +141,7 @@ def install_user_desktop_launcher(
         project_root
         / "install"
         / "assets"
-        / "garlicsmtp.ico"
+        / "garlicsmtp.png"
     )
 
     return install_desktop_launcher(

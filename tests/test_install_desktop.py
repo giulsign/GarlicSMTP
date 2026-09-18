@@ -14,7 +14,7 @@ def test_build_desktop_launcher_starts_installed_gui():
         "/home/alice/.local/share/garlicsmtp/venv"
     )
     icon_path = Path(
-        "/home/alice/.local/share/garlicsmtp/garlicsmtp.ico"
+        "/home/alice/.local/share/garlicsmtp/garlicsmtp.png"
     )
 
     launcher = build_desktop_launcher(
@@ -27,7 +27,7 @@ def test_build_desktop_launcher_starts_installed_gui():
         "Type=Application\n"
         "Name=GarlicSMTP\n"
         "Exec=/home/alice/.local/share/garlicsmtp/venv/bin/garlicsmtp-gui\n"
-        "Icon=/home/alice/.local/share/garlicsmtp/garlicsmtp.ico\n"
+        "Icon=/home/alice/.local/share/garlicsmtp/garlicsmtp.png\n"
         "Terminal=false\n"
     )
 
@@ -48,7 +48,7 @@ def test_install_desktop_launcher_writes_launcher_to_desktop(
 
     venv_dir = application_root / "venv"
 
-    icon_source = tmp_path / "garlicsmtp.ico"
+    icon_source = tmp_path / "garlicsmtp.png"
     icon_source.write_bytes(b"test-icon")
 
     launcher_path = install_desktop_launcher(
@@ -68,7 +68,7 @@ def test_install_desktop_launcher_writes_launcher_to_desktop(
         encoding="utf-8",
     ) == build_desktop_launcher(
         venv_dir=venv_dir,
-        icon_path=application_root / "garlicsmtp.ico",
+        icon_path=application_root / "garlicsmtp.png",
     )
 
 
@@ -81,7 +81,7 @@ def test_install_desktop_launcher_makes_launcher_executable(
     application_root = tmp_path / "application"
     application_root.mkdir()
 
-    icon_source = tmp_path / "garlicsmtp.ico"
+    icon_source = tmp_path / "garlicsmtp.png"
     icon_source.write_bytes(b"test-icon")
 
     launcher_path = install_desktop_launcher(
@@ -165,7 +165,7 @@ def test_install_user_desktop_launcher_uses_runtime_user_desktop(
         project_root
         / "install"
         / "assets"
-        / "garlicsmtp.ico"
+        / "garlicsmtp.png"
     )
     icon_source.parent.mkdir(parents=True)
     icon_source.write_bytes(b"test-icon")
@@ -196,11 +196,11 @@ def test_install_user_desktop_launcher_uses_runtime_user_desktop(
         encoding="utf-8",
     ) == build_desktop_launcher(
         venv_dir=application_root / "venv",
-        icon_path=application_root / "garlicsmtp.ico",
+        icon_path=application_root / "garlicsmtp.png",
     )
     assert (
         application_root
-        / "garlicsmtp.ico"
+        / "garlicsmtp.png"
     ).read_bytes() == b"test-icon"
     assert launcher_path.stat().st_mode & 0o111
 
@@ -218,7 +218,7 @@ def test_install_user_desktop_launcher_uses_system_user_account_by_default(
         project_root
         / "install"
         / "assets"
-        / "garlicsmtp.ico"
+        / "garlicsmtp.png"
     )
     icon_source.parent.mkdir(parents=True)
     icon_source.write_bytes(b"test-icon")
@@ -272,7 +272,7 @@ def test_install_desktop_launcher_copies_icon_to_application_root(
     )
     application_root.mkdir(parents=True)
 
-    source_icon = tmp_path / "garlicsmtp.ico"
+    source_icon = tmp_path / "garlicsmtp.png"
     source_icon.write_bytes(b"test-icon")
 
     install_desktop_launcher(
@@ -284,7 +284,7 @@ def test_install_desktop_launcher_copies_icon_to_application_root(
 
     installed_icon = (
         application_root
-        / "garlicsmtp.ico"
+        / "garlicsmtp.png"
     )
 
     assert installed_icon.read_bytes() == b"test-icon"
