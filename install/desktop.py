@@ -6,6 +6,7 @@
 import pwd
 from pathlib import Path
 import shutil
+import subprocess
 
 
 def build_desktop_launcher(
@@ -35,6 +36,7 @@ def install_desktop_launcher(
     venv_dir: Path,
     icon_source: Path,
     application_root: Path,
+    run=subprocess.run,
 ) -> Path:
     installed_icon = (
         application_root
@@ -60,6 +62,17 @@ def install_desktop_launcher(
     )
 
     launcher_path.chmod(0o755)
+
+    run(
+        [
+            "gio",
+            "set",
+            str(launcher_path),
+            "metadata::trusted",
+            "true",
+        ],
+        check=True,
+    )
 
     return launcher_path
 
@@ -124,6 +137,7 @@ def install_user_desktop_launcher(
     project_root: Path,
     application_root: Path,
     get_user_account=None,
+    run=subprocess.run,
 ) -> Path:
     if get_user_account is None:
         get_user_account = pwd.getpwnam
@@ -149,4 +163,5 @@ def install_user_desktop_launcher(
         venv_dir=venv_dir,
         icon_source=icon_source,
         application_root=application_root,
+        run=run,
     )

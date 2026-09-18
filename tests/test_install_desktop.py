@@ -9,6 +9,10 @@ from install.desktop import (
 )
 
 
+def _ignore_run(command, **kwargs):
+    pass
+
+
 def test_build_desktop_launcher_starts_installed_gui():
     venv_dir = Path(
         "/home/alice/.local/share/garlicsmtp/venv"
@@ -56,6 +60,7 @@ def test_install_desktop_launcher_writes_launcher_to_desktop(
         venv_dir=venv_dir,
         icon_source=icon_source,
         application_root=application_root,
+        run=_ignore_run,
     )
 
     expected_path = (
@@ -89,6 +94,7 @@ def test_install_desktop_launcher_makes_launcher_executable(
         venv_dir=tmp_path / "venv",
         icon_source=icon_source,
         application_root=application_root,
+        run=_ignore_run,
     )
 
     assert launcher_path.stat().st_mode & 0o111
@@ -187,6 +193,7 @@ def test_install_user_desktop_launcher_uses_runtime_user_desktop(
         project_root=project_root,
         application_root=application_root,
         get_user_account=lambda username: UserAccount(),
+        run=_ignore_run,
     )
 
     assert launcher_path == (
@@ -250,6 +257,7 @@ def test_install_user_desktop_launcher_uses_system_user_account_by_default(
         venv_dir=application_root / "venv",
         project_root=project_root,
         application_root=application_root,
+        run=_ignore_run,
     )
 
     assert received["username"] == "alice"
@@ -280,6 +288,7 @@ def test_install_desktop_launcher_copies_icon_to_application_root(
         venv_dir=application_root / "venv",
         icon_source=source_icon,
         application_root=application_root,
+        run=_ignore_run,
     )
 
     installed_icon = (
@@ -288,3 +297,44 @@ def test_install_desktop_launcher_copies_icon_to_application_root(
     )
 
     assert installed_icon.read_bytes() == b"test-icon"
+
+
+def test_install_desktop_launcher_marks_launcher_as_trusted(
+    tmp_path,
+):
+    desktop_dir = tmp_path / "Desktop"
+    desktop_dir.mkdir()
+
+    application_root = tmp_path / "application"
+    application_root.mkdir()
+
+    icon_source = tmp_path / "garlicsmtp.png"
+    icon_source.write_bytes(b"test-icon")
+
+    commands = []
+
+    def run(command, **kwargs):
+        commands.append((command, kwargs))
+
+    launcher_path = install_desktop_launcher(
+        desktop_dir=desktop_dir,
+        venv_dir=tmp_path / "venv",
+        icon_source=icon_source,
+        application_root=application_root,
+        run=run,
+    )
+
+    assert commands == [
+        (
+            [
+                "gio",
+                "set",
+                str(launcher_path),
+                "metadata::trusted",
+                "true",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
