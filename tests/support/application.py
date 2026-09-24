@@ -1,0 +1,247 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
+from garlicsmtp.application.mailbox_summary import (
+    MailboxSummary,
+)
+from garlicsmtp.application.status import (
+    ApplicationStatus,
+)
+from garlicsmtp.application.tor_status import (
+    TorStatus,
+)
+from garlicsmtp.core.engine.state import (
+    RuntimeState,
+)
+
+
+def make_tor_status(
+    *,
+    enabled: bool = True,
+    socks_available: bool = False,
+    control_enabled: bool = False,
+    control_available: bool = False,
+    authenticated: bool = False,
+    authentication_method: str = "DISABLED",
+    version: str | None = None,
+    bootstrap_progress: int | None = None,
+    bootstrap_summary: str | None = None,
+    built_circuits: int = 0,
+    active_streams: int = 0,
+    last_error: str | None = (
+        "Tor control is disabled"
+    ),
+    socks_listeners: tuple[str, ...] = (),
+    control_listeners: tuple[str, ...] = (),
+    onion_smtp_port=25,
+    onion_hostname=None,
+) -> TorStatus:
+    return TorStatus(
+        enabled=enabled,
+        socks_host="127.0.0.1",
+        socks_port=9050,
+        socks_available=socks_available,
+        control_enabled=control_enabled,
+        control_host="127.0.0.1",
+        control_port=9051,
+        control_available=control_available,
+        authenticated=authenticated,
+        authentication_method=(
+            authentication_method
+        ),
+        version=version,
+        bootstrap_progress=(
+            bootstrap_progress
+        ),
+        bootstrap_summary=(
+            bootstrap_summary
+        ),
+        built_circuits=built_circuits,
+        active_streams=active_streams,
+        new_circuits_allowed=False,
+        new_circuits_available=False,
+        last_error=last_error,
+        socks_listeners=socks_listeners,
+        control_listeners=(
+            control_listeners
+        ),
+        onion_hostname=onion_hostname,
+        onion_smtp_port=25,
+    )
+
+
+def make_application_status(
+    *,
+    runtime_state: RuntimeState = (
+        RuntimeState.STOPPED
+    ),
+    smtp_running: bool = False,
+    imap_running: bool = False,
+    queue_worker_running: bool = False,
+    smtp_host: str = "127.0.0.1",
+    smtp_port: int = 2525,
+    imap_host: str = "127.0.0.1",
+    imap_port: int = 1143,
+    smtp_connections: int = 0,
+    imap_connections: int = 0,
+    pending_messages: int = 0,
+    mailboxes: tuple[str, ...] = (),
+    mailbox_summaries: tuple[
+        MailboxSummary,
+        ...
+    ] | None = None,
+    tor: TorStatus | None = None,
+) -> ApplicationStatus:
+    resolved_mailbox_summaries = (
+        mailbox_summaries
+        if mailbox_summaries is not None
+        else tuple(
+            MailboxSummary(
+                address=address,
+                message_count=0,
+            )
+            for address in mailboxes
+        )
+    )
+
+    return ApplicationStatus(
+        runtime_state=runtime_state,
+        smtp_running=smtp_running,
+        imap_running=imap_running,
+        queue_worker_running=(
+            queue_worker_running
+        ),
+        smtp_host=smtp_host,
+        smtp_port=smtp_port,
+        imap_host=imap_host,
+        imap_port=imap_port,
+        smtp_connections=(
+            smtp_connections
+        ),
+        imap_connections=(
+            imap_connections
+        ),
+        pending_messages=(
+            pending_messages
+        ),
+        mailboxes=tuple(
+            mailboxes
+        ),
+        hostname="garlicsmtp.local",
+        local_domain="test.onion",
+        tor=(
+            tor
+            if tor is not None
+            else make_tor_status()
+        ),
+        mailbox_summaries=(
+            resolved_mailbox_summaries
+        ),
+    )
+
+
+class FakeController:
+
+    def __init__(
+        self,
+        runtime_state=RuntimeState.STOPPED,
+    ):
+        self.runtime_state = runtime_state
+        self.actions = []
+
+        self.current_status = (
+            make_application_status(
+                runtime_state=runtime_state,
+                mailboxes=(
+                    "bob@test.onion",
+                    "archive@test.onion",
+                ),
+                mailbox_summaries=(
+                    MailboxSummary(
+                        address="bob@test.onion",
+                        message_count=1,
+                    ),
+                    MailboxSummary(
+                        address="archive@test.onion",
+                        message_count=0,
+                    ),
+                ),
+            )
+        )
+
+    def status(self):
+        return self.current_status
+
+    def start(self):
+        self.actions.append("start")
+        self.runtime_state = RuntimeState.RUNNING
+        self.current_status = (
+            make_application_status(
+                runtime_state=RuntimeState.RUNNING,
+                mailboxes=(
+                    "bob@test.onion",
+                    "archive@test.onion",
+                ),
+                mailbox_summaries=(
+                    MailboxSummary(
+                        address="bob@test.onion",
+                        message_count=1,
+                    ),
+                    MailboxSummary(
+                        address="archive@test.onion",
+                        message_count=0,
+                    ),
+                ),
+            )
+        )
+        return self.current_status
+
+    def stop(self):
+        self.actions.append("stop")
+        self.runtime_state = RuntimeState.STOPPED
+        self.current_status = (
+            make_application_status(
+                runtime_state=RuntimeState.STOPPED,
+                mailboxes=(
+                    "bob@test.onion",
+                    "archive@test.onion",
+                ),
+                mailbox_summaries=(
+                    MailboxSummary(
+                        address="bob@test.onion",
+                        message_count=1,
+                    ),
+                    MailboxSummary(
+                        address="archive@test.onion",
+                        message_count=0,
+                    ),
+                ),
+            )
+        )
+        return self.current_status
+
+    def restart(self):
+        self.actions.append("restart")
+        self.runtime_state = RuntimeState.RUNNING
+        self.current_status = (
+            make_application_status(
+                runtime_state=RuntimeState.RUNNING,
+                mailboxes=(
+                    "bob@test.onion",
+                    "archive@test.onion",
+                ),
+                mailbox_summaries=(
+                    MailboxSummary(
+                        address="bob@test.onion",
+                        message_count=1,
+                    ),
+                    MailboxSummary(
+                        address="archive@test.onion",
+                        message_count=0,
+                    ),
+                ),
+            )
+        )
+        return self.current_status

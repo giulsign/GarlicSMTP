@@ -1,0 +1,1153 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+
+# See LICENSE for the full license terms.
+
+
+import pytest
+
+from install.system import (
+    build_package_install_action,
+    build_privilege_elevator,
+    build_profile_privilege_elevator,
+    execute_system_action,
+    execute_profile_system_action,
+    build_machine_system_install_action,
+    execute_machine_system_installation,
+    configure_profile_tor,
+    build_refreshed_user_action,
+)
+from pathlib import Path    
+
+
+def test_build_package_install_action_uses_profile_package_manager_and_plan():
+    profile = {
+        "package_manager": "apt-get",
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    plan = {
+        "packages": [
+            "tor",
+            "python3-venv",
+        ],
+    }
+
+    action = build_package_install_action(
+        profile,
+        plan,
+    )
+
+    assert action == {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+            "python3-venv",
+        ],
+        "requires_privileges": True,
+    }
+
+
+def test_build_package_install_action_returns_none_when_no_packages_required():
+    profile = {
+        "package_manager": "apt-get",
+    }
+    plan = {
+        "packages": [],
+    }
+
+    action = build_package_install_action(
+        profile,
+        plan,
+    )
+
+    assert action is None
+
+
+def test_build_package_install_action_rejects_unsupported_package_manager():
+    profile = {
+        "package_manager": "unknown-manager",
+    }
+    plan = {
+        "packages": [
+            "tor",
+        ],
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="unsupported package manager: unknown-manager",
+    ):
+        build_package_install_action(
+            profile,
+            plan,
+        )
+
+
+def test_build_package_install_action_rejects_package_not_declared_by_profile():
+    profile = {
+        "package_manager": "apt-get",
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    plan = {
+        "packages": [
+            "unexpected-package",
+        ],
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="package not declared by profile: unexpected-package",
+    ):
+        build_package_install_action(
+            profile,
+            plan,
+        )
+
+
+def test_build_package_install_action_rejects_missing_system_prerequisites():
+    profile = {
+        "package_manager": "apt-get",
+    }
+    plan = {
+        "packages": [
+            "tor",
+        ],
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="profile system_prerequisites is required",
+    ):
+        build_package_install_action(
+            profile,
+            plan,
+        )
+
+
+def test_execute_system_action_invokes_runner_with_command_and_check():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    def elevate(command):
+        return ["elevate", *command]
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=elevate,
+    )
+
+    assert calls == [
+        (
+            [
+                "elevate",
+                "apt-get",
+                "install",
+                "-y",
+                "tor",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_system_action_propagates_runner_failure():
+    def run(command, **kwargs):
+        raise RuntimeError("system command failed")
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    with pytest.raises(
+        RuntimeError,
+        match="system command failed",
+    ):
+        execute_system_action(
+            action,
+            run=run,
+            elevate=lambda command: command,
+        )
+
+
+def test_execute_system_action_rejects_privileged_action_without_elevation():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="privileged system action requires explicit elevation",
+    ):
+        execute_system_action(
+            action,
+            run=run,
+        )
+
+    assert calls == []
+
+
+def test_execute_system_action_runs_unprivileged_action_without_elevation():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    action = {
+        "command": [
+            "example-command",
+            "--check",
+        ],
+        "requires_privileges": False,
+    }
+
+    execute_system_action(
+        action,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "example-command",
+                "--check",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_build_privilege_elevator_builds_sudo_command():
+    elevate = build_privilege_elevator("sudo")
+
+    command = elevate([
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ])
+
+    assert command == [
+        "sudo",
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ]
+
+
+def test_build_privilege_elevator_rejects_unsupported_strategy():
+    with pytest.raises(
+        ValueError,
+        match="unsupported privilege elevation: unknown",
+    ):
+        build_privilege_elevator("unknown")
+
+
+def test_build_profile_privilege_elevator_uses_profile_policy():
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    elevate = build_profile_privilege_elevator(profile)
+
+    command = elevate([
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ])
+
+    assert command == [
+        "sudo",
+        "apt-get",
+        "install",
+        "-y",
+        "tor",
+    ]
+
+
+def test_build_profile_privilege_elevator_requires_profile_policy():
+    profile = {}
+
+    with pytest.raises(KeyError):
+        build_profile_privilege_elevator(profile)
+
+
+def test_execute_profile_system_action_uses_profile_elevation_and_runner():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    action = {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+    execute_profile_system_action(
+        profile,
+        action,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "tor",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_profile_system_action_uses_subprocess_run_by_default(
+    monkeypatch,
+):
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    monkeypatch.setattr(
+        "install.system.subprocess.run",
+        run,
+    )
+
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    action = {
+        "command": [
+            "true",
+        ],
+        "requires_privileges": False,
+    }
+
+    execute_profile_system_action(
+        profile,
+        action,
+    )
+
+    assert calls == [
+        (
+            [
+                "true",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_build_machine_system_install_action_connects_profile_plan_and_action():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    action = build_machine_system_install_action(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: command != "tor",
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert action == {
+        "command": [
+            "apt-get",
+            "install",
+            "-y",
+            "tor",
+        ],
+        "requires_privileges": True,
+    }
+
+
+def test_build_machine_system_install_action_returns_none_when_satisfied():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    action = build_machine_system_install_action(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert action is None
+
+
+def test_execute_machine_system_installation_connects_plan_action_and_executor():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: command != "tor",
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: True,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "tor",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_machine_system_installation_installs_missing_shared_library():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "qt_xcb_cursor": {
+                            "required": True,
+                            "library": "xcb-cursor",
+                            "package": "libxcb-cursor0",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: True,
+        shared_library_available=lambda library: False,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "libxcb-cursor0",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_machine_system_installation_installs_missing_python_tk():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "python_tk": {
+                            "required": True,
+                            "module": "tkinter",
+                            "package": "python3-tk",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: False,
+        run=run,
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "apt-get",
+                "install",
+                "-y",
+                "python3-tk",
+            ],
+            {
+                "check": True,
+            },
+        ),
+    ]
+
+
+def test_execute_machine_system_installation_skips_runner_when_satisfied():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "privilege_elevation": "sudo",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    execute_machine_system_installation(
+        manifest,
+        project_metadata,
+        (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: True,
+        run=run,
+    )
+
+    assert calls == []
+
+
+def test_execute_system_action_forwards_input():
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+
+    action = {
+        "command": [
+            "tee",
+            "-a",
+            "/etc/tor/torrc",
+        ],
+        "requires_privileges": True,
+        "input": "ControlPort 127.0.0.1:9051\n",
+    }
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=lambda command: [
+            "sudo",
+            *command,
+        ],
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "tee",
+                "-a",
+                "/etc/tor/torrc",
+            ],
+            {
+                "check": True,
+                "input": (
+                    "ControlPort "
+                    "127.0.0.1:9051\n"
+                ),
+                "text": True,
+            },
+        ),
+    ]
+
+
+def _machine_installation_inputs():
+    return {
+        "manifest": {
+            "platform": {
+                "os": "linux",
+                "profiles": [
+                    {
+                        "id": "ubuntu",
+                        "version_id": "24.04",
+                        "package_manager": "apt-get",
+                        "privilege_elevation": "sudo",
+                        "python": {
+                            "executable": "/usr/bin/python3",
+                        },
+                        "system_prerequisites": {
+                            "tor": {
+                                "required": True,
+                                "command": "tor",
+                                "package": "tor",
+                                "control": {
+                                    "host": "127.0.0.1",
+                                    "port": 9051,
+                                    "authentication": "safecookie",
+                                    "cookie_path_source": "protocolinfo",
+                                    "cookie_access": {
+                                        "runtime_user_rootless": True,
+                                    },
+                                },
+                            },
+                            "python_venv": {
+                                "required": True,
+                                "command": "python3",
+                                "package": "python3-venv",
+                            },
+                        },
+                    },
+                ],
+            },
+        },
+        "project_metadata": {
+            "requires-python": ">=3.12",
+        },
+        "os_release": (
+            'ID=ubuntu\n'
+            'VERSION_ID="24.04"\n'
+        ),
+    }
+
+
+def test_machine_system_installation_redetects_tor_after_package_install():
+    inputs = _machine_installation_inputs()
+
+    states = []
+    commands = []
+
+    def command_exists(command):
+        if command == "tor":
+            states.append("tor-probe")
+            return len(states) > 1
+        return True
+
+    def run(command, **kwargs):
+        commands.append(command)
+
+    execute_machine_system_installation(
+        **inputs,
+        command_exists=command_exists,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: True,
+        tor_configuration_compatible=lambda: True,
+        run=run,
+    )
+
+    assert states == [
+        "tor-probe",
+        "tor-probe",
+    ]
+
+
+def test_machine_system_installation_provisions_tor_after_redetection():
+    inputs = _machine_installation_inputs()
+
+    tor_present = False
+    configuration_calls = []
+
+    def command_exists(command):
+        nonlocal tor_present
+
+        if command == "tor":
+            if not tor_present:
+                tor_present = True
+                return False
+            return True
+
+        return True
+
+    def configure_tor(**kwargs):
+        configuration_calls.append(kwargs)
+
+    runner = lambda command, **kwargs: None
+    torrc_path = Path("/etc/tor/torrc")
+
+    execute_machine_system_installation(
+        **inputs,
+        command_exists=command_exists,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: True,
+        tor_configuration_compatible=lambda: False,
+        runtime_user="alice",
+        torrc_path=torrc_path,
+        configure_tor=configure_tor,
+        run=runner,
+    )
+
+    profile = inputs["manifest"]["platform"]["profiles"][0]
+
+    assert configuration_calls == [
+        {
+            "profile": profile,
+            "runtime_user": "alice",
+            "torrc_path": torrc_path,
+            "run": runner,
+        },
+    ]
+
+
+def test_machine_system_installation_does_not_configure_compatible_tor():
+    inputs = _machine_installation_inputs()
+
+    configuration_calls = []
+
+    execute_machine_system_installation(
+        **inputs,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=lambda executable, module: True,
+        tor_configuration_compatible=lambda: True,
+        runtime_user="alice",
+        configure_tor=lambda **kwargs: (
+            configuration_calls.append(kwargs)
+        ),
+        run=lambda command, **kwargs: None,
+    )
+
+    assert configuration_calls == []
+
+
+def test_configure_profile_tor_uses_manifest_control_endpoint():
+    profile = _machine_installation_inputs()[
+        "manifest"
+    ]["platform"]["profiles"][0]
+
+    calls = []
+
+    def build_plan(**kwargs):
+        calls.append(("build", kwargs))
+        return {"tor-plan": True}
+
+    def execute_plan(plan, **kwargs):
+        calls.append(
+            ("execute", plan, kwargs)
+        )
+
+    runner = object()
+
+    configure_profile_tor(
+        profile=profile,
+        runtime_user="alice",
+        torrc_path=Path("/etc/tor/torrc"),
+        run=runner,
+        build_plan=build_plan,
+        execute_plan=execute_plan,
+        execute_action=lambda *args: None,
+    )
+
+    assert calls[0] == (
+        "build",
+        {
+            "tor_state": "configuration_required",
+            "torrc_path": Path("/etc/tor/torrc"),
+            "runtime_user": "alice",
+            "control_host": "127.0.0.1",
+            "control_port": 9051,
+        },
+    )
+
+
+def test_configure_profile_tor_delegates_plan_execution():
+    profile = _machine_installation_inputs()[
+        "manifest"
+    ]["platform"]["profiles"][0]
+
+    plan = {"tor-plan": True}
+    runner = object()
+    execute_action = object()
+
+    calls = []
+
+    def execute_plan(plan_arg, **kwargs):
+        calls.append(
+            (plan_arg, kwargs)
+        )
+
+    configure_profile_tor(
+        profile=profile,
+        runtime_user="alice",
+        torrc_path=Path("/etc/tor/torrc"),
+        run=runner,
+        build_plan=lambda **kwargs: plan,
+        execute_plan=execute_plan,
+        execute_action=execute_action,
+    )
+
+    assert calls == [
+        (
+            plan,
+            {
+                "profile": profile,
+                "run": runner,
+                "execute_action": execute_action,
+            },
+        ),
+    ]
+
+
+def test_machine_system_installation_requires_torrc_path_for_tor_configuration():
+    inputs = _machine_installation_inputs()
+
+    with pytest.raises(
+        ValueError,
+        match="torrc_path is required for Tor configuration",
+    ):
+        execute_machine_system_installation(
+            **inputs,
+            command_exists=lambda command: True,
+            python_version=lambda executable: (3, 12, 3),
+            python_venv_available=lambda executable: True,
+            python_module_available=lambda executable, module: True,
+            tor_configuration_compatible=lambda: False,
+            runtime_user="alice",
+            run=lambda command, **kwargs: None,
+        )
+
+
+def test_build_refreshed_user_action_runs_command_as_runtime_user():
+    action = build_refreshed_user_action(
+        runtime_user="alice",
+        command=[
+            "/home/alice/.local/share/garlicsmtp/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+    )
+
+    assert action == {
+        "command": [
+            "sudo",
+            "-u",
+            "alice",
+            "--",
+            "/home/alice/.local/share/garlicsmtp/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+        "requires_privileges": False,
+    }
+
+
+def test_execute_refreshed_user_action_does_not_add_second_sudo():
+    action = build_refreshed_user_action(
+        runtime_user="alice",
+        command=[
+            "/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+    )
+
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(
+            (command, kwargs)
+        )
+
+    execute_system_action(
+        action,
+        run=run,
+        elevate=lambda command: [
+            "sudo",
+            *command,
+        ],
+    )
+
+    assert calls == [
+        (
+            [
+                "sudo",
+                "-u",
+                "alice",
+                "--",
+                "/venv/bin/python",
+                "-m",
+                "garlicsmtp.install_first_run",
+            ],
+            {
+                "check": True,
+            },
+        )
+    ]
+
+
+def test_build_refreshed_user_action_forwards_input():
+    action = build_refreshed_user_action(
+        runtime_user="alice",
+        command=[
+            "/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+        input="secret-password\n",
+    )
+
+    assert action == {
+        "command": [
+            "sudo",
+            "-u",
+            "alice",
+            "--",
+            "/venv/bin/python",
+            "-m",
+            "garlicsmtp.install_first_run",
+        ],
+        "requires_privileges": False,
+        "input": "secret-password\n",
+    }

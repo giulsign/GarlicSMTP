@@ -1,0 +1,24 @@
+hostname = "garlicsmtp.local"
+local_domain = "garlicsmtp.local"
+
+[smtp]
+host = "127.0.0.1"
+port = 2525
+
+[imap]
+host = "127.0.0.1"
+port = 1143
+
+[tor]
+enabled = true
+socks_host = "127.0.0.1"
+socks_port = 9050
+onion_smtp_port = 25
+
+control_enabled = true
+control_host = "127.0.0.1"
+control_port = 9051
+
+require_safecookie = true
+cookie_file = "/run/tor/control.authcookie"
+allow_new_circuits = false

@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "GarlicSMTP"
+version = "0.0.1-alpha"
+description = "Privacy-oriented SMTP messaging over Tor Onion Services"
+requires-python = ">=3.12"
+
+authors = [
+    { name = "Giuliano Signorelli" }
+]
+
+license = "LicenseRef-PolyForm-Noncommercial-1.0.0"
+license-files = [
+    "LICENSE",
+    "NOTICE",
+    "THIRD_PARTY_LICENSES.md",
+]
+
+dependencies = [
+    "dnspython>=2.8,<3",
+    "cryptography>=46,<47",
+]
+
+keywords = [
+    "smtp",
+    "email",
+    "tor",
+    "onion-services",
+    "privacy",
+]
+
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Topic :: Communications :: Email",
+    "Topic :: Security",
+]
+
+[project.scripts]
+garlicsmtp = "garlicsmtp.cli:main"
+
+[project.gui-scripts]
+garlicsmtp-gui = "garlicsmtp.gui.application:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["garlicsmtp*"]
+exclude = [
+    "tests*",
+    "logs*",
+    "spool*",
+    "config*",
+]
+namespaces = false

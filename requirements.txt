@@ -1,0 +1,7 @@
+# GarlicSMTP runtime dependencies
+#
+# Third-party components remain subject to their respective
+# upstream licenses. See THIRD_PARTY_LICENSES.md.
+
+dnspython>=2.8,<3
+cryptography>=46,<47

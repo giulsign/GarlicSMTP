@@ -1,0 +1,205 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
+from garlicsmtp.transport.smtp.client import SMTPClient
+from garlicsmtp.transport.smtp.reply import SMTPServerReply
+
+
+class FakeProtocol:
+
+    def __init__(self):
+        self.calls = []
+
+    def greeting(self):
+        self.calls.append(
+            ("greeting",)
+        )
+
+    def ehlo(self, hostname):
+        self.calls.append(
+            ("ehlo", hostname)
+        )
+
+        return SMTPServerReply(
+            250,
+            (
+                "Hello client\n"
+                "GARLICSMTP-E2EE "
+                "v=1; alg=x25519; key=dGVzdA=="
+            ),
+        )
+
+    def mail_from(self, sender):
+        self.calls.append(
+            ("mail_from", sender)
+        )
+
+    def rcpt_to(self, recipient):
+        self.calls.append(
+            ("rcpt_to", recipient)
+        )
+
+    def data(self, content):
+        self.calls.append(
+            ("data", content)
+        )
+
+    def quit(self):
+        self.calls.append(
+            ("quit",)
+        )
+
+
+def test_smtp_client_delivers_message(message):
+
+    client = SMTPClient.__new__(
+        SMTPClient
+    )
+    
+    client.protocol = FakeProtocol()
+
+    message.headers.fields[
+        "Subject"
+    ] = "Test"
+
+    message.body = "Hello"
+
+    assert client.deliver(message) is True
+
+    assert client.protocol.calls == [
+        ("greeting",),
+        (
+            "ehlo",
+            "[127.0.0.1]",
+        ),
+        (
+            "mail_from",
+            "alice@test.onion",
+        ),
+        (
+            "rcpt_to",
+            "bob@test.onion",
+        ),
+        (
+            "data",
+            "Subject: Test\r\n\r\nHello",
+        ),
+        ("quit",),
+    ]
+
+
+from garlicsmtp.models import Envelope, MailHeaders, MailMessage
+from garlicsmtp.transport.smtp.client import SMTPClient
+
+
+def test_smtp_client_serialization_does_not_add_headers():
+    headers = MailHeaders()
+    headers.add(
+        "Subject",
+        "Hello",
+    )
+
+    message = MailMessage(
+        envelope=Envelope(
+            sender="alice@sender.onion",
+            recipients=[
+                "bob@receiver.onion",
+            ],
+        ),
+        headers=headers,
+        body="Hello",
+    )
+
+    serialized = SMTPClient.serialize_message(
+        message
+    )
+
+    header_block = serialized.split(
+        "\r\n\r\n",
+        1,
+    )[0]
+
+    assert "Subject: Hello" in header_block
+    assert "Date:" not in header_block
+    assert "Message-ID:" not in header_block
+    assert "Received:" not in header_block
+    assert "Return-Path:" not in header_block
+    assert "X-Mailer:" not in header_block
+    assert "User-Agent:" not in header_block
+
+
+def test_smtp_client_exposes_e2ee_capability(
+    message,
+):
+    client = SMTPClient.__new__(
+        SMTPClient
+    )
+
+    client.protocol = FakeProtocol()
+
+    client.deliver(message)
+
+    assert client.e2ee_capability == (
+        "v=1; alg=x25519; key=dGVzdA=="
+    )
+
+
+def test_smtp_client_discovers_e2ee_capability_before_delivery():
+    client = SMTPClient.__new__(
+        SMTPClient
+    )
+
+    client.protocol = FakeProtocol()
+
+    capability = client.discover_e2ee_capability()
+
+    assert capability == (
+        "v=1; alg=x25519; key=dGVzdA=="
+    )
+
+    assert client.protocol.calls == [
+        ("greeting",),
+        (
+            "ehlo",
+            "[127.0.0.1]",
+        ),
+    ]
+
+
+def test_smtp_client_does_not_repeat_handshake_after_discovery(
+    message,
+):
+    client = SMTPClient.__new__(
+        SMTPClient
+    )
+
+    client.protocol = FakeProtocol()
+
+    client.discover_e2ee_capability()
+
+    assert client.deliver(message) is True
+
+    assert client.protocol.calls == [
+        ("greeting",),
+        (
+            "ehlo",
+            "[127.0.0.1]",
+        ),
+        (
+            "mail_from",
+            "alice@test.onion",
+        ),
+        (
+            "rcpt_to",
+            "bob@test.onion",
+        ),
+        (
+            "data",
+            SMTPClient.serialize_message(
+                message
+            ),
+        ),
+        ("quit",),
+    ]

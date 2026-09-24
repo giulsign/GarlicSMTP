@@ -1,0 +1,1193 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
+from install.prerequisites import (
+    build_installation_plan,
+    check_prerequisite,
+    command_exists_on_path,
+    is_python_venv_available,
+    is_python_version_compatible,
+    detect_python_version,
+    probe_python_version,
+    build_detected_installation_plan,
+    probe_python_venv_available,
+    build_machine_installation_plan,
+    detect_tor_configuration_state,
+    probe_tor_configuration_compatible,
+    shared_library_exists,
+    probe_python_module_available,
+)
+from pathlib import Path
+import pytest
+
+from install.validator import (
+    load_install_manifest,
+    load_project_metadata,
+)
+
+
+def test_existing_command_satisfies_prerequisite():
+    prerequisite = {
+        "required": True,
+        "command": "tor",
+        "package": "tor",
+    }
+
+    result = check_prerequisite(
+        prerequisite,
+        command_exists=lambda command: command == "tor",
+    )
+
+    assert result == {
+        "satisfied": True,
+        "installation_required": False,
+    }
+
+
+
+def test_missing_command_requires_installation():
+    prerequisite = {
+        "required": True,
+        "command": "tor",
+        "package": "tor",
+    }
+
+    result = check_prerequisite(
+        prerequisite,
+        command_exists=lambda command: False,
+    )
+
+    assert result == {
+        "satisfied": False,
+        "installation_required": True,
+    }
+
+
+def test_installation_plan_contains_missing_required_package():
+    prerequisites = {
+        "tor": {
+            "required": True,
+            "command": "tor",
+            "package": "tor",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: False,
+    )
+
+    assert plan == {
+        "packages": ["tor"],
+    }
+
+
+def test_installation_plan_is_empty_when_required_command_exists():
+    prerequisites = {
+        "tor": {
+            "required": True,
+            "command": "tor",
+            "package": "tor",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_python_3_12_satisfies_project_python_requirement():
+    assert is_python_version_compatible(
+        (3, 12, 3),
+        ">=3.12",
+    ) is True
+
+
+def test_current_python_satisfies_requirement_loaded_from_project_metadata():
+    project_root = Path(__file__).resolve().parents[1]
+    metadata = load_project_metadata(project_root / "pyproject.toml")
+
+    assert is_python_version_compatible(
+        (3, 12, 3),
+        metadata["requires-python"],
+    ) is True
+
+
+def test_python_venv_is_available_when_module_check_succeeds():
+    assert is_python_venv_available(
+        module_available=lambda module: module == "venv",
+    ) is True
+
+
+def test_python_venv_is_not_available_when_module_check_fails():
+    assert is_python_venv_available(
+        module_available=lambda module: False,
+    ) is False
+
+
+def test_installation_plan_requires_python_venv_when_python_exists_but_venv_is_missing():
+    prerequisites = {
+        "python_venv": {
+            "required": True,
+            "command": "python3",
+            "package": "python3-venv",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        python_venv_available=lambda: False,
+    )
+
+    assert plan == {
+        "packages": ["python3-venv"],
+    }
+
+
+def test_installation_plan_rejects_missing_python_venv_detector():
+    prerequisites = {
+        "python_venv": {
+            "required": True,
+            "command": "python3",
+            "package": "python3-venv",
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="python_venv_available detector is required",
+    ):
+        build_installation_plan(
+            prerequisites,
+            command_exists=lambda command: True,
+        )
+
+
+def test_installation_plan_rejects_incompatible_python_version():
+    prerequisites = {
+        "python_venv": {
+            "required": True,
+            "command": "python3",
+            "package": "python3-venv",
+        },
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Python version does not satisfy project requirement",
+    ):
+        build_installation_plan(
+            prerequisites,
+            command_exists=lambda command: True,
+            python_venv_available=lambda: True,
+            python_version=(3, 11, 9),
+            python_requirement=">=3.12",
+        )
+
+
+def test_installation_plan_requires_no_python_package_when_python_and_venv_are_compatible():
+    prerequisites = {
+        "python_venv": {
+            "required": True,
+            "command": "python3",
+            "package": "python3-venv",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        python_venv_available=lambda: True,
+        python_version=(3, 12, 3),
+        python_requirement=">=3.12",
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_real_repository_metadata_builds_empty_plan_when_prerequisites_are_satisfied():
+    project_root = Path(__file__).resolve().parents[1]
+
+    manifest = load_install_manifest(
+        project_root / "install" / "manifest.toml"
+    )
+    metadata = load_project_metadata(
+        project_root / "pyproject.toml"
+    )
+
+    profile = manifest["platform"]["profiles"][0]
+
+    plan = build_installation_plan(
+        profile["system_prerequisites"],
+        command_exists=lambda command: True,
+        python_venv_available=lambda: True,
+        python_version=(3, 12, 3),
+        python_requirement=metadata["requires-python"],
+        shared_library_available=lambda library: True,
+        python_module_available=lambda module: True,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_real_repository_manifest_has_no_qt_prerequisites():
+    project_root = Path(__file__).resolve().parents[1]
+
+    manifest = load_install_manifest(
+        project_root / "install" / "manifest.toml"
+    )
+
+    profile = manifest["platform"]["profiles"][0]
+    prerequisites = profile["system_prerequisites"]
+
+    assert "qt_xcb_cursor" not in prerequisites
+
+
+def test_real_repository_metadata_builds_plan_for_missing_tor_and_python_venv():
+    project_root = Path(__file__).resolve().parents[1]
+
+    manifest = load_install_manifest(
+        project_root / "install" / "manifest.toml"
+    )
+    metadata = load_project_metadata(
+        project_root / "pyproject.toml"
+    )
+
+    profile = manifest["platform"]["profiles"][0]
+
+    plan = build_installation_plan(
+        profile["system_prerequisites"],
+        command_exists=lambda command: False,
+        python_venv_available=lambda: False,
+        python_version=(3, 12, 3),
+        python_requirement=metadata["requires-python"],
+        shared_library_available=lambda library: True,
+        python_module_available=lambda module: True,
+    )
+
+    assert plan == {
+        "packages": ["tor", "python3-venv"],
+    }
+
+
+def test_command_exists_on_path_uses_which_result():
+    assert command_exists_on_path(
+        "tor",
+        which=lambda command: "/usr/bin/tor"
+        if command == "tor"
+        else None,
+    ) is True
+
+
+def test_command_exists_on_path_returns_false_when_command_is_missing():
+    assert command_exists_on_path(
+        "tor",
+        which=lambda command: None,
+    ) is False
+
+
+def test_detect_python_version_uses_selected_interpreter():
+    calls = []
+
+    def run_version_check(executable):
+        calls.append(executable)
+        return (3, 12, 3)
+
+    version = detect_python_version(
+        "/usr/bin/python3",
+        run_version_check=run_version_check,
+    )
+
+    assert version == (3, 12, 3)
+    assert calls == ["/usr/bin/python3"]
+
+
+def test_probe_python_version_queries_selected_interpreter():
+    calls = []
+
+    class Result:
+        stdout = "3.12.3\n"
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    version = probe_python_version(
+        "/usr/bin/python3",
+        run=run,
+    )
+
+    assert version == (3, 12, 3)
+    assert calls == [
+        (
+            [
+                "/usr/bin/python3",
+                "-c",
+                (
+                    "import sys; "
+                    "print('.'.join(str(part) "
+                    "for part in sys.version_info[:3]))"
+                ),
+            ],
+            {
+                "check": True,
+                "capture_output": True,
+                "text": True,
+            },
+        )
+    ]
+
+
+def test_probe_python_venv_available_queries_selected_interpreter():
+    calls = []
+
+    class Result:
+        returncode = 0
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    available = probe_python_venv_available(
+        "/usr/bin/python3",
+        run=run,
+    )
+
+    assert available is True
+    assert calls == [
+        (
+            [
+                "/usr/bin/python3",
+                "-m",
+                "ensurepip",
+                "--version",
+            ],
+            {
+                "capture_output": True,
+                "text": True,
+            },
+        )
+    ]
+
+
+def test_probe_python_module_available_uses_requested_python_and_module():
+    calls = []
+
+    class Result:
+        returncode = 0
+
+    def run(command, **kwargs):
+        calls.append((command, kwargs))
+        return Result()
+
+    assert probe_python_module_available(
+        "/usr/bin/python3",
+        "tkinter",
+        run=run,
+    ) is True
+
+    assert calls == [
+        (
+            [
+                "/usr/bin/python3",
+                "-c",
+                "import tkinter",
+            ],
+            {
+                "capture_output": True,
+                "text": True,
+            },
+        ),
+    ]
+
+
+def test_probe_python_module_available_returns_false_when_import_fails():
+    class Result:
+        returncode = 1
+
+    assert probe_python_module_available(
+        "/usr/bin/python3",
+        "tkinter",
+        run=lambda command, **kwargs: Result(),
+    ) is False
+
+
+def test_probe_python_venv_available_returns_false_when_import_fails():
+    class Result:
+        returncode = 1
+
+    available = probe_python_venv_available(
+        "/usr/bin/python3",
+        run=lambda command, **kwargs: Result(),
+    )
+
+    assert available is False
+
+
+def test_probe_python_venv_available_requires_ensurepip():
+    calls = []
+
+    class Result:
+        returncode = 1
+
+    def run(command, **kwargs):
+        calls.append(command)
+        return Result()
+
+    available = probe_python_venv_available(
+        "/usr/bin/python3",
+        run=run,
+    )
+
+    assert available is False
+    assert calls == [
+        [
+            "/usr/bin/python3",
+            "-m",
+            "ensurepip",
+            "--version",
+        ]
+    ]
+
+
+def test_installation_plan_requires_python_tk_when_tkinter_is_missing():
+    prerequisites = {
+        "python_tk": {
+            "required": True,
+            "module": "tkinter",
+            "package": "python3-tk",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        python_module_available=lambda module: False,
+    )
+
+    assert plan == {
+        "packages": ["python3-tk"],
+    }
+
+
+def test_installation_plan_requires_no_python_tk_when_tkinter_is_available():
+    prerequisites = {
+        "python_tk": {
+            "required": True,
+            "module": "tkinter",
+            "package": "python3-tk",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        python_module_available=lambda module: module == "tkinter",
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_detected_installation_plan_requires_python_tk_when_tkinter_is_missing():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+            "python_tk": {
+                "required": True,
+                "module": "tkinter",
+                "package": "python3-tk",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    calls = []
+
+    def python_module_available(executable, module):
+        calls.append((executable, module))
+        return False
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=python_module_available,
+    )
+
+    assert plan == {
+        "packages": ["python3-tk"],
+    }
+    assert calls == [
+        ("/usr/bin/python3", "tkinter"),
+    ]
+
+
+def test_detected_installation_plan_uses_profile_and_project_metadata():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    calls = []
+
+    def command_exists(command):
+        calls.append(("command", command))
+        return command == "tor"
+
+    def python_version(executable):
+        calls.append(("version", executable))
+        return (3, 12, 3)
+
+    def python_venv_available(executable):
+        calls.append(("venv", executable))
+        return True
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=python_version,
+        python_venv_available=python_venv_available,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+    assert calls == [
+        ("version", "/usr/bin/python3"),
+        ("venv", "/usr/bin/python3"),
+        ("command", "tor"),
+    ]
+
+
+def test_detected_installation_plan_requires_missing_tor_and_python_venv():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: False,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: False,
+    )
+
+    assert plan == {
+        "packages": ["tor", "python3-venv"],
+    }
+
+
+def test_detected_installation_plan_propagates_python_probe_failure():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    def python_version(executable):
+        raise RuntimeError("Python version probe failed")
+
+    with pytest.raises(
+        RuntimeError,
+        match="Python version probe failed",
+    ):
+        build_detected_installation_plan(
+            profile,
+            project_metadata,
+            command_exists=lambda command: True,
+            python_version=python_version,
+            python_venv_available=lambda executable: True,
+        )
+
+
+def test_build_machine_installation_plan_selects_profile_and_builds_plan():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "tor": {
+                            "required": True,
+                            "command": "tor",
+                            "package": "tor",
+                        },
+                        "python_venv": {
+                            "required": True,
+                            "command": "python3",
+                            "package": "python3-venv",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+    os_release = (
+        "ID=ubuntu\n"
+        'VERSION_ID="24.04"\n'
+        "ID_LIKE=debian\n"
+        "VERSION_CODENAME=noble\n"
+    )
+
+    plan = build_machine_installation_plan(
+        manifest,
+        project_metadata,
+        os_release=os_release,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_build_machine_installation_plan_detects_missing_python_tk():
+    manifest = {
+        "platform": {
+            "profiles": [
+                {
+                    "id": "ubuntu",
+                    "version_id": "24.04",
+                    "package_manager": "apt-get",
+                    "python": {
+                        "executable": "/usr/bin/python3",
+                    },
+                    "system_prerequisites": {
+                        "python_tk": {
+                            "required": True,
+                            "module": "tkinter",
+                            "package": "python3-tk",
+                        },
+                    },
+                },
+            ],
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+    os_release = (
+        "ID=ubuntu\n"
+        'VERSION_ID="24.04"\n'
+        "ID_LIKE=debian\n"
+        "VERSION_CODENAME=noble\n"
+    )
+
+    calls = []
+
+    def python_module_available(executable, module):
+        calls.append((executable, module))
+        return False
+
+    plan = build_machine_installation_plan(
+        manifest,
+        project_metadata,
+        os_release=os_release,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        python_module_available=python_module_available,
+    )
+
+    assert plan == {
+        "packages": ["python3-tk"],
+    }
+    assert calls == [
+        ("/usr/bin/python3", "tkinter"),
+    ]
+
+
+def test_tor_configuration_state_is_absent_when_tor_is_missing():
+    state = detect_tor_configuration_state(
+        tor_present=lambda: False,
+        configuration_compatible=lambda: True,
+    )
+
+    assert state == "absent"
+
+
+def test_tor_configuration_state_is_compatible_when_detector_confirms_it():
+    state = detect_tor_configuration_state(
+        tor_present=lambda: True,
+        configuration_compatible=lambda: True,
+    )
+
+    assert state == "compatible"
+
+
+def test_tor_configuration_state_requires_configuration_when_detector_rejects_it():
+    state = detect_tor_configuration_state(
+        tor_present=lambda: True,
+        configuration_compatible=lambda: False,
+    )
+
+    assert state == "configuration_required"
+
+
+def test_tor_configuration_state_does_not_probe_configuration_when_tor_is_missing():
+    def configuration_compatible():
+        raise AssertionError(
+            "Tor configuration must not be probed when Tor is absent"
+        )
+
+    state = detect_tor_configuration_state(
+        tor_present=lambda: False,
+        configuration_compatible=configuration_compatible,
+    )
+
+    assert state == "absent"
+
+
+def test_probe_tor_configuration_compatible_requires_expected_control_port(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "SocksPort 9050\n",
+        encoding="utf-8",
+    )
+
+    compatible = probe_tor_configuration_compatible(
+        torrc_path=torrc_path,
+        control_host="127.0.0.1",
+        control_port=9051,
+    )
+
+    assert compatible is False
+
+
+def test_probe_tor_configuration_compatible_accepts_expected_control_port(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "ControlPort 127.0.0.1:9051\n",
+        encoding="utf-8",
+    )
+
+    compatible = probe_tor_configuration_compatible(
+        torrc_path=torrc_path,
+        control_host="127.0.0.1",
+        control_port=9051,
+    )
+
+    assert compatible is True
+
+
+def test_detected_installation_plan_reports_tor_configuration_when_required():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: False,
+    )
+
+    assert plan == {
+        "packages": [],
+        "tor_configuration_required": True,
+    }
+
+
+def test_detected_installation_plan_reuses_compatible_tor_configuration():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=lambda: True,
+    )
+
+    assert plan == {
+        "packages": [],
+        "tor_configuration_required": False,
+    }
+
+
+def test_detected_installation_plan_does_not_probe_tor_configuration_when_tor_is_missing():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    def command_exists(command):
+        return command != "tor"
+
+    def tor_configuration_compatible():
+        raise AssertionError(
+            "Tor configuration must not be probed when Tor is absent"
+        )
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=command_exists,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        tor_configuration_compatible=tor_configuration_compatible,
+    )
+
+    assert plan == {
+        "packages": ["tor"],
+        "tor_configuration_required": False,
+    }
+
+
+def test_tor_configuration_state_rejects_ambiguous_configuration():
+    def configuration_state():
+        return "ambiguous"
+
+    with pytest.raises(
+        ValueError,
+        match="Tor configuration state is incompatible or ambiguous",
+    ):
+        detect_tor_configuration_state(
+            tor_present=lambda: True,
+            configuration_compatible=lambda: False,
+            configuration_state=configuration_state,
+        )
+
+
+def test_tor_configuration_state_rejects_incompatible_configuration():
+    def configuration_state():
+        return "incompatible"
+
+    with pytest.raises(
+        ValueError,
+        match="Tor configuration state is incompatible or ambiguous",
+    ):
+        detect_tor_configuration_state(
+            tor_present=lambda: True,
+            configuration_compatible=lambda: False,
+            configuration_state=configuration_state,
+        )
+
+
+def test_detected_installation_plan_rejects_ambiguous_tor_configuration():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "tor": {
+                "required": True,
+                "command": "tor",
+                "package": "tor",
+            },
+            "python_venv": {
+                "required": True,
+                "command": "python3",
+                "package": "python3-venv",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    with pytest.raises(
+        ValueError,
+        match="Tor configuration state is incompatible or ambiguous",
+    ):
+        build_detected_installation_plan(
+            profile,
+            project_metadata,
+            command_exists=lambda command: True,
+            python_version=lambda executable: (3, 12, 3),
+            python_venv_available=lambda executable: True,
+            tor_configuration_compatible=lambda: False,
+            tor_configuration_state=lambda: "ambiguous",
+        )
+
+
+def test_shared_library_exists_when_library_is_available():
+    def find_library(name):
+        assert name == "xcb-cursor"
+        return "libxcb-cursor.so.0"
+
+    assert shared_library_exists(
+        "xcb-cursor",
+        find_library=find_library,
+    ) is True
+
+
+def test_shared_library_exists_when_library_is_missing():
+    def find_library(name):
+        assert name == "xcb-cursor"
+        return None
+
+    assert shared_library_exists(
+        "xcb-cursor",
+        find_library=find_library,
+    ) is False
+
+
+def test_installation_plan_requires_package_when_shared_library_is_missing():
+    prerequisites = {
+        "qt_xcb_cursor": {
+            "required": True,
+            "library": "xcb-cursor",
+            "package": "libxcb-cursor0",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        shared_library_available=lambda library: False,
+    )
+
+    assert plan == {
+        "packages": ["libxcb-cursor0"],
+    }
+
+
+def test_installation_plan_requires_no_package_when_shared_library_is_available():
+    prerequisites = {
+        "qt_xcb_cursor": {
+            "required": True,
+            "library": "xcb-cursor",
+            "package": "libxcb-cursor0",
+        },
+    }
+
+    plan = build_installation_plan(
+        prerequisites,
+        command_exists=lambda command: True,
+        shared_library_available=lambda library: True,
+    )
+
+    assert plan == {
+        "packages": [],
+    }
+
+
+def test_build_detected_installation_plan_detects_shared_library_prerequisite():
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "qt_xcb_cursor": {
+                "required": True,
+                "library": "xcb-cursor",
+                "package": "libxcb-cursor0",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+        shared_library_available=lambda library: False,
+    )
+
+    assert plan == {
+        "packages": ["libxcb-cursor0"],
+    }
+
+
+def test_detected_installation_plan_uses_default_python_module_probe(
+    monkeypatch,
+):
+    profile = {
+        "python": {
+            "executable": "/usr/bin/python3",
+        },
+        "system_prerequisites": {
+            "python_tk": {
+                "required": True,
+                "module": "tkinter",
+                "package": "python3-tk",
+            },
+        },
+    }
+    project_metadata = {
+        "requires-python": ">=3.12",
+    }
+
+    calls = []
+
+    def python_module_available(executable, module):
+        calls.append((executable, module))
+        return False
+
+    monkeypatch.setattr(
+        "install.prerequisites.probe_python_module_available",
+        python_module_available,
+    )
+
+    plan = build_detected_installation_plan(
+        profile,
+        project_metadata,
+        command_exists=lambda command: True,
+        python_version=lambda executable: (3, 12, 3),
+        python_venv_available=lambda executable: True,
+    )
+
+    assert plan == {
+        "packages": ["python3-tk"],
+    }
+    assert calls == [
+        ("/usr/bin/python3", "tkinter"),
+    ]
+
+
+def test_runtime_requirements_do_not_include_qt():
+    project_root = Path(__file__).resolve().parents[1]
+    requirements = (
+        project_root / "requirements.txt"
+    ).read_text(encoding="utf-8")
+
+    assert "PySide6" not in requirements
+    assert "PyQt" not in requirements

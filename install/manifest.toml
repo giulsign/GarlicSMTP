@@ -1,0 +1,38 @@
+schema_version = 1
+
+[platform]
+os = "linux"
+
+[[platform.profiles]]
+id = "ubuntu"
+version_id = "24.04"
+package_manager = "apt-get"
+privilege_elevation = "sudo"
+
+[platform.profiles.python]
+executable = "/usr/bin/python3"
+
+[platform.profiles.system_prerequisites.tor]
+required = true
+command = "tor"
+package = "tor"
+torrc_path = "/etc/tor/torrc"
+
+[platform.profiles.system_prerequisites.tor.control]
+host = "127.0.0.1"
+port = 9051
+authentication = "safecookie"
+cookie_path_source = "protocolinfo"
+
+[platform.profiles.system_prerequisites.tor.control.cookie_access]
+runtime_user_rootless = true
+
+[platform.profiles.system_prerequisites.python_venv]
+required = true
+command = "python3"
+package = "python3-venv"
+
+[platform.profiles.system_prerequisites.python_tk]
+required = true
+module = "tkinter"
+package = "python3-tk"

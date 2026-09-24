@@ -1,0 +1,763 @@
+Certo. Ti faccio un recap dello stato attuale del progetto GarlicSMTP, separando ciò che è già realmente implementato da ciò che manca per arrivare a una versione che possiamo considerare completa e consolidata.
+
+Stato generale
+
+Il progetto non è più un prototipo minimale: oggi copre già l’intera pipeline mail principale, storage persistente, SMTP, trasporto onion/SOCKS5 e una implementazione IMAP ormai piuttosto estesa.
+
+La suite completa è attualmente verde, quindi il punto di partenza per il prossimo refactoring è stabile.
+
+1. SMTP e flusso dei messaggi — implementato
+
+Sono presenti:
+
+server SMTP;
+protocollo SMTP con greeting, EHLO, MAIL FROM, RCPT TO, DATA, QUIT;
+client SMTP;
+consegna locale;
+consegna remota;
+pipeline receiver → delivery → queue/transport;
+gestione errori temporanei e permanenti;
+retry policy;
+queue worker;
+persistenza della queue;
+runtime/start-stop dei servizi;
+bootstrap e factory condivise.
+
+Questa parte ha già test end-to-end e test con connessioni reali.
+
+2. Storage dei messaggi — implementato
+
+Abbiamo:
+
+MessageStore;
+backend in-memory;
+backend SQLite;
+persistenza dei messaggi;
+mailbox multiple;
+UID per mailbox;
+flag IMAP;
+metadata;
+internal date;
+create/delete/rename mailbox;
+subscriptions;
+copy;
+move;
+append;
+expunge;
+API MailboxView.
+
+Inoltre abbiamo ormai una buona separazione:
+
+Protocol
+   ↓
+MailboxView
+   ↓
+MessageStore
+   ↓
+Memory / SQLite backend
+
+Questa è una delle parti architetturalmente più mature.
+
+3. Queue e delivery — implementato
+
+Sono presenti:
+
+queue storage;
+SQLite queue backend;
+enqueue / peek / ack / nack;
+persistenza dopo restart;
+retry;
+scheduling del retry;
+worker;
+classificazione degli errori;
+delivery locale/remota;
+integrazione con transport manager.
+4. Tor / Onion / SOCKS5 — già funzionante
+
+Il progetto dispone già di:
+
+parsing e validazione indirizzi .onion;
+onion resolver/validator;
+client SOCKS5;
+handshake SOCKS5;
+transport Onion;
+selezione automatica Onion vs SMTP normale;
+trasporto verso SMTP tramite Tor;
+test con server SMTP reale;
+test end-to-end Onion locale.
+
+Questa parte quindi esiste e funziona.
+
+Il lavoro che resta qui è soprattutto consolidamento dell'architettura e integrazione finale, non costruzione da zero.
+
+IMAP — stato attuale
+
+Questa è la parte su cui abbiamo lavorato maggiormente e oggi è parecchio avanzata.
+
+Sessione e protocollo base
+
+Implementati:
+
+greeting;
+parser IMAP;
+session state;
+authentication state;
+selected state;
+CAPABILITY;
+NOOP;
+LOGIN;
+LOGOUT;
+CHECK;
+gestione comandi unsupported/errori.
+Mailbox discovery e management
+
+Implementati:
+
+LIST;
+LSUB;
+CREATE;
+DELETE;
+RENAME;
+SUBSCRIBE;
+UNSUBSCRIBE;
+STATUS;
+NAMESPACE.
+
+STATUS supporta almeno:
+
+MESSAGES
+UIDNEXT
+UIDVALIDITY
+UNSEEN
+HIGHESTMODSEQ
+SELECT / EXAMINE
+
+Entrambi implementati.
+
+Ora restituiscono:
+
+FLAGS
+PERMANENTFLAGS
+EXISTS
+RECENT
+UIDVALIDITY
+UIDNEXT
+UNSEEN
+
+e terminano rispettivamente con:
+
+[READ-WRITE]
+
+e:
+
+[READ-ONLY]
+
+EXAMINE protegge correttamente la mailbox dalle operazioni mutanti.
+
+APPEND
+
+Implementati:
+
+APPEND;
+literal sincronizzanti;
+literal non sincronizzanti;
+flags;
+internal date;
+metadata;
+MULTIAPPEND;
+validazione atomica del multiappend.
+EXPUNGE / CLOSE / UNSELECT
+
+Implementati:
+
+EXPUNGE;
+sequence numbers corretti durante expunge multipli;
+CLOSE;
+UNSELECT;
+comportamento read-only di EXAMINE.
+UID commands
+
+Questa parte è ormai molto completa.
+
+UID FETCH
+
+Supporta sequence-set UID:
+
+1
+1,2
+1:5
+5:1
+*
+1:*
+set misti
+
+I range saltano correttamente UID mancanti.
+
+UID STORE
+
+Supporta:
+
+FLAGS
++FLAGS
+-FLAGS
+FLAGS.SILENT
++FLAGS.SILENT
+-FLAGS.SILENT
+
+e sequence-set multipli/range/*.
+
+UID COPY
+
+Supporta:
+
+singolo UID;
+liste;
+range;
+reverse range;
+*;
+range con UID mancanti;
+mapping COPYUID;
+UIDPLUS.
+UID MOVE
+
+Supporta:
+
+singolo UID;
+liste;
+range;
+reverse range;
+*;
+UID mancanti;
+notifiche EXPUNGE;
+mapping COPYUID.
+UID SEARCH
+
+È diventata una parte piuttosto ricca.
+
+Sono implementati criteri come:
+
+ALL
+SEEN / UNSEEN
+FLAGGED / UNFLAGGED
+DELETED / UNDELETED
+ANSWERED / UNANSWERED
+DRAFT / UNDRAFT
+
+FROM
+TO
+CC
+BCC
+SUBJECT
+BODY
+TEXT
+HEADER
+
+oltre alla composizione:
+
+NOT
+OR
+NOT NOT ...
+OR OR ...
+OR NOT ...
+
+quindi il parser SEARCH è ormai ricorsivo per NOT e OR.
+
+Comandi non-UID
+
+Questo era uno dei gap importanti e ora è stato chiuso.
+
+FETCH
+
+Implementato tramite message sequence numbers:
+
+FETCH 1
+FETCH 1,2
+FETCH 1:5
+FETCH *
+
+con sequence numbers aggiornati dopo modifiche della mailbox.
+
+STORE
+
+Implementato con sequence-set non-UID e:
+
+FLAGS
++FLAGS
+-FLAGS
+*.SILENT
+SEARCH
+
+Implementato e restituisce message sequence numbers, non UID.
+
+Abbiamo anche verificato che dopo EXPUNGE i numeri restituiti cambino correttamente.
+
+COPY
+
+Implementato con:
+
+sequence numbers;
+sequence-set;
+mapping COPYUID;
+UIDPLUS.
+FETCH data items
+
+Qui siamo andati parecchio avanti.
+
+Implementati:
+
+UID
+FLAGS
+INTERNALDATE
+RFC822.SIZE
+RFC822
+RFC822.HEADER
+RFC822.TEXT
+BODY sections
+
+Implementati:
+
+BODY[]
+BODY.PEEK[]
+
+BODY[TEXT]
+BODY.PEEK[TEXT]
+
+BODY[HEADER]
+BODY.PEEK[HEADER]
+
+e:
+
+BODY[HEADER.FIELDS (...)]
+BODY.PEEK[HEADER.FIELDS (...)]
+
+BODY[HEADER.FIELDS.NOT (...)]
+BODY.PEEK[HEADER.FIELDS.NOT (...)]
+Partial FETCH
+
+Implementati:
+
+BODY[]<offset.count>
+BODY.PEEK[]<offset.count>
+
+BODY[TEXT]<offset.count>
+BODY.PEEK[TEXT]<offset.count>
+
+con gestione di:
+
+offset non-zero;
+EOF;
+count zero;
+sintassi invalida;
+corretta semantica \Seen.
+Semantica \Seen
+
+Coperta esplicitamente.
+
+Marca \Seen:
+
+BODY[]
+BODY[TEXT]
+RFC822
+RFC822.TEXT
+
+Non marca:
+
+FLAGS
+INTERNALDATE
+RFC822.SIZE
+RFC822.HEADER
+BODY.PEEK[]
+BODY.PEEK[TEXT]
+BODY[HEADER]
+HEADER.FIELDS
+ENVELOPE
+
+Implementato recentemente, compresi:
+
+Date;
+Subject;
+From;
+Sender;
+Reply-To;
+To;
+Cc;
+Bcc;
+In-Reply-To;
+Message-ID;
+parsing degli address;
+fallback Sender/Reply-To → From.
+FETCH macro
+
+Ora abbiamo:
+
+FAST
+ALL
+FULL
+
+con espansione nei rispettivi data item.
+
+BODY
+
+È implementata la struttura BODY single-part text compatibile con il modello attuale, ad esempio:
+
+BODY ("TEXT" "PLAIN" ("CHARSET" "US-ASCII") NIL NIL "7BIT" ...)
+
+Non abbiamo intenzionalmente trasformato questo in un sistema MIME multipart completo.
+
+Estensioni IMAP
+
+Sono già implementate/annunciate:
+
+UIDPLUS
+UNSELECT
+MOVE
+NAMESPACE
+ID
+ENABLE
+
+Abbiamo anche:
+
+IDLE;
+notification sink;
+IMAPIdleSession;
+notification factory;
+gestione dedicata lato connection handler.
+Architettura IMAP
+
+Il refactoring precedente ha già prodotto una divisione sana:
+
+IMAPServer
+    lifecycle / accept / orchestration
+
+IMAPConnectionHandler
+    logica per connessione
+
+IMAPProtocol
+    semantica dei comandi
+
+IMAPSession
+    stato della sessione
+
+IMAPFetchRenderer
+    rendering FETCH
+
+IMAPSearchEngine
+    SEARCH
+
+MailboxView
+    operazioni mailbox
+
+MessageStore
+    storage
+
+NotificationSink / IdleSession
+    notifiche asincrone
+
+Questa separazione è ormai abbastanza buona.
+
+Cosa manca davvero
+
+Qui separerei ciò che serve per completare il progetto da ciò che sarebbe semplicemente “implementare tutto IMAP esistente”.
+
+Priorità alta
+1. Consolidare SELECT / EXAMINE
+
+È esattamente il prossimo step che abbiamo deciso.
+
+Adesso i due metodi duplicano:
+
+autenticazione;
+mailbox lookup;
+FLAGS;
+PERMANENTFLAGS;
+EXISTS;
+RECENT;
+UIDVALIDITY;
+UIDNEXT;
+UNSEEN.
+
+La differenza reale è quasi soltanto:
+
+SELECT  → read_only=False → [READ-WRITE]
+EXAMINE → read_only=True  → [READ-ONLY]
+
+Quindi estrarre un helper ora è refactoring giustificato, non sovraengineering.
+
+2. UIDVALIDITY reale
+
+Oggi:
+
+uid_validity() -> 1
+
+è sostanzialmente una costante.
+
+Per un server realmente persistente dovrebbe esserci una UIDVALIDITY per mailbox, persistita e aggiornata correttamente quando la mailbox viene ricreata.
+
+Questo è un gap importante.
+
+3. MODSEQ reale
+
+Analogamente:
+
+highest_modseq() -> 1
+
+è ancora sostanzialmente placeholder.
+
+Se vogliamo mantenere/esporre davvero HIGHESTMODSEQ, bisogna introdurre una sequenza di modifica persistente.
+
+In alternativa possiamo non pretendere supporto avanzato CONDSTORE/QRESYNC.
+
+4. AUTHENTICATE / TLS
+
+Mancano ancora:
+
+AUTHENTICATE
+STARTTLS
+
+Questo va affrontato come fase architetturale separata, perché STARTTLS riguarda socket/connection handler, non semplicemente IMAPProtocol.
+
+Non conviene inserirlo come un altro metodo di 30 righe.
+
+5. Capability audit finale
+
+Dobbiamo far sì che CAPABILITY dichiari esattamente ciò che il server offre.
+
+Un caso da verificare è IDLE: il comando esiste, ma va controllato che venga anche pubblicizzato nella capability finale.
+
+MIME / FETCH avanzato
+
+Qui non considero il progetto incompleto se decidiamo consapevolmente di fermarci.
+
+Mancano ancora cose come:
+
+BODYSTRUCTURE completo
+multipart
+message/rfc822 annidati
+MIME body part numerate
+BODY[1]
+BODY[1.2]
+BODY[1.MIME]
+Content-Disposition strutturata
+Content-Language
+Content-Location
+
+Implementarle bene richiede una vera rappresentazione MIME ad albero.
+
+Non le metterei nella critical path adesso.
+
+Quando il modello MailMessage verrà eventualmente evoluto per rappresentare multipart/attachments, allora BODYSTRUCTURE diventerà naturale.
+
+IMAP opzionale che non serve implementare ora
+
+Non considererei mancanti per “completare GarlicSMTP” cose come:
+
+ACL
+QUOTA
+SORT
+THREAD
+ESEARCH
+SEARCHRES
+LIST-EXTENDED
+SPECIAL-USE
+METADATA
+QRESYNC
+CONDSTORE
+COMPRESS
+BINARY
+CATENATE
+URLAUTH
+
+Sono estensioni. Implementarle adesso sarebbe esattamente sovraengineering.
+
+Tor / progetto complessivo: cosa resta
+
+Dopo il consolidamento IMAP, tornerei alla roadmap originale:
+
+Message Store = source of truth
+        ↓
+eventi / cambi mailbox
+        ↓
+IMAP notifications
+
+Message Store
+        ↓
+delivery
+        ↓
+local / SMTP / Tor
+
+La parte Tor funziona già, ma andrebbe consolidata attorno a questa architettura invece di far evolvere IMAP e Onion come due mondi separati.
+
+Poi restano attività da prodotto:
+
+configuration completa;
+lifecycle robusto;
+shutdown pulito;
+error handling di rete;
+logging;
+security hardening;
+migration/storage versioning;
+packaging;
+documentazione;
+test end-to-end completi SMTP → Store → IMAP e SMTP → Tor → SMTP.
+Roadmap che seguirei da qui
+
+La sequenza che vedo più efficiente è:
+
+1. helper comune SELECT / EXAMINE
+2. audit CAPABILITY / IDLE
+3. UIDVALIDITY persistente
+4. decisione HIGHESTMODSEQ reale vs rimozione/limitazione
+5. audit finale IMAP core
+6. consolidamento Tor / Store events
+7. TLS + authentication architecture
+8. hardening end-to-end
+9. packaging/documentazione
+
+E terrei fuori dalla critical path:
+
+BODYSTRUCTURE multipart completo
+estensioni IMAP avanzate
+feature MIME sofisticate
+
+Quindi siamo in un punto buono: la fase “aggiungiamo continuamente comandi IMAP” può praticamente considerarsi conclusa. Ora conviene consolidare ciò che esiste e chiudere i pochi gap strutturali rimasti.
+
+Il prossimo passo può essere esattamente quello concordato: estrarre un helper che costruisce le risposte comuni di SELECT e EXAMINE, senza modificare il comportamento osservabile e mantenendo la suite verde.
+
+terminata questa aprte possiamo considerare concluso il lavoro di sviluppo del sistema e passare alla creazione di una gui per invio, ricezione, lettura e ricerca delle mail?
+
+Sì, quasi. Terminato il consolidamento IMAP che stiamo facendo, io considererei conclusa la fase di sviluppo del motore mail/backend e passerei alla GUI, ma con una distinzione importante: prima della GUI chiuderei ancora pochi punti strutturali, non nuove feature.
+
+In pratica, eviterei di continuare ad aggiungere comandi IMAP o funzionalità MIME. Il backend ha già abbastanza superficie per supportare una GUI reale: invio SMTP, ricezione/store, mailbox, flag, lettura, ricerca, copy/move/delete, persistenza SQLite e trasporto Onion.
+
+Prima di dichiarare definitivamente “backend completo”, chiuderei questa breve checklist:
+
+estrazione helper comune SELECT / EXAMINE;
+audit finale CAPABILITY (in particolare verificare IDLE e non dichiarare capacità non realmente supportate);
+rendere UIDVALIDITY persistente per mailbox, invece della costante 1;
+decidere cosa fare di HIGHESTMODSEQ: implementarlo realmente oppure non presentarlo come funzionalità avanzata;
+una suite end-to-end finale che copra almeno SMTP → Store → IMAP;
+stabilizzare l’interfaccia che userà la GUI, evitando che la GUI parli direttamente con dettagli interni dello storage.
+
+STARTTLS / AUTHENTICATE meritano una considerazione separata. Se GarlicSMTP deve essere usato solo localmente sul computer dell’utente e l’esposizione di rete è controllata, possono anche essere affrontati dopo la prima GUI. Se invece il server IMAP/SMTP deve essere esposto su rete normale, li considererei prerequisiti di sicurezza prima di chiamare il sistema “finito”.
+
+Dopo quei punti, sì: smetterei di sviluppare il protocollo e inizierei la GUI.
+
+La GUI potrebbe poggiare su quattro funzionalità principali:
+
+COMPOSER
+Nuova mail
+Destinatari
+Oggetto
+Corpo
+Invio
+
+MAILBOX
+Inbox / altre mailbox
+Lista messaggi
+Seen / Unseen / Flagged
+Move / Delete
+
+READER
+Header
+Mittente / destinatari
+Corpo
+Rispondi / inoltra
+
+SEARCH
+Testo
+Mittente
+Destinatario
+Oggetto
+Flag
+Risultati
+
+E architetturalmente eviterei che la GUI conosca direttamente MessageStore, SQLite, MailboxView, queue, SOCKS o Tor. Creerei un piccolo application/service layer:
+
+GUI
+ │
+ ▼
+MailApplication / MailService
+ │
+ ├── send_message()
+ ├── list_mailboxes()
+ ├── list_messages()
+ ├── get_message()
+ ├── search_messages()
+ ├── mark_seen()
+ ├── move_message()
+ └── delete_message()
+ │
+ ▼
+SMTP / Store / IMAP-domain / Queue / Transport
+
+Questo sarebbe, secondo me, il vero confine tra “backend terminato” e “iniziamo il prodotto”.
+
+Quindi la roadmap che adotterei è:
+
+ADESSO
+  helper SELECT / EXAMINE
+       ↓
+  ultimi 4-5 punti di consolidamento
+       ↓
+BACKEND FREEZE
+       ↓
+  application/service layer
+       ↓
+GUI
+  ├── inbox
+  ├── reader
+  ├── composer
+  └── search
+       ↓
+integrazione e UX
+
+Non investirei invece altro tempo, prima della GUI, in BODYSTRUCTURE multipart completo, ACL, QUOTA, QRESYNC, THREAD, SORT e altre estensioni IMAP. Per il prodotto che stiamo costruendo, sarebbero ormai marginali rispetto al valore di avere un client grafico realmente utilizzabile.
+
+voglio ricordare che al termine dello sviluppo l'intero sistema dovrà diventare un pacchetto autoinstallante ed auto configurante ready to use su piattaforma linux (opzionalmente windows ma questo lo vedremo nella versione successiva
+
+Sì, e questa deve diventare una condizione di progetto, non un dettaglio finale.
+
+La target release Linux quindi non è solo “il codice funziona”, ma:
+
+installazione
+    ↓
+prima configurazione automatica
+    ↓
+avvio servizi
+    ↓
+GUI pronta
+    ↓
+SMTP / IMAP / Store / Tor operativi
+
+Questo cambia leggermente la roadmap: dopo il freeze del backend e la GUI, dovremo prevedere una vera fase di packaging + bootstrap + autoconfigurazione.
+
+Per Linux punterei a un risultato del tipo:
+
+./install.sh
+
+oppure, meglio ancora in una fase più matura:
+
+sudo apt install garlicsmtp
+
+con installazione automatica di dipendenze, directory dati/config/log, database iniziale, configurazione Tor/SOCKS se prevista, servizi di sistema, launcher GUI e procedura di primo avvio.
+
+L'obiettivo finale dovrebbe essere che l'utente non debba conoscere Python, virtualenv, SQLite, SMTP, IMAP o Tor per utilizzare GarlicSMTP.
+
+Quindi aggiornerei mentalmente la roadmap così:
+
+1. consolidamento backend
+2. backend freeze
+3. application/service layer
+4. GUI
+5. integrazione GUI/backend
+6. configurazione first-run
+7. packaging Linux
+8. installer/autoconfigurazione
+9. test su Linux pulito
+10. release ready-to-use
+
+E terrei Windows fuori dalla critical path della v1: possiamo progettare fin da subito percorsi/configurazione in modo portabile, ma packaging Windows, servizi e installer li affrontiamo nella versione successiva.
+
+Una cosa importante: quando inizieremo la GUI, conviene già evitare scelte che rendano difficile il packaging. Ad esempio niente path assoluti, niente dipendenze implicite dalla .venv, configurazione centralizzata e un unico entry point applicativo.
+
+Quindi sì: “autoinstallante, autoconfigurante e ready-to-use su Linux” entra da ora tra i criteri di completamento del progetto, insieme alla GUI.
