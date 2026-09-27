@@ -85,10 +85,15 @@ class ApplicationViewModel:
     def __init__(
         self,
         controller,
-        message_list: MessageListViewModel | None = None,
-        message_preview: MessagePreviewViewModel | None = None,
-        compose: ComposeViewModel | None = None,
-    ) -> None:
+        message_list=None,
+        message_preview=None,
+        compose=None,
+        received_message_list=None,
+        received_message_preview=None,
+        sent_message_list=None,
+        sent_message_preview=None,
+        sent_store=None,
+    ):
         self.compose = compose
         self.message_preview = (
             message_preview
@@ -109,6 +114,59 @@ class ApplicationViewModel:
                 EmptyMessageExplorer()
             )
         )
+
+        if received_message_list is None:
+            received_message_list = (
+                self.message_list
+            )
+
+        if received_message_preview is None:
+            received_message_preview = (
+                self.message_preview
+            )
+
+        self.received_message_list = (
+            received_message_list
+        )
+        self.received_message_preview = (
+            received_message_preview
+        )
+
+        if sent_message_list is None:
+            sent_message_list = MessageListViewModel(
+                EmptyMessageExplorer()
+            )
+
+        if sent_message_preview is None:
+            sent_message_preview = MessagePreviewViewModel(
+                EmptyMessagePreviewExplorer()
+            )
+
+        self.sent_message_list = (
+            sent_message_list
+        )
+        self.sent_message_preview = (
+            sent_message_preview
+        )
+
+        self.sent_store = sent_store
+
+        # Backward-compatible aliases:
+        # the historical message_* pair is Received.
+        self.message_list = (
+            self.received_message_list
+        )
+        self.message_preview = (
+            self.received_message_preview
+        )
+
+        if (
+            self.sent_message_list
+            .selected_mailbox
+            is not None
+        ):
+            self.sent_message_list.refresh()
+
         self._listeners = []
         self.activity_formatter = (
             ApplicationActivityFormatter()
@@ -140,15 +198,24 @@ class ApplicationViewModel:
 
         self._refresh_compose_sender()  
 
-        if self.message_preview.message_id is not None:
-            self.message_preview.refresh()
+        if (
+            self.received_message_preview.message_id
+            is not None
+        ):
+            self.received_message_preview.refresh()
 
         if (
-            self.message_list
+            self.sent_message_preview.message_id
+            is not None
+        ):
+            self.sent_message_preview.refresh()
+
+        if (
+            self.received_message_list
             .selected_mailbox
             is not None
         ):
-            self.message_list.refresh()
+            self.received_message_list.refresh()
 
         return self._status
 
@@ -556,6 +623,9 @@ class ApplicationViewModel:
 
         self._listeners.clear()
 
+        if self.sent_store is not None:
+            self.sent_store.backend.close()
+
 
     def _handle_application_event(
         self,
@@ -566,15 +636,31 @@ class ApplicationViewModel:
 
         self._refresh_compose_sender()
 
-        if self.message_preview.message_id is not None:
-            self.message_preview.refresh()
+        if (
+            self.received_message_preview.message_id
+            is not None
+        ):
+            self.received_message_preview.refresh()
 
         if (
-            self.message_list
+            self.sent_message_preview.message_id
+            is not None
+        ):
+            self.sent_message_preview.refresh()
+
+        if (
+            self.received_message_list
             .selected_mailbox
             is not None
         ):
-            self.message_list.refresh()
+            self.received_message_list.refresh()
+
+        if (
+            self.sent_message_list
+            .selected_mailbox
+            is not None
+        ):
+            self.sent_message_list.refresh()
 
         for listener in tuple(
             self._listeners

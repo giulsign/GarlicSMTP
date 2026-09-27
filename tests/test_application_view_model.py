@@ -17,6 +17,7 @@ from garlicsmtp.application import (
     ApplicationEventLog,
     ApplicationEventSource,
     MessageListViewModel,
+    MessagePreviewViewModel,
 )
 from garlicsmtp.application.compose_view_model import (
     ComposeViewModel,
@@ -71,11 +72,16 @@ class FakeController:
 
 class FakeMessageExplorer:
 
+    def __init__(self):
+        self.calls = []
+
     def list_messages(
         self,
         mailbox,
     ):
-        del mailbox
+        self.calls.append(
+            mailbox
+        )
         return ()
 
 class FakeApplicationController:
@@ -440,6 +446,57 @@ def test_application_view_model_exposes_message_list():
     )
 
 
+def test_application_view_model_exposes_received_and_sent_messages():
+    received_explorer = FakeMessageExplorer()
+    sent_explorer = FakeMessageExplorer()
+
+    received_list = MessageListViewModel(
+        received_explorer
+    )
+    received_preview = MessagePreviewViewModel(
+        received_explorer
+    )
+
+    sent_list = MessageListViewModel(
+        sent_explorer
+    )
+    sent_preview = MessagePreviewViewModel(
+        sent_explorer
+    )
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        received_message_list=received_list,
+        received_message_preview=received_preview,
+        sent_message_list=sent_list,
+        sent_message_preview=sent_preview,
+    )
+
+    assert (
+        view_model.received_message_list
+        is received_list
+    )
+    assert (
+        view_model.received_message_preview
+        is received_preview
+    )
+    assert (
+        view_model.sent_message_list
+        is sent_list
+    )
+    assert (
+        view_model.sent_message_preview
+        is sent_preview
+    )
+
+    assert view_model.message_list is (
+        received_list
+    )
+    assert view_model.message_preview is (
+        received_preview
+    )
+
+
 def test_application_view_model_sets_compose_default_sender():
     controller = FakeController()
 
@@ -466,3 +523,139 @@ def test_application_view_model_sets_compose_default_sender():
         + ("a" * 56)
         + ".onion"
     )
+
+
+def test_application_view_model_refreshes_received_and_sent_messages():
+    received_explorer = FakeMessageExplorer()
+    sent_explorer = FakeMessageExplorer()
+
+    received_list = MessageListViewModel(
+        received_explorer
+    )
+    sent_list = MessageListViewModel(
+        sent_explorer
+    )
+
+    received_list.select_mailbox(
+        "alice@test.onion"
+    )
+    sent_list.select_mailbox(
+        "alice@test.onion"
+    )
+
+    received_explorer.calls = []
+    sent_explorer.calls = []
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        received_message_list=received_list,
+        sent_message_list=sent_list,
+    )
+
+    view_model.refresh()
+
+    assert received_explorer.calls == [
+        "alice@test.onion",
+    ]
+    assert sent_explorer.calls == [
+        "alice@test.onion",
+    ]
+
+
+def test_application_view_model_refreshes_received_and_sent_previews():
+    class FakeMessagePreview:
+
+        def __init__(self):
+            self.message_id = "message-1"
+            self.refresh_calls = 0
+
+        def refresh(self):
+            self.refresh_calls += 1
+
+    received_preview = FakeMessagePreview()
+    sent_preview = FakeMessagePreview()
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        received_message_preview=received_preview,
+        sent_message_preview=sent_preview,
+    )
+
+    view_model.refresh()
+
+    assert received_preview.refresh_calls == 1
+    assert sent_preview.refresh_calls == 1
+
+
+def test_application_view_model_closes_owned_sent_store():
+    class FakeBackend:
+
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeSentStore:
+
+        def __init__(self):
+            self.backend = FakeBackend()
+
+    sent_store = FakeSentStore()
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        sent_store=sent_store,
+    )
+
+    view_model.close()
+
+    assert sent_store.backend.closed is True
+
+
+def test_application_view_model_application_event_refreshes_sent_messages():
+    sent_explorer = FakeMessageExplorer()
+    sent_list = MessageListViewModel(
+        sent_explorer
+    )
+
+    sent_list.select_mailbox(
+        "alice@test.onion"
+    )
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        sent_message_list=sent_list,
+    )
+
+    sent_explorer.calls = []
+
+    view_model._handle_application_event()
+
+    assert sent_explorer.calls == [
+        "alice@test.onion",
+    ]
+
+
+def test_application_view_model_application_event_refreshes_sent_preview():
+    class FakeMessagePreview:
+
+        def __init__(self):
+            self.message_id = "message-1"
+            self.refresh_calls = 0
+
+        def refresh(self):
+            self.refresh_calls += 1
+
+    sent_preview = FakeMessagePreview()
+
+    view_model = ApplicationViewModel(
+        FakeApplicationController(),
+        sent_message_preview=sent_preview,
+    )
+
+    sent_preview.refresh_calls = 0
+
+    view_model._handle_application_event()
+
+    assert sent_preview.refresh_calls == 1

@@ -109,6 +109,10 @@ class ApplicationPaths:
         return self.data_dir / "mailboxes.db"
 
     @property
+    def sent_mailbox_database(self) -> Path:
+        return self.data_dir / "sent.db"
+
+    @property
     def queue_database(self) -> Path:
         return self.state_dir / "queue.db"
 

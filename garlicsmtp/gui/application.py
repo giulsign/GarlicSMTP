@@ -36,6 +36,12 @@ from garlicsmtp.application import (
 from garlicsmtp.configuration import (
     ApplicationPaths,
 )
+from garlicsmtp.storage.store import (
+    MessageStore,
+)
+from garlicsmtp.storage.sqlite.backend import (
+    SQLiteMessageStoreBackend,
+)
 
 
 def build_view_model(
@@ -50,20 +56,32 @@ def build_view_model(
         context
     )
 
-    message_explorer = (
-        MessageExplorerService(
-            context.store
+    received_message_explorer = MessageExplorerService(
+        context.store
+    )
+
+    sent_store = MessageStore(
+        backend=SQLiteMessageStoreBackend(
+            context.paths.sent_mailbox_database
         )
     )
 
-    message_list = MessageListViewModel(
-        message_explorer
+    sent_message_explorer = MessageExplorerService(
+        sent_store
     )
 
-    message_preview = (
-        MessagePreviewViewModel(
-            message_explorer
-        )
+    received_message_list = MessageListViewModel(
+        received_message_explorer
+    )
+    received_message_preview = MessagePreviewViewModel(
+        received_message_explorer
+    )
+
+    sent_message_list = MessageListViewModel(
+        sent_message_explorer
+    )
+    sent_message_preview = MessagePreviewViewModel(
+        sent_message_explorer
     )
 
     mail_composer = MailComposerService(
@@ -74,6 +92,7 @@ def build_view_model(
             "verifier",
             None,
         ),
+        sent_store=sent_store,
     )
 
     compose = ComposeViewModel(
@@ -82,9 +101,12 @@ def build_view_model(
 
     return ApplicationViewModel(
         controller,
-        message_list=message_list,
-        message_preview=message_preview,
+        received_message_list=received_message_list,
+        received_message_preview=received_message_preview,
+        sent_message_list=sent_message_list,
+        sent_message_preview=sent_message_preview,
         compose=compose,
+        sent_store=sent_store,
     )
 
 

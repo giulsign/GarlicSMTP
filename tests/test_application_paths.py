@@ -52,6 +52,10 @@ def test_application_paths_derive_files():
         "/tmp/garlicsmtp/state/queue.db"
     )
 
+    assert paths.sent_mailbox_database == Path(
+        "/tmp/garlicsmtp/data/sent.db"
+    )
+
 
 def test_application_paths_for_user():
     paths = ApplicationPaths.for_user(

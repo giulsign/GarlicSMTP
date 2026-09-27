@@ -155,16 +155,93 @@ def test_tk_main_window_builds_dashboard_sections():
             is not None
         )
         assert (
-            window.activity_section
+            window.activity_section 
             is not None
         )
         assert (
-            window.message_list_section
+            window.received_message_list_section
             is not None
         )
         assert (
-            window.message_preview_section
+            window.received_message_preview_section
             is not None
+        )
+        assert (
+            window.sent_message_list_section
+            is not None
+        )
+        assert (
+            window.sent_message_preview_section
+            is not None
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_tk_main_window_binds_received_and_sent_sections():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        view_model = ApplicationViewModel(
+            FakeController()
+        )
+
+        window = MainWindow(
+            root,
+            view_model,
+        )
+
+        assert (
+            window.received_message_list_section.view_model
+            is view_model.received_message_list
+        )
+        assert (
+            window.received_message_preview_section.view_model
+            is view_model.received_message_preview
+        )
+        assert (
+            window.sent_message_list_section.view_model
+            is view_model.sent_message_list
+        )
+        assert (
+            window.sent_message_preview_section.view_model
+            is view_model.sent_message_preview
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_tk_main_window_selects_mailbox_for_received_and_sent():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        view_model = ApplicationViewModel(
+            FakeController()
+        )
+
+        window = MainWindow(
+            root,
+            view_model,
+        )
+
+        assert (
+            window.mailbox_section.select_mailbox(  
+                "bob@test.onion"
+            )
+            is True
+        )
+
+        assert (
+            view_model.received_message_list.selected_mailbox
+            == "bob@test.onion"
+        )
+        assert (
+            view_model.sent_message_list.selected_mailbox
+            == "bob@test.onion"
         )
 
     finally:
@@ -426,6 +503,67 @@ def test_tk_main_window_clears_preview_for_deleted_message():
         root.destroy()
 
 
+def test_tk_main_window_clears_sent_preview_for_deleted_message():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        explorer = FakeMessageExplorer()
+
+        sent_message_list = MessageListViewModel(
+            explorer
+        )
+        sent_message_preview = MessagePreviewViewModel(
+            explorer
+        )
+
+        view_model = ApplicationViewModel(
+            FakeController(),
+            sent_message_list=sent_message_list,
+            sent_message_preview=sent_message_preview,
+        )
+
+        window = MainWindow(
+            root,
+            view_model,
+        )
+
+        assert (
+            window.mailbox_section.select_mailbox(
+                "bob@test.onion"
+            )
+            is True
+        )
+
+        assert (
+            window.sent_message_list_section.select_message(
+                "message-1"
+            )
+            is True
+        )
+
+        assert (
+            view_model.sent_message_preview.message_id
+            == "message-1"
+        )
+
+        window.sent_message_list_section._notify_deleted(
+            "message-1"
+        )
+
+        assert (
+            view_model.sent_message_preview.message_id
+            is None
+        )
+        assert (
+            view_model.sent_message_preview.has_message
+            is False
+        )
+
+    finally:
+        root.destroy()
+
+
 def test_tk_main_window_keeps_preview_for_other_deleted_message():
     root = tk.Tk()
     root.withdraw()
@@ -512,8 +650,10 @@ def test_tk_main_window_refreshes_all_sections():
             window.mailbox_section,
             window.mail_metrics_section,
             window.activity_section,
-            window.message_list_section,
-            window.message_preview_section,
+            window.received_message_list_section,
+            window.received_message_preview_section,
+            window.sent_message_list_section,
+            window.sent_message_preview_section,
         )
 
         for section in sections:
@@ -1022,25 +1162,46 @@ def test_tk_main_window_places_compose_and_messages_layout():
         assert pane_info["columnspan"] == 3
 
         assert (
-            window.message_list_section.master
+            window.received_message_list_section.master
             is window.messages_pane
         )
         assert (
-            window.message_preview_section.master
+            window.received_message_preview_section.master
+            is window.messages_pane
+        )
+        assert (
+            window.sent_message_list_section.master
+            is window.messages_pane
+        )
+        assert (
+            window.sent_message_preview_section.master
             is window.messages_pane
         )
 
-        list_info = (
-            window.message_list_section.grid_info()
+        received_list_info = (
+            window.received_message_list_section.grid_info()
         )
-        preview_info = (
-            window.message_preview_section.grid_info()
+        received_preview_info = (
+            window.received_message_preview_section.grid_info()
+        )
+        sent_list_info = (
+            window.sent_message_list_section.grid_info()
+        )
+        sent_preview_info = (
+            window.sent_message_preview_section.grid_info()
         )
 
-        assert list_info["row"] == 0
-        assert list_info["column"] == 0
-        assert preview_info["row"] == 0
-        assert preview_info["column"] == 1
+        assert received_list_info["row"] == 0
+        assert received_list_info["column"] == 0
+
+        assert received_preview_info["row"] == 0
+        assert received_preview_info["column"] == 1
+
+        assert sent_list_info["row"] == 1
+        assert sent_list_info["column"] == 0
+
+        assert sent_preview_info["row"] == 1
+        assert sent_preview_info["column"] == 1
 
     finally:
         root.destroy()
@@ -1589,6 +1750,83 @@ def test_tk_main_window_keeps_message_preview_visible_before_selection():
         assert (
             preview_x + preview_width
             <= pane_width
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_tk_main_window_displays_selected_sent_message_preview():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        received_explorer = FakeMessageExplorer()
+        sent_explorer = FakeMessageExplorer()
+
+        received_message_list = MessageListViewModel(
+            received_explorer
+        )
+        received_message_preview = MessagePreviewViewModel(
+            received_explorer
+        )
+        sent_message_list = MessageListViewModel(
+            sent_explorer
+        )
+        sent_message_preview = MessagePreviewViewModel(
+            sent_explorer
+        )
+
+        view_model = ApplicationViewModel(
+            FakeController(),
+            received_message_list=received_message_list,
+            received_message_preview=received_message_preview,
+            sent_message_list=sent_message_list,
+            sent_message_preview=sent_message_preview,
+        )
+
+        window = MainWindow(
+            root,
+            view_model,
+        )
+
+        assert (
+            window.mailbox_section.select_mailbox(
+                "bob@test.onion"
+            )
+            is True
+        )
+
+        assert (
+            window.sent_message_list_section.select_message(
+                "message-1"
+            )
+            is True
+        )
+
+        assert (
+            view_model.sent_message_preview.message_id
+            == "message-1"
+        )
+        assert (
+            view_model.sent_message_preview.mailbox
+            == "bob@test.onion"
+        )
+        assert (
+            view_model.sent_message_preview.subject
+            == "GarlicSMTP Preview"
+        )
+
+        assert (
+            window.sent_message_preview_section
+            .subject_value
+            .get()
+            == "GarlicSMTP Preview"
+        )
+
+        assert (
+            view_model.received_message_preview.message_id
+            is None
         )
 
     finally:

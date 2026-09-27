@@ -9,6 +9,9 @@ from garlicsmtp.application import (
 from garlicsmtp.gui.application import (
     build_view_model,
 )
+from garlicsmtp.configuration import (
+    ApplicationPaths,
+)
 
 
 def test_gui_builds_message_list_view_model(
@@ -21,6 +24,179 @@ def test_gui_builds_message_list_view_model(
         view_model.message_list,
         MessageListViewModel,
     )
+
+
+def test_gui_builds_received_and_sent_message_view_models():
+    view_model = build_view_model()
+
+    context = (
+        view_model.controller.context
+    )
+
+    assert isinstance(
+        view_model.received_message_list,
+        MessageListViewModel,
+    )
+    assert isinstance(
+        view_model.sent_message_list,
+        MessageListViewModel,
+    )
+
+    assert (
+        view_model.received_message_list
+        is not view_model.sent_message_list
+    )
+
+    assert (
+        view_model.received_message_preview
+        is not view_model.sent_message_preview
+    )
+
+    assert (
+        view_model.received_message_list
+        .explorer.store
+        is context.store
+    )
+    assert (
+        view_model.received_message_preview
+        .explorer.store
+        is context.store
+    )
+    assert (
+        view_model.sent_message_list
+        .explorer.store
+        is not context.store
+    )
+    assert (
+        view_model.sent_message_preview
+        .explorer.store
+        is not context.store
+    )
+    assert (
+        view_model.sent_message_list
+        .explorer.store
+        is view_model.sent_message_preview
+        .explorer.store
+    )
+
+    assert (
+        view_model.message_list
+        is view_model.received_message_list
+    )
+    assert (
+        view_model.message_preview
+        is view_model.received_message_preview
+    )
+
+
+def test_real_gui_self_send_separates_received_and_sent_mail(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.application import (
+        ApplicationBuilder,
+    )
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+        ApplicationSettings,
+    )
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    real_builder = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    )
+
+    class TestBuilder:
+
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            pass
+
+        def build(
+            self,
+        ):
+            return real_builder.build()
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        TestBuilder,
+    )
+
+    view_model = (
+        gui_application.build_view_model()
+    )
+
+    context = (
+        view_model.controller.context
+    )
+
+    try:
+        view_model.compose.sender = (
+            "alice@test.onion"
+        )
+        view_model.compose.recipient = (
+            "alice@test.onion"
+        )
+        view_model.compose.subject = (
+            "Self test"
+        )
+        view_model.compose.body = (
+            "Self delivery"
+        )
+
+        assert (
+            view_model.compose.send()
+            is True
+        )
+
+        received_store = (
+            view_model.received_message_list
+            .explorer.store
+        )
+        sent_store = (
+            view_model.sent_message_list
+            .explorer.store
+        )
+
+        received_entries = (
+            received_store.list_entries(
+                "alice@test.onion"
+            )
+        )
+        sent_entries = (
+            sent_store.list_entries(
+                "alice@test.onion"
+            )
+        )
+
+        assert received_store is context.store
+        assert sent_store is not context.store
+
+        assert len(received_entries) == 1
+        assert len(sent_entries) == 1
+
+        assert (
+            received_entries[0].message.body
+            == "Self delivery"
+        )
+        assert (
+            sent_entries[0].message.body
+            == "Self delivery"
+        )
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
 
 
 from types import SimpleNamespace
@@ -63,6 +239,7 @@ class FakeController:
 
 
 def test_build_view_model_connects_composer_to_application_pipeline(
+    tmp_path,
     monkeypatch,
 ):
     pipeline = FakePipeline()
@@ -71,6 +248,14 @@ def test_build_view_model_connects_composer_to_application_pipeline(
         pipeline=pipeline,
         store=object(),
         signer=None,
+        paths=ApplicationPaths(
+            root_dir=tmp_path / "garlicsmtp",
+        ),
+    )
+
+    context.paths.data_dir.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     class FakeBuilder:
@@ -115,13 +300,24 @@ def test_build_view_model_connects_composer_to_application_pipeline(
 
 def test_build_view_model_composer_sends_through_pipeline(
     monkeypatch,
+    tmp_path,
 ):
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
     pipeline = FakePipeline()
 
     context = SimpleNamespace(
         pipeline=pipeline,
         store=object(),
         signer=None,
+        paths=paths,
+    )
+
+    context.paths.data_dir.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     class FakeBuilder:
@@ -211,7 +407,12 @@ def test_build_view_model_composer_sends_through_pipeline(
 
 def test_build_view_model_connects_composer_to_context_signer(
     monkeypatch,
+    tmp_path,
 ):
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
     pipeline = FakePipeline()
     signer = object()
     verifier = object()
@@ -221,6 +422,12 @@ def test_build_view_model_connects_composer_to_context_signer(
         store=object(),
         signer=signer,
         verifier=verifier,
+        paths=paths,
+    )
+
+    context.paths.data_dir.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     class FakeBuilder:
@@ -370,6 +577,153 @@ def test_real_gui_composer_delivers_to_local_mailbox(
             message.body
             == "Delivered through the real pipeline"
         )
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_real_gui_composer_separates_received_and_sent_mail(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.application import (
+        ApplicationBuilder,
+    )
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+        ApplicationSettings,
+    )
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    real_builder = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    )
+
+    class TestBuilder:
+
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            pass
+
+        def build(
+            self,
+        ):
+            return real_builder.build()
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        TestBuilder,
+    )
+
+    view_model = (
+        gui_application.build_view_model()
+    )
+
+    context = (
+        view_model.controller.context
+    )
+
+    try:
+        view_model.compose.sender = (
+            "alice@test.onion"
+        )
+        view_model.compose.recipient = (
+            "bob@test.onion"
+        )
+        view_model.compose.subject = (
+            "Sent and received"
+        )
+        view_model.compose.body = (
+            "GarlicSMTP dual mailbox test"
+        )
+
+        assert (
+            view_model.compose.send()
+            is True
+        )
+
+        received_store = (
+            view_model.received_message_list
+            .explorer.store
+        )
+        sent_store = (
+            view_model.sent_message_list
+            .explorer.store
+        )
+
+        assert received_store is context.store
+        assert sent_store is not context.store
+
+        received_entries = (
+            received_store.list_entries(
+                "bob@test.onion"
+            )
+        )
+        sent_entries = (
+            sent_store.list_entries(
+                "alice@test.onion"
+            )
+        )
+
+        assert (
+            context.store.list_entries(
+                "alice@test.onion"
+            )
+            == []
+        )
+
+        assert len(received_entries) == 1
+        assert len(sent_entries) == 1
+
+        received_message = (
+            received_entries[0].message
+        )
+        sent_message = (
+            sent_entries[0].message
+        )
+
+        assert (
+            received_message.envelope.sender
+            == "alice@test.onion"
+        )
+        assert (
+            sent_message.envelope.sender
+            == "alice@test.onion"
+        )
+
+        assert (
+            received_message.envelope.recipients
+            == ["bob@test.onion"]
+        )
+        assert (
+            sent_message.envelope.recipients
+            == ["bob@test.onion"]
+        )
+
+        assert (
+            received_message.headers.get(
+                "Subject"
+            )
+            == "Sent and received"
+        )
+        assert (
+            sent_message.headers.get(
+                "Subject"
+            )
+            == "Sent and received"
+        )
+
     finally:
         context.queue.backend.close()
         context.store.backend.close()
@@ -610,10 +964,7 @@ def test_run_gui_uses_provided_application_paths(
 def test_build_view_model_uses_provided_application_paths(
     tmp_path,
     monkeypatch,
-):
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-    )
+):  
 
     expected_paths = (
         ApplicationPaths.for_development(
@@ -626,6 +977,12 @@ def test_build_view_model_uses_provided_application_paths(
         pipeline=FakePipeline(),
         store=object(),
         signer=None,
+        paths=expected_paths,
+    )
+
+    context.paths.data_dir.mkdir(
+        parents=True,
+        exist_ok=True,
     )
 
     received = {}
@@ -759,3 +1116,125 @@ def test_gui_package_exports_tk_main_window():
     )
 
     assert gui.MainWindow is TkMainWindow
+
+
+def test_real_gui_sent_mail_persists_across_rebuild(
+    tmp_path,
+    monkeypatch,
+):
+    from garlicsmtp.application import (
+        ApplicationBuilder,
+    )
+    from garlicsmtp.configuration import (
+        ApplicationPaths,
+        ApplicationSettings,
+    )
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    class TestBuilder:
+
+        def __init__(
+            self,
+            *,
+            paths,
+        ):
+            self.builder = ApplicationBuilder(
+                paths=paths,
+                settings=settings,
+            )
+
+        def build(
+            self,
+        ):
+            return self.builder.build()
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        TestBuilder,
+    )
+
+    first_view_model = (
+        gui_application.build_view_model(
+            paths=paths,
+        )
+    )
+
+    first_context = (
+        first_view_model.controller.context
+    )
+
+    try:
+        first_view_model.compose.sender = (
+            "alice@test.onion"
+        )
+        first_view_model.compose.recipient = (
+            "bob@test.onion"
+        )
+        first_view_model.compose.subject = (
+            "Persistent sent"
+        )
+        first_view_model.compose.body = (
+            "This sent message must survive rebuild"
+        )
+
+        assert (
+            first_view_model.compose.send()
+            is True
+        )
+
+        first_sent_store = (
+            first_view_model.sent_message_list
+            .explorer.store
+        )
+
+        assert len(
+            first_sent_store.list_entries(
+                "alice@test.onion"
+            )
+        ) == 1
+
+    finally:
+        first_context.queue.backend.close()
+        first_context.store.backend.close()
+        first_sent_store.backend.close()
+
+    second_view_model = (
+        gui_application.build_view_model(
+            paths=paths,
+        )
+    )
+
+    second_context = (
+        second_view_model.controller.context
+    )
+
+    try:
+        second_sent_store = (
+            second_view_model.sent_message_list
+            .explorer.store
+        )
+
+        sent_entries = (
+            second_sent_store.list_entries(
+                "alice@test.onion"
+            )
+        )
+
+        assert len(sent_entries) == 1
+
+        assert (
+            sent_entries[0].message.body
+            == "This sent message must survive rebuild"
+        )
+
+    finally:
+        second_context.queue.backend.close()
+        second_context.store.backend.close()
+        second_sent_store.backend.close()

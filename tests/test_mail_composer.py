@@ -28,6 +28,11 @@ from garlicsmtp.security.trust_store import (
 from garlicsmtp.security.verifier import (
     Ed25519MessageVerifier,
 )
+from garlicsmtp.models import (
+    Envelope,
+    MailHeaders,
+    MailMessage,
+)
 
 
 class FakePipeline:
@@ -347,4 +352,138 @@ def test_mail_composer_marks_trusted_local_signature_verified():
     assert (
         context.verification_status
         == VerificationStatus.VERIFIED
+    )
+
+
+class FakeSentStore:
+
+    def __init__(self):
+        self.saved = []
+
+    def save(
+        self,
+        mailbox,
+        message,
+    ):
+        self.saved.append(
+            (
+                mailbox,
+                message,
+            )
+        )
+
+
+def test_mail_composer_saves_accepted_message_as_sent():
+    pipeline = FakePipeline()
+    sent_store = FakeSentStore()
+
+    composer = MailComposerService(
+        pipeline,
+        sent_store=sent_store,
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Hello",
+        body="Hello from GarlicSMTP",
+    )
+
+    assert result is True
+    assert len(sent_store.saved) == 1
+
+    mailbox, message = sent_store.saved[0]
+
+    assert mailbox == "alice@sender.onion"
+    assert message.envelope.sender == (
+        "alice@sender.onion"
+    )
+    assert message.envelope.recipients == [
+        "bob@receiver.onion",
+    ]
+    assert message.headers.get(
+        "Subject"
+    ) == "Hello"
+    assert message.body == (
+        "Hello from GarlicSMTP"
+    )
+
+
+def test_mail_composer_does_not_save_rejected_message_as_sent():
+    class RejectingPipeline:
+
+        def execute(
+            self,
+            context,
+        ):
+            context.accepted = False
+            return context
+
+    sent_store = FakeSentStore()
+
+    composer = MailComposerService(
+        RejectingPipeline(),
+        sent_store=sent_store,
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Rejected",
+        body="This must not be saved",
+    )
+
+    assert result is False
+    assert sent_store.saved == []
+
+
+def test_mail_composer_saves_original_message_when_pipeline_replaces_it():
+    class TransformingPipeline:
+
+        def execute(
+            self,
+            context,
+        ):
+            context.message = MailMessage(
+                envelope=Envelope(
+                    sender=(
+                        context.message
+                        .envelope.sender
+                    ),
+                    recipients=list(
+                        context.message
+                        .envelope.recipients
+                    ),
+                ),
+                headers=MailHeaders(),
+                body="encrypted-payload",
+            )
+
+            return context
+
+    sent_store = FakeSentStore()
+
+    composer = MailComposerService(
+        TransformingPipeline(),
+        sent_store=sent_store,
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Hello",
+        body="Hello from GarlicSMTP",
+    )
+
+    assert result is True
+    assert len(sent_store.saved) == 1
+
+    mailbox, message = sent_store.saved[0]
+
+    assert mailbox == "alice@sender.onion"
+    assert message.headers.get(
+        "Subject"
+    ) == "Hello"
+    assert message.body == (
+        "Hello from GarlicSMTP"
     )

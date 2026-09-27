@@ -22,11 +22,17 @@ from garlicsmtp.gui.tk_mail_metrics_section import (
 from garlicsmtp.gui.tk_mailbox_list_section import (
     MailboxListSection,
 )
-from garlicsmtp.gui.tk_message_list_section import (
-    MessageListSection,
+from garlicsmtp.gui.tk_message_received_list_section import (
+    MessageReceivedListSection,
 )
-from garlicsmtp.gui.tk_message_preview_section import (
-    MessagePreviewSection,
+from garlicsmtp.gui.tk_message_received_preview_section import (
+    MessageReceivedPreviewSection,
+)
+from garlicsmtp.gui.tk_message_sent_list_section import (
+    MessageSentListSection,
+)
+from garlicsmtp.gui.tk_message_sent_preview_section import (
+    MessageSentPreviewSection,
 )
 from garlicsmtp.gui.tk_services_section import (
     ServicesSection,
@@ -187,26 +193,69 @@ class MainWindow(ttk.Frame):
             style="Garlic.TFrame",
         )
 
-        self.message_list_section = MessageListSection(
-            self.messages_pane,
-            view_model=self.view_model.message_list,
+        self.received_message_list_section = (
+            MessageReceivedListSection(
+                self.messages_pane,
+                view_model=(
+                    self.view_model.received_message_list
+                ),
+            )
         )
 
-        self.message_preview_section = MessagePreviewSection(
-            self.messages_pane,
-            view_model=self.view_model.message_preview,
+        self.received_message_preview_section = (
+            MessageReceivedPreviewSection(
+                self.messages_pane,
+                view_model=(
+                    self.view_model.received_message_preview
+                ),
+            )
+        )
+
+        self.sent_message_list_section = (
+            MessageSentListSection(
+                self.messages_pane,
+                view_model=(
+                    self.view_model.sent_message_list
+                ),
+            )
+        )
+
+        self.sent_message_preview_section = (
+            MessageSentPreviewSection(
+                self.messages_pane,
+                view_model=(
+                    self.view_model.sent_message_preview
+                ),
+            )
+        )
+
+        # Backward-compatible aliases:
+        # historical message_* behavior is Received.
+        self.message_list_section = (
+            self.received_message_list_section
+        )
+        self.message_preview_section = (
+            self.received_message_preview_section
         )
 
         self.mailbox_section.add_selection_listener(
             self._select_mailbox
         )
 
-        self.message_list_section.add_selection_listener(
-            self._select_message
+        self.received_message_list_section.add_selection_listener(
+            self._select_received_message
         )
 
-        self.message_list_section.add_deleted_listener(
-            self._message_deleted
+        self.sent_message_list_section.add_selection_listener(
+            self._select_sent_message
+        )
+
+        self.received_message_list_section.add_deleted_listener(
+            self._received_message_deleted
+        )
+
+        self.sent_message_list_section.add_deleted_listener(
+            self._sent_message_deleted
         )
 
         self.refresh_button = ttk.Button(
@@ -286,14 +335,26 @@ class MainWindow(ttk.Frame):
             )
             messages_row = 3
 
-        self.message_list_section.grid(
+        self.received_message_list_section.grid(
             row=0,
             column=0,
             sticky="nsew",
         )
 
-        self.message_preview_section.grid(
+        self.received_message_preview_section.grid(
             row=0,
+            column=1,
+            sticky="nsew",
+        )
+
+        self.sent_message_list_section.grid(
+            row=1,
+            column=0,
+            sticky="nsew",
+        )
+
+        self.sent_message_preview_section.grid(
+            row=1,
             column=1,
             sticky="nsew",
         )
@@ -317,6 +378,11 @@ class MainWindow(ttk.Frame):
 
         self.messages_pane.rowconfigure(
             0,
+            weight=1,
+        )
+
+        self.messages_pane.rowconfigure(
+            1,
             weight=1,
         )
 
@@ -500,8 +566,10 @@ class MainWindow(ttk.Frame):
             self.mailbox_section,
             self.mail_metrics_section,
             self.activity_section,
-            self.message_list_section,
-            self.message_preview_section,
+            self.received_message_list_section,
+            self.received_message_preview_section,
+            self.sent_message_list_section,
+            self.sent_message_preview_section,
         )
 
         for section in sections:
@@ -514,45 +582,76 @@ class MainWindow(ttk.Frame):
         self,
         mailbox: str,
     ) -> None:
-        self.view_model.message_list.select_mailbox(
+        self.view_model.received_message_list.select_mailbox(
             mailbox
         )
 
-        self.view_model.message_preview.select_message(
+        self.view_model.received_message_preview.select_message(
             mailbox=mailbox,
             message_id=None,
         )
 
-        self.message_list_section.refresh_view()
-        self.message_preview_section.refresh_view()
+        self.view_model.sent_message_list.select_mailbox(
+            mailbox
+        )
 
-    def _select_message(
+        self.view_model.sent_message_preview.select_message(
+            mailbox=mailbox,
+            message_id=None,
+        )
+
+        self.received_message_list_section.refresh_view()
+        self.received_message_preview_section.refresh_view()
+        self.sent_message_list_section.refresh_view()
+        self.sent_message_preview_section.refresh_view()
+
+    def _select_received_message(
         self,
         message_id: str,
     ) -> None:
         mailbox = (
             self.view_model
-            .message_list
+            .received_message_list
             .selected_mailbox
         )
 
         if mailbox is None:
             return
 
-        self.view_model.message_preview.select_message(
+        self.view_model.received_message_preview.select_message(
             mailbox=mailbox,
             message_id=message_id,
         )
 
-        self.message_preview_section.refresh_view()
+        self.received_message_preview_section.refresh_view()
 
-    def _message_deleted(
+    def _select_sent_message(
+        self,
+        message_id: str,
+    ) -> None:
+        mailbox = (
+            self.view_model
+            .sent_message_list
+            .selected_mailbox
+        )
+
+        if mailbox is None:
+            return
+
+        self.view_model.sent_message_preview.select_message(
+            mailbox=mailbox,
+            message_id=message_id,
+        )
+
+        self.sent_message_preview_section.refresh_view()
+
+    def _received_message_deleted(
         self,
         message_id: str,
     ) -> None:
         if (
             self.view_model
-            .message_preview
+            .received_message_preview
             .message_id
             != message_id
         ):
@@ -560,16 +659,41 @@ class MainWindow(ttk.Frame):
 
         mailbox = (
             self.view_model
-            .message_list
+            .received_message_list
             .selected_mailbox
         )
 
-        self.view_model.message_preview.select_message(
+        self.view_model.received_message_preview.select_message(
             mailbox=mailbox,
             message_id=None,
         )
 
-        self.message_preview_section.refresh_view()
+        self.received_message_preview_section.refresh_view()
+
+    def _sent_message_deleted(
+        self,
+        message_id: str,
+    ) -> None:
+        if (
+            self.view_model
+            .sent_message_preview
+            .message_id
+            != message_id
+        ):
+            return
+
+        mailbox = (
+            self.view_model
+            .sent_message_list
+            .selected_mailbox
+        )
+
+        self.view_model.sent_message_preview.select_message(
+            mailbox=mailbox,
+            message_id=None,
+        )
+
+        self.sent_message_preview_section.refresh_view()
 
     def refresh_view(
         self,

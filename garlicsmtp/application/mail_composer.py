@@ -20,10 +20,12 @@ class MailComposerService:
         pipeline,
         signer=None,
         verifier=None,
+        sent_store=None,
     ) -> None:
         self.pipeline = pipeline
         self.signer = signer
         self.verifier = verifier
+        self.sent_store = sent_store
 
     def send(
         self,
@@ -90,11 +92,22 @@ class MailComposerService:
                     verification_status
                 ),
             )
-
+        sent_message = message
         context = self.pipeline.execute(
             context
         )
 
-        return bool(
+        accepted = bool(
             context.accepted
         )
+
+        if (
+            accepted
+            and self.sent_store is not None
+        ):
+            self.sent_store.save(
+                sender,
+                sent_message,
+            )
+
+        return accepted
