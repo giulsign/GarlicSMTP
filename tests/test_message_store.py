@@ -6,6 +6,9 @@
 from garlicsmtp.storage.store import (
     MessageStore,
 )
+from garlicsmtp.storage.attachment_store import (
+    AttachmentStore,
+)
 
 
 def test_message_store_delegates_to_backend(
@@ -244,3 +247,166 @@ def test_message_store_rejects_subscription_to_missing_mailbox():
     assert store.subscribe_mailbox(
         "Missing"
     ) is False
+
+
+
+def test_message_store_deletes_attachments_with_message(
+    tmp_path,
+    message,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        message,
+    )
+
+    message_directory = (
+        tmp_path
+        / "attachments"
+        / entry.id
+    )
+
+    message_directory.mkdir(
+        parents=True
+    )
+
+    (
+        message_directory
+        / "attachment"
+    ).write_bytes(
+        b"attachment content"
+    )
+
+    assert store.delete_entry(
+        "bob@test.onion",
+        entry.id,
+    ) is True
+
+    assert not message_directory.exists()
+
+
+def test_message_store_deletes_mailbox_attachments(
+    tmp_path,
+    message,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    first = store.save_entry(
+        "archive@test.onion",
+        message,
+    )
+
+    second = store.save_entry(
+        "archive@test.onion",
+        message,
+    )
+
+    for entry in (
+        first,
+        second,
+    ):
+        directory = (
+            tmp_path
+            / "attachments"
+            / entry.id
+        )
+
+        directory.mkdir(
+            parents=True
+        )
+
+        (
+            directory
+            / "attachment"
+        ).write_bytes(
+            b"attachment content"
+        )
+
+    assert store.delete_mailbox(
+        "archive@test.onion"
+    ) is True
+
+    assert not (
+        tmp_path
+        / "attachments"
+        / first.id
+    ).exists()
+
+    assert not (
+        tmp_path
+        / "attachments"
+        / second.id
+    ).exists()
+
+
+def test_message_store_delete_mailbox_preserves_other_attachments(
+    tmp_path,
+    message,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    deleted_entry = store.save_entry(
+        "archive@test.onion",
+        message,
+    )
+
+    preserved_entry = store.save_entry(
+        "inbox@test.onion",
+        message,
+    )
+
+    for entry in (
+        deleted_entry,
+        preserved_entry,
+    ):
+        directory = (
+            tmp_path
+            / "attachments"
+            / entry.id
+        )
+
+        directory.mkdir(
+            parents=True
+        )
+
+        (
+            directory
+            / "attachment"
+        ).write_bytes(
+            b"attachment content"
+        )
+
+    assert store.delete_mailbox(
+        "archive@test.onion"
+    ) is True
+
+    assert not (
+        tmp_path
+        / "attachments"
+        / deleted_entry.id
+    ).exists()
+
+    assert (
+        tmp_path
+        / "attachments"
+        / preserved_entry.id
+    ).exists()

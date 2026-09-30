@@ -20,6 +20,7 @@ class FakeComposer:
         recipient,
         subject,
         body,
+        attachments=None,
     ):
         self.calls.append(
             {
@@ -27,6 +28,7 @@ class FakeComposer:
                 "recipient": recipient,
                 "subject": subject,
                 "body": body,
+                "attachments": attachments,
             }
         )
 
@@ -63,13 +65,14 @@ def test_compose_view_model_sends_message():
             "sender": (
                 "alice@sender.onion"
             ),
-            "recipient": (
+            "recipient": (  
                 "bob@receiver.onion"
             ),
             "subject": "Hello",
             "body": (
                 "Hello from GarlicSMTP"
             ),
+            "attachments": []
         }
     ]
 
@@ -139,3 +142,59 @@ def test_compose_view_model_does_not_replace_existing_sender():
     assert view_model.sender == (
         "alice@example.onion"
     )
+
+
+def test_compose_view_model_sends_attachments():
+    composer = FakeComposer()
+
+    view_model = ComposeViewModel(
+        composer
+    )
+
+    attachment = object()
+
+    view_model.sender = (
+        "alice@sender.onion"
+    )
+    view_model.recipient = (
+        "bob@receiver.onion"
+    )
+    view_model.subject = "Attachment"
+    view_model.body = "Hello Bob"
+    view_model.attachments = [
+        attachment
+    ]
+
+    result = view_model.send()
+
+    assert result is True
+
+    assert composer.calls[0][
+        "attachments"
+    ] == [
+        attachment
+    ]
+
+
+def test_compose_view_model_clears_attachments_after_successful_send():
+    composer = FakeComposer()
+
+    view_model = ComposeViewModel(
+        composer
+    )
+
+    view_model.sender = (
+        "alice@sender.onion"
+    )
+    view_model.recipient = (
+        "bob@receiver.onion"
+    )
+    view_model.subject = "Attachment"
+    view_model.body = "Hello Bob"
+    view_model.attachments = [
+        object()
+    ]
+
+    assert view_model.send() is True
+
+    assert view_model.attachments == []

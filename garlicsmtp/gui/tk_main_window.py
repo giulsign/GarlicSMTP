@@ -54,11 +54,16 @@ class MainWindow(ttk.Frame):
         self,
         master,
         view_model: ApplicationViewModel,
+        *,
+        folder_opener,
     ) -> None:
         super().__init__(
             master,
             style="Garlic.TFrame",
         )
+
+        self.view_model = view_model
+        self.folder_opener = folder_opener
 
         self.view_model = view_model
 
@@ -208,6 +213,7 @@ class MainWindow(ttk.Frame):
                 view_model=(
                     self.view_model.received_message_preview
                 ),
+                folder_opener=self.folder_opener,
             )
         )
 
@@ -226,6 +232,7 @@ class MainWindow(ttk.Frame):
                 view_model=(
                     self.view_model.sent_message_preview
                 ),
+                folder_opener=self.folder_opener,
             )
         )
 

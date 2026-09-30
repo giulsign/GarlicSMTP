@@ -464,3 +464,27 @@ class MessagePreviewViewModel:
         )
 
         return parser.text()
+
+    @property
+    def attachments(
+        self,
+    ) -> tuple:
+        if self._message_id is None:
+            return ()
+
+        return tuple(
+            self.explorer.list_attachments(
+                self._message_id
+            )
+        )
+
+    @property
+    def attachment_directory(
+        self,
+    ):
+        if self._message_id is None:
+            return None
+
+        return self.explorer.attachment_directory(
+            self._message_id
+        )

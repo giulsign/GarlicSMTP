@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+from uuid import uuid4
+
 from garlicsmtp.models import (
     Envelope,
     MailHeaders,
@@ -11,6 +13,7 @@ from garlicsmtp.models import (
 from garlicsmtp.core.pipeline import (
     PipelineContext,
 )
+from garlicsmtp.smtp.mime import MimeEncoder
 
 
 class MailComposerService:
@@ -34,6 +37,7 @@ class MailComposerService:
         recipient: str,
         subject: str,
         body: str,
+        attachments=None,
     ) -> bool:
         sender = sender.strip()
         recipient = recipient.strip()
@@ -59,13 +63,58 @@ class MailComposerService:
         message = MailMessage(
             envelope=Envelope(
                 sender=sender,
-                recipients=[
-                    recipient,
-                ],
+                recipients=[recipient],
             ),
             headers=headers,
             body=body,
         )
+
+        sent_headers = MailHeaders()
+
+        for name, value in message.headers.fields.items():
+            if isinstance(value, list):
+                for item in value:
+                    sent_headers.add(
+                        name,
+                        item,
+                    )
+            else:
+                sent_headers.add(
+                    name,
+                    value,
+                )
+
+        sent_message = MailMessage(
+            envelope=Envelope(
+                sender=message.envelope.sender,
+                recipients=list(
+                    message.envelope.recipients
+                ),
+            ),
+            headers=sent_headers,
+            body=body,
+        )
+
+        if attachments:
+            boundary = (
+                f"garlicsmtp-{uuid4().hex}"
+            )
+
+            message.headers.add(
+                "Content-Type",
+                (
+                    "multipart/mixed; "
+                    f'boundary="{boundary}"'
+                ),
+            )
+
+            message.body = (
+                MimeEncoder.encode_multipart_mixed(
+                    text=body,  
+                    attachments=attachments,
+                    boundary=boundary,
+                )
+            )
 
         verification_status = None
 
@@ -83,7 +132,8 @@ class MailComposerService:
 
         if verification_status is None:
             context = PipelineContext(
-                message=message
+                message=message,
+                attachments=attachments,
             )
         else:
             context = PipelineContext(
@@ -91,8 +141,9 @@ class MailComposerService:
                 verification_status=(
                     verification_status
                 ),
+                attachments=attachments,
             )
-        sent_message = message
+        #sent_message = message
         context = self.pipeline.execute(
             context
         )
@@ -105,9 +156,35 @@ class MailComposerService:
             accepted
             and self.sent_store is not None
         ):
-            self.sent_store.save(
+            message_id = self.sent_store.save(
                 sender,
                 sent_message,
             )
+
+            attachment_store = getattr(
+                self.sent_store,
+                "attachment_store",
+                None,
+            )
+
+            if attachment_store is not None:
+                try:
+                    for attachment in (
+                            attachments or []
+                        ):
+                        attachment_store.save(
+                            message_id=message_id,
+                            filename=attachment.filename,
+                            declared_mime=(
+                                attachment.declared_mime
+                            ),
+                            content=attachment.content,
+                        )
+                except Exception:
+                    self.sent_store.delete_entry(
+                        sender,
+                        message_id,
+                    )
+                    raise
 
         return accepted

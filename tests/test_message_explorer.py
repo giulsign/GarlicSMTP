@@ -18,6 +18,9 @@ from garlicsmtp.models import (
 from garlicsmtp.storage.store import (
     MessageStore,
 )
+from garlicsmtp.storage.attachment_store import (
+    AttachmentStore,
+)
 
 
 def make_message(
@@ -359,3 +362,132 @@ def test_message_explorer_deletes_message():
         "bob@test.onion",
         entry.id,
     ) is None
+
+
+def test_message_explorer_delete_removes_attachments(
+    tmp_path,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store
+    )
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        make_message(),
+    )
+
+    attachment_store.save(
+        message_id=entry.id,
+        filename="note.txt",
+        declared_mime="text/plain",
+        content=b"hello",
+    )
+
+    attachment_directory = (
+        attachment_store.directory_for_message(
+            entry.id
+        )
+    )
+
+    assert attachment_directory.is_dir()
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    result = explorer.delete_message(
+        "bob@test.onion",
+        entry.id,
+    )
+
+    assert result is True
+
+    assert store.get_entry(
+        "bob@test.onion",
+        entry.id,
+    ) is None
+
+    assert not attachment_directory.exists()
+
+
+
+def test_message_explorer_lists_attachments(
+    tmp_path,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store
+    )
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        make_message(),
+    )
+
+    attachment_store.save(
+        message_id=entry.id,
+        filename="note.txt",
+        declared_mime="text/plain",
+        content=b"Hello attachment",
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    attachments = (
+        explorer.list_attachments(
+            entry.id
+        )
+    )
+
+    assert len(attachments) == 1
+    assert (
+        attachments[0].filename
+        == "note.txt"
+    )
+    assert (
+        attachments[0].declared_mime
+        == "text/plain"
+    )
+    assert (
+        attachments[0].content
+        == b"Hello attachment"
+    )
+
+
+def test_message_explorer_returns_attachment_directory(
+    tmp_path,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    directory = (
+        explorer.attachment_directory(
+            "message-123"
+        )
+    )
+
+    assert directory == (
+        tmp_path
+        / "attachments"
+        / "message-123"
+    )
+
+    assert not directory.exists()

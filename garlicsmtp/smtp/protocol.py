@@ -20,6 +20,7 @@ from garlicsmtp.smtp.state import SMTPState
 from garlicsmtp.storage.entry import (
     VerificationStatus,
 )
+from garlicsmtp.smtp.mime import MimeDecoder
 
 
 class SMTPProtocol:
@@ -137,6 +138,64 @@ class SMTPProtocol:
 
                         return True
 
+                attachments = []
+
+                content_type = (
+                    message.headers.get(
+                        "Content-Type",
+                        "",
+                    )
+                )
+
+                if content_type.lower().startswith(
+                    "multipart/mixed"
+                ):
+                    boundary = ""
+
+                    for parameter in (
+                        content_type.split(";")[1:]
+                    ):
+                        name, separator, value = (
+                            parameter.partition("=")
+                        )
+
+                        if (
+                            separator
+                            and name.strip().lower()
+                            == "boundary"
+                        ):
+                            boundary = (
+                                value.strip()
+                                .strip('"')
+                            )
+                            break
+
+                    if boundary:
+                        try:
+                            (
+                                body,
+                                attachments,
+                            ) = (
+                                MimeDecoder
+                                .extract_multipart_mixed(
+                                    message.body,
+                                    boundary,
+                                )
+                            )
+                        except ValueError:
+                            reply = (
+                                ReplyFactory
+                                .transaction_failed()
+                            )
+
+                            self.connection.send(
+                                reply.serialize()
+                            )
+
+                            return True
+
+                        message.body = body
+
                 verification_status = (
                     self.verifier.verify(
                         message
@@ -148,6 +207,7 @@ class SMTPProtocol:
                 context = PipelineContext(
                     message=message,
                     verification_status=verification_status,
+                    attachments=attachments,
                 )
 
                 context = self.pipeline.execute(

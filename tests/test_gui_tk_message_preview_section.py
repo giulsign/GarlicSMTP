@@ -23,6 +23,14 @@ from garlicsmtp.storage.entry import (
 )
 
 
+class FakeFolderOpener:
+
+    def open(
+        self,
+        directory,
+    ):
+        del directory
+
 class FakeExplorer:
 
     def get_message(
@@ -33,6 +41,7 @@ class FakeExplorer:
         del mailbox
         del message_id
         return None
+
 
 def make_entry():
     headers = MailHeaders()
@@ -92,6 +101,30 @@ class MessageExplorer:
 
         return None
 
+    def list_attachments(
+        self,
+        message_id,
+    ):
+        del message_id
+
+        return [
+            type(
+                "Attachment",
+                (),
+                {
+                    "filename": "note.txt",
+                },
+            )(),
+        ]
+
+    def attachment_directory(
+        self,
+        message_id,
+    ):
+        return (
+            f"/attachments/{message_id}"
+        )
+
 def test_message_preview_section_starts_empty():
     root = tk.Tk()
     root.withdraw()
@@ -106,6 +139,7 @@ def test_message_preview_section_starts_empty():
         section = MessagePreviewSection(
             root,
             view_model=view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -154,6 +188,7 @@ def test_message_preview_section_has_complete_structure():
                     FakeExplorer()
                 )
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert hasattr(
@@ -211,6 +246,7 @@ def test_message_preview_section_displays_message():
         section = MessagePreviewSection(
             root,
             view_model=view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -284,11 +320,19 @@ def test_message_preview_section_clears_missing_message():
         section = MessagePreviewSection(
             root,
             view_model=view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
             section.subject_value.get()
             == "GarlicSMTP Preview"
+        )
+
+        assert (
+            section.attachment_value.cget(
+                "text"
+            )
+            == "note.txt"
         )
 
         view_model.select_message(
@@ -297,6 +341,13 @@ def test_message_preview_section_clears_missing_message():
         )
 
         section.refresh_view()
+
+        assert (
+            section.attachment_value.cget(
+                "text"
+            )
+            == ""
+        )
 
         assert (
             section.placeholder_value.cget(
@@ -397,6 +448,13 @@ def test_message_preview_section_displays_safe_html_fallback():
 
             return None
 
+        def list_attachments(
+            self,
+            message_id,
+        ):
+            del message_id
+            return []
+
     try:
         view_model = (
             MessagePreviewViewModel(
@@ -412,6 +470,7 @@ def test_message_preview_section_displays_safe_html_fallback():
         section = MessagePreviewSection(
             root,
             view_model=view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -445,6 +504,7 @@ def test_message_preview_section_separates_header_and_body():
         section = MessagePreviewSection(
             root,
             view_model=view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -469,7 +529,7 @@ def test_message_preview_section_separates_header_and_body():
         assert (
             section.body_value
             .grid_info()["row"]
-            == 2
+            == 4
         )
 
         assert (
@@ -497,6 +557,7 @@ def test_message_preview_section_uses_bold_header_labels():
                     FakeExplorer()
                 )
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         labels = [
@@ -535,6 +596,7 @@ def test_message_preview_body_uses_input_palette():
                     FakeExplorer()
                 )
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -574,6 +636,7 @@ def test_message_preview_placeholder_is_visible_when_no_message_is_selected():
                     FakeExplorer()
                 )
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         section.pack(
@@ -610,6 +673,7 @@ def test_message_preview_body_stays_visible_without_selected_message():
                     FakeExplorer()
                 )
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         section.pack(
@@ -623,6 +687,88 @@ def test_message_preview_body_stays_visible_without_selected_message():
             section.body_value
             .winfo_ismapped()
         )
+
+    finally:
+        root.destroy()
+
+
+def test_message_preview_section_displays_attachment_filename():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        view_model = (
+            MessagePreviewViewModel(
+                MessageExplorer()
+            )
+        )
+
+        view_model.select_message(
+            mailbox="bob@test.onion",
+            message_id="message-1",
+        )
+
+        section = MessagePreviewSection(
+            root,
+            view_model=view_model,
+            folder_opener=FakeFolderOpener(),
+        )
+
+        assert (
+            section.attachment_value.cget(
+                "text"
+            )
+            == "note.txt"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_message_preview_section_opens_attachment_folder():
+    root = tk.Tk()
+    root.withdraw()
+
+    class RecordingFolderOpener:
+
+        def __init__(self):
+            self.calls = []
+
+        def open(
+            self,
+            directory,
+        ):
+            self.calls.append(
+                directory
+            )
+
+    try:
+        view_model = (
+            MessagePreviewViewModel(
+                MessageExplorer()
+            )
+        )
+
+        view_model.select_message(
+            mailbox="bob@test.onion",
+            message_id="message-1",
+        )
+
+        folder_opener = (
+            RecordingFolderOpener()
+        )
+
+        section = MessagePreviewSection(
+            root,
+            view_model=view_model,
+            folder_opener=folder_opener,
+        )
+
+        section.open_attachments_button.invoke()
+
+        assert folder_opener.calls == [
+            "/attachments/message-1",
+        ]
 
     finally:
         root.destroy()

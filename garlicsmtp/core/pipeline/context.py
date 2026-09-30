@@ -3,10 +3,10 @@
 #
 # See LICENSE for the full license terms.
 
-from dataclasses import dataclass 
+from dataclasses import dataclass, field
 
 from garlicsmtp.models import MailMessage 
-from garlicsmtp.storage.entry import (
+from garlicsmtp.storage.entry import (  
     VerificationStatus,
 )
 
@@ -18,4 +18,7 @@ class PipelineContext:
     transport: str = "onion"
     verification_status: VerificationStatus = (
         VerificationStatus.UNSIGNED
+    )
+    attachments: list = field(
+        default_factory=list
     )

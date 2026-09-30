@@ -42,6 +42,13 @@ from garlicsmtp.storage.store import (
 from garlicsmtp.storage.sqlite.backend import (
     SQLiteMessageStoreBackend,
 )
+from garlicsmtp.storage.attachment_store import (
+    AttachmentStore,
+)
+from garlicsmtp.gui.folder_opener import (
+    FolderOpener,
+    open_directory,
+)
 
 
 def build_view_model(
@@ -63,7 +70,10 @@ def build_view_model(
     sent_store = MessageStore(
         backend=SQLiteMessageStoreBackend(
             context.paths.sent_mailbox_database
-        )
+        ),
+        attachment_store=AttachmentStore(
+            context.paths.attachments_dir
+        ),
     )
 
     sent_message_explorer = MessageExplorerService(
@@ -127,15 +137,20 @@ def run_gui(
 
     view_model = build_view_model(
         paths=(
-            paths
+            paths   
             if paths is not None
             else ApplicationPaths.for_user()
         ),
     )
 
+    folder_opener = FolderOpener(
+        open_directory=open_directory
+    )
+
     window = MainWindow(
         root,
         view_model,
+        folder_opener=folder_opener,
     )
 
     window.pack(

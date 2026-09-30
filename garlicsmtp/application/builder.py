@@ -123,6 +123,12 @@ from garlicsmtp.security.auth.persistent_imap_authenticator import (
 from garlicsmtp.tor.onion_service_factory import (
     build_onion_service_manager,
 )
+from garlicsmtp.application.attachment_policy_stage import (
+    AttachmentPolicyStage,
+)
+from garlicsmtp.storage.attachment_store import (
+    AttachmentStore,
+)
 
 
 class ApplicationBuilder:
@@ -345,10 +351,13 @@ class ApplicationBuilder:
             or SQLiteMessageStoreBackend(
                 self.paths.mailbox_database
             )
-        )
+        )   
 
         return MessageStore(
-            backend=backend
+            backend=backend,
+            attachment_store=AttachmentStore(
+                self.paths.attachments_dir
+            ),
         )
     
     def _build_queue(
@@ -429,6 +438,10 @@ class ApplicationBuilder:
 
         pipeline.add(
             LoggerStage()
+        )
+
+        pipeline.add(
+            AttachmentPolicyStage()
         )
 
         default_transport = (

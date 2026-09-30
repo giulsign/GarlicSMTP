@@ -15,6 +15,7 @@ class ComposeViewModel:
         self.recipient = ""
         self.subject = ""
         self.body = ""
+        self.attachments = []
 
     def send(
         self,
@@ -24,6 +25,7 @@ class ComposeViewModel:
             recipient=self.recipient,
             subject=self.subject,
             body=self.body,
+            attachments=self.attachments,
         )
 
         if result:
@@ -38,6 +40,7 @@ class ComposeViewModel:
         self.recipient = ""
         self.subject = ""
         self.body = ""
+        self.attachments = []
 
     def set_default_sender(
         self,

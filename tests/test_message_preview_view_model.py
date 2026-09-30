@@ -89,6 +89,7 @@ class FakeExplorer:
         }
 
         self.calls = []
+        self.attachments = {}
 
     def get_message(
         self,
@@ -109,6 +110,21 @@ class FakeExplorer:
             )
         )
 
+    def list_attachments(
+        self,
+        message_id,
+    ):
+        return self.attachments.get(
+            message_id,
+            []
+        )
+
+    def attachment_directory(
+        self,
+        message_id,
+    ):
+        return f"/attachments/{message_id}"
+
 
 def test_message_preview_starts_empty():
     view_model = MessagePreviewViewModel(
@@ -124,6 +140,7 @@ def test_message_preview_starts_empty():
     assert view_model.placeholder_text == (
         "Select a mailbox"
     )
+    assert view_model.attachments == ()
 
 
 def test_message_preview_loads_message():
@@ -524,3 +541,46 @@ def test_message_preview_view_model_derives_size_from_message():
 
     assert view_model.size > 0
     assert view_model.size_text != "0 B"
+
+
+def test_message_preview_exposes_attachments():
+    explorer = FakeExplorer()
+
+    attachment = object()
+
+    explorer.attachments[
+        "message-1"
+    ] = [
+        attachment,
+    ]
+
+    view_model = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    assert view_model.attachments == (
+        attachment,
+    )
+
+
+def test_message_preview_exposes_attachment_directory():
+    explorer = FakeExplorer()
+
+    view_model = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    assert (
+        view_model.attachment_directory
+        == "/attachments/message-1"
+    )

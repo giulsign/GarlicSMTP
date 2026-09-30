@@ -35,6 +35,7 @@ class MessageSentPreviewSection(DashboardCard):
         master,
         *,
         view_model: MessagePreviewViewModel,
+        folder_opener,
     ) -> None:
         super().__init__(
             master,
@@ -42,6 +43,8 @@ class MessageSentPreviewSection(DashboardCard):
         )
 
         self.view_model = view_model
+
+        self.folder_opener = folder_opener
 
         self.placeholder_value = ttk.Label(
             self.content,
@@ -149,6 +152,31 @@ class MessageSentPreviewSection(DashboardCard):
             ),
         )
 
+        self.attachment_value = ttk.Label(
+            self.details_widget,
+            text="",
+            style="Garlic.TLabel",
+        )
+        self.attachment_value.grid(
+            row=3,
+            column=0,
+            sticky="w",
+            pady=(0, 8),
+        )
+
+        self.open_attachments_button = ttk.Button(
+            self.details_widget,
+            text="Open attachments folder",
+            command=self._open_attachments_folder,
+        )
+
+        self.open_attachments_button.grid(
+            row=4,
+            column=0,
+            sticky="w",
+            pady=(0, 8),
+        )
+
         self.body_value = tk.Text(
             self.details_widget,
             height=14,
@@ -166,7 +194,7 @@ class MessageSentPreviewSection(DashboardCard):
         )
 
         self.body_value.grid(
-            row=2,
+            row=4,
             column=0,
             sticky="nsew",
         )
@@ -250,6 +278,15 @@ class MessageSentPreviewSection(DashboardCard):
             self.view_model.flags_text
         )
 
+        attachments = self.view_model.attachments
+
+        self.attachment_value.configure(
+            text=", ".join(
+                attachment.filename
+                for attachment in attachments
+            )
+        )
+
         self._set_body_text(
             self.view_model.display_body
         )
@@ -267,7 +304,10 @@ class MessageSentPreviewSection(DashboardCard):
             self.flags_value,
         ):
             value.set_text("")
-
+            
+        self.attachment_value.configure(
+            text=""
+        )
         self._set_body_text("")
 
     def _set_body_text(
@@ -287,4 +327,18 @@ class MessageSentPreviewSection(DashboardCard):
         )
         self.body_value.configure(
             state="disabled"
+        )
+
+    def _open_attachments_folder(
+        self,
+    ) -> None:
+        directory = (
+            self.view_model.attachment_directory
+        )
+
+        if directory is None:
+            return
+
+        self.folder_opener.open(
+            directory
         )

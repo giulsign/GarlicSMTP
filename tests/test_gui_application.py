@@ -183,6 +183,11 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
         assert received_store is context.store
         assert sent_store is not context.store
 
+        assert (
+            sent_store.attachment_store
+            is not None
+        )
+
         assert len(received_entries) == 1
         assert len(sent_entries) == 1
 
@@ -791,12 +796,15 @@ def test_run_gui_uses_user_application_paths(
             self,
             master,
             view_model,
+            *,
+            folder_opener,
         ):
             received["window"] = self
             received["master"] = master
             received["view_model"] = (
                 view_model
             )
+            received["folder_opener"] = folder_opener
 
         def pack(
             self,
@@ -845,6 +853,8 @@ def test_run_gui_uses_user_application_paths(
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
     )
+
+    assert received["folder_opener"] is not None
 
     assert result == 0
     assert received["paths"] == expected_paths
@@ -913,6 +923,8 @@ def test_run_gui_uses_provided_application_paths(
             self,
             master,
             view_model,
+            *,
+            folder_opener,
         ):
             pass
 
@@ -1063,6 +1075,8 @@ def test_run_gui_closes_window_before_destroying_root(
             self,
             master,
             view_model,
+            *,
+            folder_opener,
         ):
             pass
 

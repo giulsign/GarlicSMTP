@@ -33,6 +33,15 @@ from garlicsmtp.models import (
     MailHeaders,
     MailMessage,
 )
+from garlicsmtp.smtp.mime import MimeAttachment
+from garlicsmtp.smtp.mime import (
+    MimeAttachment,
+    MimeDecoder,
+)
+from garlicsmtp.storage.store import MessageStore
+from garlicsmtp.storage.attachment_store import (
+    AttachmentStore,
+)
 
 
 class FakePipeline:
@@ -487,3 +496,296 @@ def test_mail_composer_saves_original_message_when_pipeline_replaces_it():
     assert message.body == (
         "Hello from GarlicSMTP"
     )
+
+
+def test_mail_composer_passes_attachments_to_pipeline():
+    pipeline = FakePipeline()
+
+    composer = MailComposerService(
+        pipeline,
+    )
+
+    attachment = MimeAttachment(
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\nattachment",
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Attachment",
+        body="Hello Bob",
+        attachments=[
+            attachment,
+        ],
+    )
+
+    assert result is True
+    assert len(pipeline.contexts) == 1
+    assert pipeline.contexts[0].attachments == [
+        attachment,
+    ]
+
+
+def test_mail_composer_builds_multipart_mixed_for_attachments():
+    pipeline = FakePipeline()
+
+    composer = MailComposerService(
+        pipeline,
+    )
+
+    attachment = MimeAttachment(
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\nattachment",
+    )
+
+    composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Attachment",
+        body="Hello Bob",
+        attachments=[
+            attachment,
+        ],
+    )
+
+    message = pipeline.contexts[0].message
+
+    content_type = message.headers.get(
+        "Content-Type"
+    )
+
+    assert content_type.startswith(
+        "multipart/mixed"
+    )
+
+    boundary = (
+        content_type
+        .split("boundary=", 1)[1]
+        .strip()
+        .strip('"')
+    )
+
+    text, attachments = (
+        MimeDecoder.extract_multipart_mixed(
+            message.body,
+            boundary,
+        )
+    )
+
+    assert text == "Hello Bob"
+    assert attachments == [
+        attachment,
+    ]
+
+
+def test_mail_composer_saves_attachment_message_as_plain_sent_message():
+    pipeline = FakePipeline()
+    sent_store = FakeSentStore()
+
+    composer = MailComposerService(
+        pipeline,
+        sent_store=sent_store,
+    )
+
+    attachment = MimeAttachment(
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\nattachment",
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Attachment",
+        body="Hello Bob",
+        attachments=[
+            attachment,
+        ],
+    )
+
+    assert result is True
+    assert len(sent_store.saved) == 1
+
+    mailbox, message = sent_store.saved[0]
+
+    assert mailbox == "alice@sender.onion"
+    assert message.body == "Hello Bob"
+    assert message.headers.get(
+        "Content-Type"
+    ) is None
+
+
+def test_mail_composer_stores_sent_attachments(
+    tmp_path,
+):
+    pipeline = FakePipeline()
+
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    sent_store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    composer = MailComposerService(
+        pipeline,
+        sent_store=sent_store,
+    )
+
+    attachment = MimeAttachment(
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\nattachment",
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="Attachment",
+        body="Hello Bob",
+        attachments=[
+            attachment,
+        ],
+    )
+
+    assert result is True
+
+    entries = sent_store.list_entries(
+        "alice@sender.onion"
+    )
+
+    assert len(entries) == 1
+
+    stored = (
+        attachment_store.list_for_message(
+            entries[0].id
+        )
+    )
+
+    assert len(stored) == 1
+    assert stored[0].filename == (
+        attachment.filename
+    )
+    assert stored[0].declared_mime == (
+        attachment.declared_mime
+    )
+    assert stored[0].content == (
+        attachment.content
+    )
+
+
+def test_mail_composer_rolls_back_sent_when_attachment_save_fails(
+    tmp_path,
+):
+    class FailingAttachmentStore(
+        AttachmentStore
+    ):
+
+        def __init__(
+            self,
+            path,
+        ):
+            super().__init__(path)
+            self.save_calls = 0
+
+        def save(
+            self,
+            **kwargs,
+        ):
+            self.save_calls += 1
+
+            if self.save_calls == 2:
+                raise RuntimeError(
+                    "attachment save failed"
+                )
+
+            return super().save(
+                **kwargs
+            )
+
+    attachment_store = FailingAttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    sent_store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    composer = MailComposerService(
+        FakePipeline(),
+        sent_store=sent_store,
+    )
+
+    attachments = [
+        MimeAttachment(
+            filename="first.pdf",
+            declared_mime="application/pdf",
+            content=b"%PDF-1.4\nfirst",
+        ),
+        MimeAttachment(
+            filename="second.pdf",
+            declared_mime="application/pdf",
+            content=b"%PDF-1.4\nsecond",
+        ),
+    ]
+
+    with pytest.raises(
+        RuntimeError,
+        match="attachment save failed",
+    ):
+        composer.send(
+            sender="alice@sender.onion",
+            recipient="bob@receiver.onion",
+            subject="Attachments",
+            body="Hello Bob",
+            attachments=attachments,
+        )
+
+    assert sent_store.list_entries(
+        "alice@sender.onion"
+    ) == []
+
+    attachments_path = (
+        tmp_path / "attachments"
+    )
+
+    assert (
+        not attachments_path.exists()
+        or not any(
+            attachments_path.iterdir()
+        )
+    )
+
+
+def test_mail_composer_with_attachment_store_accepts_no_attachments(
+    tmp_path,
+):
+    sent_store = MessageStore(
+        attachment_store=AttachmentStore(
+            tmp_path / "attachments"
+        ),
+    )
+
+    composer = MailComposerService(
+        FakePipeline(),
+        sent_store=sent_store,
+    )
+
+    result = composer.send(
+        sender="alice@sender.onion",
+        recipient="bob@receiver.onion",
+        subject="No attachment",
+        body="Hello Bob",
+    )
+
+    assert result is True
+
+    entries = sent_store.list_entries(
+        "alice@sender.onion"
+    )
+
+    assert len(entries) == 1

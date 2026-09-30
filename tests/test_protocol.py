@@ -607,3 +607,81 @@ def test_protocol_rejects_malformed_multipart_without_verifier_or_pipeline():
 
     assert expected_reply in sock.sent
     assert b"250 Message accepted\r\n" not in sock.sent
+
+
+def test_protocol_passes_multipart_mixed_attachment_to_pipeline():
+    sock = FakeSocket()
+
+    sock.buffer = [
+        b"EHLO client.onion\r\n",
+        b"MAIL FROM:<alice@test.onion>\r\n",
+        b"RCPT TO:<bob@test.onion>\r\n",
+        b"DATA\r\n",
+        (
+            b"Content-Type: multipart/mixed; "
+            b'boundary="mixed123"\r\n'
+        ),
+        b"\r\n",
+        b"--mixed123\r\n",
+        b"Content-Type: text/plain; charset=utf-8\r\n",
+        b"\r\n",
+        b"Hello Bob\r\n",
+        b"--mixed123\r\n",
+        b"Content-Type: application/pdf\r\n",
+        (
+            b"Content-Disposition: attachment; "
+            b'filename="document.pdf"\r\n'
+        ),
+        b"Content-Transfer-Encoding: base64\r\n",
+        b"\r\n",
+        b"JVBERi0xLjQK\r\n",
+        b"--mixed123--\r\n",
+        b".\r\n",
+        b"QUIT\r\n",
+    ]
+
+    connection = SMTPConnection(
+        sock,
+        ("127.0.0.1", 2525),
+    )
+
+    class SpyPipeline:
+
+        def __init__(self):
+            self.context = None
+
+        def execute(self, context):
+            self.context = context
+            return context
+
+    pipeline = SpyPipeline()
+
+    protocol = SMTPProtocol(
+        connection,
+        hostname="garlicsmtp.onion",
+        pipeline=pipeline,
+    )
+
+    protocol.serve()
+
+    assert pipeline.context is not None
+
+    assert (
+        pipeline.context.message.body
+        == "Hello Bob"
+    )
+
+    assert len(
+        pipeline.context.attachments
+    ) == 1
+
+    attachment = (
+        pipeline.context.attachments[0]
+    )
+
+    assert attachment.filename == "document.pdf"
+    assert (
+        attachment.declared_mime
+        == "application/pdf"
+    )
+    assert attachment.content == b"%PDF-1.4\n"

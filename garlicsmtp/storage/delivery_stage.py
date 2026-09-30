@@ -44,13 +44,41 @@ class DeliveryStage(PipelineStage):
         )
 
         if domain in self.local_domains:
-            self.store.save_entry(
+            entry = self.store.save_entry(
                 recipient,
                 message,
                 verification_status=(
                     context.verification_status
                 ),
             )
+
+            try:
+                if (
+                    self.store.attachment_store
+                    is not None
+                ):
+                    for attachment in (
+                        context.attachments or []
+                    ):
+                        self.store.attachment_store.save(
+                            message_id=entry.id,
+                            filename=(
+                                attachment.filename
+                            ),
+                            declared_mime=(
+                                attachment.declared_mime
+                            ),
+                            content=(
+                                attachment.content
+                            ),
+                        )
+            except Exception:
+                self.store.delete_entry(
+                    recipient,
+                    entry.id,
+                )
+                raise
+
             return context
 
         if (

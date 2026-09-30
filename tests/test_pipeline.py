@@ -85,3 +85,12 @@ def test_pipeline_logger_is_privacy_safe(
         not in output
     )
 
+
+def test_pipeline_context_has_empty_attachments_by_default(
+    message,
+):
+    context = PipelineContext(
+        message=message,
+    )
+
+    assert context.attachments == []

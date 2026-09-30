@@ -121,6 +121,41 @@ class FakeMessageExplorer:
 
         return None
 
+    def list_attachments(
+        self,
+        message_id,
+    ):
+        del message_id
+
+        return [
+            type(
+                "Attachment",
+                (),
+                {
+                    "filename": "note.txt",
+                },
+            )(),
+        ]
+
+    def attachment_directory(
+        self,
+        message_id,
+    ):
+        return f"/attachments/{message_id}"
+
+class FakeFolderOpener:
+
+    def __init__(self):
+        self.opened = []
+
+    def open(
+        self,
+        directory,
+    ):
+        self.opened.append(
+            directory
+        )
+
 
 def test_tk_main_window_builds_dashboard_sections():
     root = tk.Tk()
@@ -132,6 +167,7 @@ def test_tk_main_window_builds_dashboard_sections():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -191,6 +227,7 @@ def test_tk_main_window_binds_received_and_sent_sections():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -226,6 +263,7 @@ def test_tk_main_window_selects_mailbox_for_received_and_sent():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -258,6 +296,7 @@ def test_tk_main_window_has_no_compose_without_view_model():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -300,6 +339,7 @@ def test_tk_main_window_builds_compose_section():
                 FakeController(),
                 compose=compose,
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -333,6 +373,7 @@ def test_tk_main_window_loads_selected_mailbox_messages():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -392,9 +433,12 @@ def test_tk_main_window_displays_selected_message_preview():
             message_preview=message_preview,
         )
 
+        folder_opener = FakeFolderOpener()
+
         window = MainWindow(
             root,
-            view_model,
+            view_model, 
+            folder_opener=folder_opener,
         )
 
         assert (
@@ -434,6 +478,27 @@ def test_tk_main_window_displays_selected_message_preview():
             .get()
             == "GarlicSMTP Preview"
         )
+
+        assert (
+            window.received_message_preview_section
+            .attachment_value
+            .cget("text")
+            == "note.txt"
+        )
+
+        assert (
+            window.received_message_preview_section
+            .open_attachments_button
+            .cget("text")
+            == "Open attachments folder"
+        )
+
+        window.received_message_preview_section \
+            .open_attachments_button.invoke()
+
+        assert folder_opener.opened == [
+            "/attachments/message-1",
+        ]
     finally:
         root.destroy()
 
@@ -462,6 +527,7 @@ def test_tk_main_window_clears_preview_for_deleted_message():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -526,6 +592,7 @@ def test_tk_main_window_clears_sent_preview_for_deleted_message():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -588,6 +655,7 @@ def test_tk_main_window_keeps_preview_for_other_deleted_message():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -639,6 +707,7 @@ def test_tk_main_window_refreshes_all_sections():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         refreshed = []
@@ -703,6 +772,7 @@ def test_tk_main_window_refreshes_compose_when_present():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         refreshed = []
@@ -733,6 +803,7 @@ def test_tk_main_window_has_refresh_button():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -754,6 +825,7 @@ def test_tk_main_window_refresh_button_refreshes_view():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         refreshed = []
@@ -780,6 +852,7 @@ def test_tk_main_window_has_start_button():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -803,6 +876,7 @@ def test_tk_main_window_start_button_starts_and_refreshes():
             ApplicationViewModel(
                 controller
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         started = []
@@ -837,6 +911,7 @@ def test_tk_main_window_action_buttons_follow_stopped_state():
                     RuntimeState.STOPPED
                 )
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -873,6 +948,7 @@ def test_tk_main_window_stop_and_restart_buttons_execute_actions():
             ApplicationViewModel(
                 controller
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -936,6 +1012,7 @@ def test_tk_main_window_action_error_is_generic_and_refreshes(
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         dialogs = []
@@ -1003,6 +1080,7 @@ def test_tk_main_window_refresh_button_refreshes_view_model():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         actions = []
@@ -1035,6 +1113,7 @@ def test_tk_main_window_places_top_dashboard_in_three_columns():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -1138,6 +1217,7 @@ def test_tk_main_window_places_compose_and_messages_layout():
                 FakeController(),
                 compose=compose,
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         compose_info = (
@@ -1217,6 +1297,7 @@ def test_tk_main_window_moves_messages_up_without_compose():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert window.compose_section is None
@@ -1243,6 +1324,7 @@ def test_tk_main_window_dashboard_columns_and_messages_row_expand():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         for column in range(3):
@@ -1298,6 +1380,7 @@ def test_tk_main_window_dashboard_sections_belong_to_content_frame():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert isinstance(
@@ -1344,6 +1427,7 @@ def test_tk_main_window_builds_header_and_action_bar():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -1420,6 +1504,7 @@ def test_tk_main_window_queues_view_model_event_from_worker_thread():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         refresh_calls = []
@@ -1460,6 +1545,7 @@ def test_tk_main_window_schedules_refresh_queue_poll():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -1497,6 +1583,7 @@ def test_tk_main_window_close_stops_polling_and_running_application():
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         listener = window._queue_refresh
@@ -1538,6 +1625,7 @@ def test_tk_main_window_content_has_vertical_scrollbar():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert window.content_canvas is not None
@@ -1575,6 +1663,7 @@ def test_tk_main_window_messages_are_visible_at_bottom_of_scroll():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
         window.pack(
             fill="both",
@@ -1619,6 +1708,7 @@ def test_tk_main_window_messages_container_uses_grid_layout():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -1645,6 +1735,7 @@ def test_tk_main_window_mouse_wheel_scrolls_content_on_linux():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
         window.pack(
             fill="both",
@@ -1679,6 +1770,7 @@ def test_tk_main_window_mouse_wheel_scrolls_over_content_widget():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
         window.pack(
             fill="both",
@@ -1715,6 +1807,7 @@ def test_tk_main_window_keeps_message_preview_visible_before_selection():
             ApplicationViewModel(
                 FakeController()
             ),
+            folder_opener=FakeFolderOpener(),
         )
         window.pack(
             fill="both",
@@ -1785,9 +1878,11 @@ def test_tk_main_window_displays_selected_sent_message_preview():
             sent_message_preview=sent_message_preview,
         )
 
+
         window = MainWindow(
             root,
             view_model,
+            folder_opener=FakeFolderOpener(),
         )
 
         assert (
@@ -1820,8 +1915,22 @@ def test_tk_main_window_displays_selected_sent_message_preview():
         assert (
             window.sent_message_preview_section
             .subject_value
-            .get()
+            .get()  
             == "GarlicSMTP Preview"
+        )
+
+        assert (
+            window.sent_message_preview_section
+            .attachment_value
+            .cget("text")
+            == "note.txt"
+        )
+
+        assert (
+            window.sent_message_preview_section
+            .open_attachments_button
+            .cget("text")
+            == "Open attachments folder"
         )
 
         assert (

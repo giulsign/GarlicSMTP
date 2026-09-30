@@ -34,6 +34,10 @@ def test_application_paths_derive_directories():
         "/tmp/garlicsmtp/state/logs"
     )
 
+    assert paths.attachments_dir == Path(
+        "/tmp/garlicsmtp/data/attachments"
+    )
+
 
 def test_application_paths_derive_files():
     paths = ApplicationPaths(
@@ -81,6 +85,7 @@ def test_application_paths_create_directories(
     assert paths.state_dir.is_dir()
     assert paths.cache_dir.is_dir()
     assert paths.log_dir.is_dir()
+    assert paths.attachments_dir.is_dir()
 
 
 def test_create_directories_is_idempotent(

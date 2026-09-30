@@ -88,6 +88,9 @@ from garlicsmtp.security.auth.persistent_imap_authenticator import (
     PersistentImapAuthenticator,
 )
 import garlicsmtp.application.builder as builder_module
+from garlicsmtp.smtp.mime import (
+    MimeAttachment,
+)
 
 
 def test_application_builder_creates_context(
@@ -116,6 +119,15 @@ def test_application_builder_creates_context(
     )
 
     assert context.store is not None
+    assert (
+        context.store.attachment_store
+        is not None
+    )
+
+    assert (
+        context.store.attachment_store.path
+        == paths.attachments_dir
+    )
     assert context.queue is not None
     assert context.transport is not None
     assert context.pipeline is not None
@@ -1847,3 +1859,52 @@ def test_application_builder_uses_persistent_imap_authenticator_by_default(
     finally:
         context.queue.backend.close()
         context.store.backend.close()
+
+
+def test_application_builder_wires_attachment_policy_before_delivery(
+    tmp_path,
+    message,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+    ).build()
+
+    message.envelope.recipients = [
+        "bob@test.onion"
+    ]
+
+    pipeline_context = PipelineContext(
+        message=message,
+        attachments=[
+            MimeAttachment(
+                filename="document.pdf",
+                declared_mime="application/pdf",
+                content=b"MZ executable",
+            ),
+        ],
+    )
+
+    try:
+        result = context.pipeline.execute(
+            pipeline_context
+        )
+
+        assert result.accepted is False
+        assert result.reject_reason == (
+            "Attachment rejected"
+        )
+
+        assert context.store.list_messages(
+            "bob@test.onion"
+        ) == []
+
+    finally:
+        context.queue.backend.close()

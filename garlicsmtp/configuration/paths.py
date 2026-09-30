@@ -122,6 +122,7 @@ class ApplicationPaths:
         directories = (
             self.config_dir,
             self.data_dir,
+            self.attachments_dir,
             self.state_dir,
             self.cache_dir,
             self.log_dir,
@@ -141,3 +142,7 @@ class ApplicationPaths:
             self.state_dir
             / "onion-service.key"
         )
+
+    @property
+    def attachments_dir(self) -> Path:
+        return self.data_dir / "attachments"

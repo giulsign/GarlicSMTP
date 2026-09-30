@@ -24,6 +24,9 @@ from garlicsmtp.storage.entry import (
     MessageEntry,
     VerificationStatus,
 )
+from garlicsmtp.storage.attachment_store import (
+    AttachmentStore,
+)
 
 
 class MessageStore:
@@ -32,6 +35,7 @@ class MessageStore:
         self,
         backend: MessageStoreBackend | None = None,
         event_sink: StoreEventSink | None = None,
+        attachment_store: AttachmentStore | None = None,
     ):
         self.backend = (
             backend
@@ -42,6 +46,8 @@ class MessageStore:
             event_sink
             or NullStoreEventSink()
         )
+
+        self.attachment_store = attachment_store
 
     def save(
         self,
@@ -87,9 +93,28 @@ class MessageStore:
         self,
         mailbox: str,
     ) -> bool:
-        return self.backend.delete_mailbox(
+        message_ids = [
+            entry.id
+            for entry in self.backend.list_entries(
+                mailbox
+            )
+        ]
+
+        deleted = self.backend.delete_mailbox(
             mailbox
         )
+
+        if (
+            deleted
+            and self.attachment_store
+            is not None
+        ):
+            for message_id in message_ids:
+                self.attachment_store.delete_for_message(
+                    message_id
+                )
+
+        return deleted
 
     def rename_mailbox(
         self,
@@ -296,7 +321,18 @@ class MessageStore:
         mailbox: str,
         message_id: str,
     ) -> bool:
-        return self.backend.delete_entry(
+        deleted = self.backend.delete_entry(
             mailbox,
             message_id,
         )
+
+        if (
+            deleted
+            and self.attachment_store
+            is not None
+        ):
+            self.attachment_store.delete_for_message(
+                message_id
+            )
+
+        return deleted

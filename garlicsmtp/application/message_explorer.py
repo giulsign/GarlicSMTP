@@ -303,3 +303,45 @@ class MessageExplorerService:
             )
 
         return normalized
+
+    def list_attachments(
+        self,
+        message_id: str,
+    ):
+        normalized_message_id = (
+            self._validate_message_id(
+                message_id
+            )
+        )
+
+        attachment_store = (
+            self.store.attachment_store
+        )
+
+        if attachment_store is None:
+            return []
+
+        return attachment_store.list_for_message(
+            normalized_message_id
+        )
+
+    def attachment_directory(
+        self,
+        message_id: str,
+    ):
+        normalized_message_id = (
+            self._validate_message_id(
+                message_id
+            )
+        )
+
+        attachment_store = (
+            self.store.attachment_store
+        )
+
+        if attachment_store is None:
+            return None
+
+        return attachment_store.directory_for_message(
+            normalized_message_id
+        )
