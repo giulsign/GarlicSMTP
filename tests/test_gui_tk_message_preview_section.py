@@ -22,6 +22,12 @@ from garlicsmtp.storage.entry import (
     MessageEntry,
 )
 
+def attachment_directory_factory(
+    message_id,
+):
+    return (
+        f"/materialized/{message_id}"
+    )
 
 class FakeFolderOpener:
 
@@ -125,6 +131,18 @@ class MessageExplorer:
             f"/attachments/{message_id}"
         )
 
+    def materialize_attachments(
+        self,
+        message_id,
+        destination,
+    ):
+        return (
+            destination
+            / message_id
+        )
+
+
+
 def test_message_preview_section_starts_empty():
     root = tk.Tk()
     root.withdraw()
@@ -140,6 +158,9 @@ def test_message_preview_section_starts_empty():
             root,
             view_model=view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -189,6 +210,9 @@ def test_message_preview_section_has_complete_structure():
                 )
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert hasattr(
@@ -247,6 +271,9 @@ def test_message_preview_section_displays_message():
             root,
             view_model=view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -321,6 +348,9 @@ def test_message_preview_section_clears_missing_message():
             root,
             view_model=view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -471,6 +501,9 @@ def test_message_preview_section_displays_safe_html_fallback():
             root,
             view_model=view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -505,6 +538,9 @@ def test_message_preview_section_separates_header_and_body():
             root,
             view_model=view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -558,6 +594,9 @@ def test_message_preview_section_uses_bold_header_labels():
                 )
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            )
         )
 
         labels = [
@@ -597,6 +636,9 @@ def test_message_preview_body_uses_input_palette():
                 )
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            )
         )
 
         assert (
@@ -637,6 +679,9 @@ def test_message_preview_placeholder_is_visible_when_no_message_is_selected():
                 )
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            )
         )
 
         section.pack(
@@ -674,6 +719,9 @@ def test_message_preview_body_stays_visible_without_selected_message():
                 )
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            )
         )
 
         section.pack(
@@ -712,6 +760,9 @@ def test_message_preview_section_displays_attachment_filename():
             root,
             view_model=view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            )
         )
 
         assert (
@@ -725,7 +776,9 @@ def test_message_preview_section_displays_attachment_filename():
         root.destroy()
 
 
-def test_message_preview_section_opens_attachment_folder():
+def test_message_preview_section_materializes_before_opening_attachment_folder(
+    tmp_path,
+):
     root = tk.Tk()
     root.withdraw()
 
@@ -758,16 +811,26 @@ def test_message_preview_section_opens_attachment_folder():
             RecordingFolderOpener()
         )
 
+        destination = (
+            tmp_path
+            / "materialized"
+        )
+
         section = MessagePreviewSection(
             root,
             view_model=view_model,
             folder_opener=folder_opener,
+            attachment_directory_factory=(
+                lambda message_id: (
+                    destination
+                )
+            ),
         )
 
         section.open_attachments_button.invoke()
 
         assert folder_opener.calls == [
-            "/attachments/message-1",
+            destination / "message-1",
         ]
 
     finally:

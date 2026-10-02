@@ -146,3 +146,12 @@ class ApplicationPaths:
     @property
     def attachments_dir(self) -> Path:
         return self.data_dir / "attachments"
+
+    @property
+    def attachment_limit_file(
+        self,
+    ) -> Path:
+        return (
+            self.config_dir
+            / "attachment-limit.json"
+        )

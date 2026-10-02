@@ -181,3 +181,104 @@ def test_attachment_store_returns_message_directory(
     )
 
     assert not directory.exists()
+
+
+def test_attachment_store_materializes_attachment_with_original_filename(
+    tmp_path,
+):
+    store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store.save(
+        message_id="message-123",
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\n",
+    )
+
+    destination = (
+        tmp_path
+        / "materialized"
+    )
+
+    directory = store.materialize_for_message(
+        "message-123",
+        destination,
+    )
+
+    assert directory == destination
+    assert (
+        destination / "document.pdf"
+    ).read_bytes() == b"%PDF-1.4\n"
+
+    persistent_names = {
+        path.name
+        for path in (
+            tmp_path
+            / "attachments"
+            / "message-123"
+        ).iterdir()
+    }
+
+    assert "document.pdf" not in persistent_names
+
+
+def test_attachment_store_rejects_unsafe_filename_when_materializing(
+    tmp_path,
+):
+    store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store.save(
+        message_id="message-123",
+        filename="../secret.txt",
+        declared_mime="text/plain",
+        content=b"secret",
+    )
+
+    destination = (
+        tmp_path
+        / "materialized"
+    )
+
+    with pytest.raises(ValueError):
+        store.materialize_for_message(
+            "message-123",
+            destination,
+        )
+
+    assert not (
+        destination / "secret.txt"
+    ).exists()
+
+
+def test_attachment_store_rejects_duplicate_filenames_when_materializing(
+    tmp_path,
+):
+    store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    for content in (
+        b"first",
+        b"second",
+    ):
+        store.save(
+            message_id="message-123",
+            filename="document.txt",
+            declared_mime="text/plain",
+            content=content,
+        )
+
+    destination = (
+        tmp_path
+        / "materialized"
+    )
+
+    with pytest.raises(ValueError):
+        store.materialize_for_message(
+            "message-123",
+            destination,
+        )

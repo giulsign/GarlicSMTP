@@ -36,6 +36,7 @@ class MessageSentPreviewSection(DashboardCard):
         *,
         view_model: MessagePreviewViewModel,
         folder_opener,
+        attachment_directory_factory,
     ) -> None:
         super().__init__(
             master,
@@ -45,6 +46,9 @@ class MessageSentPreviewSection(DashboardCard):
         self.view_model = view_model
 
         self.folder_opener = folder_opener
+        self.attachment_directory_factory = (
+            attachment_directory_factory
+        )
 
         self.placeholder_value = ttk.Label(
             self.content,
@@ -332,8 +336,24 @@ class MessageSentPreviewSection(DashboardCard):
     def _open_attachments_folder(
         self,
     ) -> None:
+        message_id = (
+            self.view_model.message_id
+        )
+
+        if message_id is None:
+            return
+
+        destination = (
+            self.attachment_directory_factory(
+                message_id
+            )
+        )
+
         directory = (
-            self.view_model.attachment_directory
+            self.view_model
+            .materialize_attachments(
+                destination
+            )
         )
 
         if directory is None:

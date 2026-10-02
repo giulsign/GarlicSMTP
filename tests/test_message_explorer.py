@@ -491,3 +491,48 @@ def test_message_explorer_returns_attachment_directory(
     )
 
     assert not directory.exists()
+
+
+def test_message_explorer_materializes_attachments_for_user(
+    tmp_path,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store
+    )
+
+    entry = store.save_entry(
+        "bob@test.onion",
+        make_message(),
+    )
+
+    attachment_store.save(
+        message_id=entry.id,
+        filename="note.txt",
+        declared_mime="text/plain",
+        content=b"Hello attachment",
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    destination = (
+        tmp_path
+        / "materialized"
+    )
+
+    directory = (
+        explorer.materialize_attachments(
+            entry.id,
+            destination,
+        )
+    )
+
+    assert directory == destination
+    assert (
+        destination / "note.txt"
+    ).read_bytes() == b"Hello attachment"

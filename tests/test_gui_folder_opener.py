@@ -70,6 +70,7 @@ def test_open_directory_uses_xdg_open_on_linux(
         system_run=lambda command: (
             calls.append(command)
         ),
+        is_wsl=False,
     )
 
     assert calls == [
@@ -134,6 +135,7 @@ def test_open_directory_uses_current_platform_by_default(
         system_run=lambda command: calls.append(
             command
         ),
+        is_wsl=False,
     )
 
     assert calls == [
@@ -142,3 +144,61 @@ def test_open_directory_uses_current_platform_by_default(
             "/attachments/message-1",
         ],
     ]
+
+
+def test_open_directory_uses_explorer_on_wsl(
+    tmp_path,
+):
+    calls = []
+
+    def run(command, **kwargs):
+        calls.append(command)
+
+        if command == [
+            "wslpath",
+            "-w",
+            str(tmp_path),
+        ]:
+            class Result:
+                stdout = (
+                    "C:\\attachments\\message-1\n"
+                )
+
+            return Result()
+
+    open_directory(
+        tmp_path,
+        platform="linux",
+        system_run=run,
+        is_wsl=True,
+    )
+
+    assert calls == [
+        [
+            "wslpath",
+            "-w",
+            str(tmp_path),
+        ],
+        [
+            "explorer.exe",
+            "C:\\attachments\\message-1",
+        ],
+    ]
+
+
+def test_running_on_wsl_detects_wsl_distro_name():
+    from garlicsmtp.gui.folder_opener import running_on_wsl
+
+    assert running_on_wsl(
+        environ={
+            "WSL_DISTRO_NAME": "Ubuntu",
+        }
+    ) is True
+
+
+def test_running_on_wsl_returns_false_without_wsl_environment():
+    from garlicsmtp.gui.folder_opener import running_on_wsl
+
+    assert running_on_wsl(
+        environ={}
+    ) is False

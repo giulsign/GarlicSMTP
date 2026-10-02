@@ -56,3 +56,15 @@ def test_attachment_limit_rejects_invalid_sizes(
         validate_attachment_sizes(
             sizes
         )
+
+
+def test_attachment_limit_uses_explicit_limit():
+    with pytest.raises(
+        AttachmentLimitExceeded
+    ):
+        validate_attachment_sizes(
+            [
+                600_000,
+            ],
+            limit_bytes=500_000,
+        )

@@ -11,6 +11,7 @@ from garlicsmtp.core.pipeline.stage import (
     PipelineStage,
 )
 from garlicsmtp.application.attachment_limit import (
+    ATTACHMENT_LIMIT_BYTES,
     AttachmentLimitExceeded,
     validate_attachment_sizes,
 )
@@ -19,6 +20,14 @@ from garlicsmtp.application.attachment_limit import (
 class AttachmentPolicyStage(
     PipelineStage
 ):
+
+    def __init__(
+        self,
+        *,
+        limit_bytes=ATTACHMENT_LIMIT_BYTES,
+    ):
+        self.limit_bytes = limit_bytes
+
 
     def process(
         self,
@@ -34,20 +43,17 @@ class AttachmentPolicyStage(
                     len(attachment.content)
                     for attachment
                     in attachments
-                ]
+                ],
+                limit_bytes=self.limit_bytes,
             )
 
             for attachment in attachments:
                 validate_attachment_type(
-                    filename=(
-                        attachment.filename
-                    ),
+                    filename=attachment.filename,
                     declared_mime=(
                         attachment.declared_mime
                     ),
-                    content=(
-                        attachment.content
-                    ),
+                    content=attachment.content,
                 )
 
         except (

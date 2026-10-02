@@ -135,12 +135,14 @@ def run_gui(
         "980x720"
     )
 
+    application_paths = (
+        paths
+        if paths is not None
+        else ApplicationPaths.for_user()
+    )
+
     view_model = build_view_model(
-        paths=(
-            paths   
-            if paths is not None
-            else ApplicationPaths.for_user()
-        ),
+        paths=application_paths,
     )
 
     folder_opener = FolderOpener(
@@ -151,6 +153,13 @@ def run_gui(
         root,
         view_model,
         folder_opener=folder_opener,
+        attachment_directory_factory=(
+            lambda message_id: (
+                application_paths.cache_dir
+                / "attachments"
+                / message_id
+            )
+        ),
     )
 
     window.pack(

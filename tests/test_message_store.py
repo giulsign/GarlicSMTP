@@ -410,3 +410,141 @@ def test_message_store_delete_mailbox_preserves_other_attachments(
         / "attachments"
         / preserved_entry.id
     ).exists()
+
+
+def test_message_store_copies_attachments_with_message(
+    tmp_path,
+    message,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    source = store.save_entry(
+        "source@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "destination@test.onion"
+    )
+
+    attachment_store.save(
+        message_id=source.id,
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\nattachment",
+    )
+
+    copied = store.copy_entry(
+        "source@test.onion",
+        source.id,
+        "destination@test.onion",
+    )
+
+    assert copied is not None
+    assert copied.id != source.id
+
+    source_attachments = (
+        attachment_store.list_for_message(
+            source.id
+        )
+    )
+
+    copied_attachments = (
+        attachment_store.list_for_message(
+            copied.id
+        )
+    )
+
+    assert len(source_attachments) == 1
+    assert len(copied_attachments) == 1
+
+    assert copied_attachments[0].filename == (
+        "document.pdf"
+    )
+    assert (
+        copied_attachments[0].declared_mime
+        == "application/pdf"
+    )
+    assert copied_attachments[0].content == (
+        b"%PDF-1.4\nattachment"
+    )
+
+
+def test_message_store_copy_rolls_back_when_attachment_copy_fails(
+    tmp_path,
+    message,
+    monkeypatch,
+):
+    attachment_store = AttachmentStore(
+        tmp_path / "attachments"
+    )
+
+    store = MessageStore(
+        attachment_store=attachment_store,
+    )
+
+    source = store.save_entry(
+        "source@test.onion",
+        message,
+    )
+
+    store.create_mailbox(
+        "destination@test.onion"
+    )
+
+    attachment_store.save(
+        message_id=source.id,
+        filename="document.pdf",
+        declared_mime="application/pdf",
+        content=b"%PDF-1.4\nattachment",
+    )
+
+    original_save = attachment_store.save
+
+    def failing_save(**kwargs):
+        if kwargs["message_id"] != source.id:
+            raise OSError("attachment copy failed")
+
+        return original_save(**kwargs)
+
+    monkeypatch.setattr(
+        attachment_store,
+        "save",
+        failing_save,
+    )
+
+    try:
+        store.copy_entry(
+            "source@test.onion",
+            source.id,
+            "destination@test.onion",
+        )
+    except OSError as exc:
+        assert str(exc) == (
+            "attachment copy failed"
+        )
+    else:
+        raise AssertionError(
+            "Expected attachment copy failure"
+        )
+
+    assert store.list_entries(
+        "destination@test.onion"
+    ) == []
+
+    source_attachments = (
+        attachment_store.list_for_message(
+            source.id
+        )
+    )
+
+    assert len(source_attachments) == 1
+    assert source_attachments[0].filename == (
+        "document.pdf"
+    )

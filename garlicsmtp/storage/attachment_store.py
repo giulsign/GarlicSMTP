@@ -205,4 +205,56 @@ class AttachmentStore:
             self.path
             / normalized_message_id
         )
+
+    def materialize_for_message(
+        self,
+        message_id: str,
+        destination: Path,
+    ) -> Path:
+        attachments = self.list_for_message(
+            message_id
+        )
+
+        filenames = set()
+
+        for attachment in attachments:
+            filename = attachment.filename
+
+            if (
+                not isinstance(filename, str)
+                or not filename
+                or Path(filename).name != filename
+                or "/" in filename
+                or "\\" in filename
+                or Path(filename).is_absolute()
+                or filename in {
+                    ".",
+                    "..",
+                }
+            ):
+                raise ValueError(
+                    "attachment filename is not safe"
+                )
+
+            if filename in filenames:
+                raise ValueError(
+                    "duplicate attachment filename"
+                )
+
+            filenames.add(filename)
+
+        destination.mkdir(
+            parents=True,
+            exist_ok=True,
+        )
+
+        for attachment in attachments:
+            (
+                destination
+                / attachment.filename
+            ).write_bytes(
+                attachment.content
+            )
+
+        return destination
         

@@ -9,18 +9,53 @@ import subprocess
 import os
 import sys
 
+
+def running_on_wsl(
+    *,
+    environ=os.environ,
+) -> bool:
+    return bool(
+        environ.get("WSL_DISTRO_NAME")
+        or environ.get("WSL_INTEROP")
+    )
+
 def open_directory(
     directory: Path,
     *,
     platform: str | None = None,
     system_run=subprocess.run,
     startfile=None,
+    is_wsl: bool | None = None,
 ) -> None:
     platform = (
         sys.platform
         if platform is None
         else platform
     )
+
+    if is_wsl is None:
+        is_wsl = running_on_wsl()
+
+    if platform == "linux" and is_wsl:
+        result = system_run(
+            [
+                "wslpath",
+                "-w",
+                str(directory),
+            ],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        windows_path = result.stdout.strip()
+
+        system_run(
+            [
+                "explorer.exe",
+                windows_path,
+            ]
+        )
+        return
 
     if platform == "linux":
         system_run(
@@ -62,4 +97,13 @@ class FolderOpener:
 
         self.open_directory(
             directory
+        )
+
+    def running_on_wsl(
+        *,
+        environ=os.environ,
+    ) -> bool:
+        return bool(
+            environ.get("WSL_DISTRO_NAME")
+            or environ.get("WSL_INTEROP")
         )

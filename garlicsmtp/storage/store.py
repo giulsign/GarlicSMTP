@@ -310,6 +310,31 @@ class MessageStore:
         if copied is None:
             return None
 
+        try:
+            if self.attachment_store is not None:
+                attachments = (
+                    self.attachment_store.list_for_message(
+                        message_id
+                    )
+                )
+
+                for attachment in attachments:
+                    self.attachment_store.save(
+                        message_id=copied.id,
+                        filename=attachment.filename,
+                        declared_mime=(
+                            attachment.declared_mime
+                        ),
+                        content=attachment.content,
+                    )
+
+        except Exception:
+            self.delete_entry(
+                destination_mailbox,
+                copied.id,
+            )
+            raise
+
         self.event_sink.message_added(
             destination_mailbox
         )

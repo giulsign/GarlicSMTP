@@ -488,3 +488,19 @@ class MessagePreviewViewModel:
         return self.explorer.attachment_directory(
             self._message_id
         )
+
+
+    def materialize_attachments(
+        self,
+        destination,
+    ):
+        if self._message_id is None:
+            return None
+
+        return (
+            self.explorer
+            .materialize_attachments(
+                self._message_id,
+                destination,
+            )
+        )

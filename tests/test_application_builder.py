@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+
 from garlicsmtp.application import (
     ApplicationBuilder,
 )
@@ -90,6 +92,9 @@ from garlicsmtp.security.auth.persistent_imap_authenticator import (
 import garlicsmtp.application.builder as builder_module
 from garlicsmtp.smtp.mime import (
     MimeAttachment,
+)
+from garlicsmtp.application.attachment_limit_admin import (
+    AttachmentLimitAdminStore,
 )
 
 
@@ -1908,3 +1913,130 @@ def test_application_builder_wires_attachment_policy_before_delivery(
 
     finally:
         context.queue.backend.close()
+
+
+def test_application_builder_uses_admin_attachment_limit(
+    tmp_path,
+    message,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    paths.create_directories()
+
+    admin_store = AttachmentLimitAdminStore(
+        path=paths.attachment_limit_file
+    )
+
+    admin_store.create(
+        password="secret-password"
+    )
+
+    admin_store.change_limit(
+        password="secret-password",
+        limit_bytes=500_000,
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    try:
+        result = context.pipeline.execute(
+            PipelineContext(
+                message=message,
+                attachments=[
+                    MimeAttachment(
+                        filename="document.pdf",
+                        declared_mime="application/pdf",
+                        content=(
+                            b"%PDF-"
+                            + b"x" * 599_995
+                        ),
+                    ),
+                ],
+            )
+        )
+
+        assert result.accepted is False
+        assert result.reject_reason == (
+            "Attachment rejected"
+        )
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+    context.queue.backend.close()
+    context.store.backend.close()
+
+
+def test_application_builder_uses_default_attachment_limit_when_admin_file_missing(
+    tmp_path,
+    message,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=ApplicationSettings(),
+    ).build()
+
+    try:
+        result = context.pipeline.execute(
+            PipelineContext(
+                message=message,
+                attachments=[
+                    MimeAttachment(
+                        filename="document.pdf",
+                        declared_mime="application/pdf",
+                        content=(
+                            b"%PDF-"
+                            + b"x" * 599_995
+                        ),
+                    ),
+                ],
+            )
+        )
+
+        assert result.accepted is True
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_rejects_invalid_admin_attachment_limit(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    paths.create_directories()
+
+    paths.attachment_limit_file.write_text(
+        """
+{
+    "limit_bytes": 0,
+    "password_hash": "unused"
+}
+""".strip(),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match=(
+            "limit_bytes must be "
+            "a positive integer"
+        ),
+    ):
+        ApplicationBuilder(
+            paths=paths,
+            settings=ApplicationSettings(),
+        ).build()

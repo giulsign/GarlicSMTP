@@ -798,6 +798,7 @@ def test_run_gui_uses_user_application_paths(
             view_model,
             *,
             folder_opener,
+            attachment_directory_factory,
         ):
             received["window"] = self
             received["master"] = master
@@ -805,6 +806,9 @@ def test_run_gui_uses_user_application_paths(
                 view_model
             )
             received["folder_opener"] = folder_opener
+            received[
+                "attachment_directory_factory"
+            ] = attachment_directory_factory
 
         def pack(
             self,
@@ -855,6 +859,22 @@ def test_run_gui_uses_user_application_paths(
     )
 
     assert received["folder_opener"] is not None
+    attachment_directory_factory = (
+        received[
+            "attachment_directory_factory"
+        ]
+    )
+
+    assert (
+        attachment_directory_factory(
+            "message-1"
+        )
+        == (
+            expected_paths.cache_dir
+            / "attachments"
+            / "message-1"
+        )
+    )
 
     assert result == 0
     assert received["paths"] == expected_paths
@@ -925,6 +945,7 @@ def test_run_gui_uses_provided_application_paths(
             view_model,
             *,
             folder_opener,
+            attachment_directory_factory,
         ):
             pass
 
@@ -1077,6 +1098,7 @@ def test_run_gui_closes_window_before_destroying_root(
             view_model,
             *,
             folder_opener,
+            attachment_directory_factory,
         ):
             pass
 

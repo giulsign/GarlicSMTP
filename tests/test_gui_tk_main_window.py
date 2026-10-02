@@ -7,6 +7,7 @@ import tkinter as tk
 from tkinter import ttk
 from datetime import UTC, datetime
 import threading
+from pathlib import Path
 
 from garlicsmtp.application.view_model import (
     ApplicationViewModel,
@@ -143,6 +144,16 @@ class FakeMessageExplorer:
     ):
         return f"/attachments/{message_id}"
 
+    def materialize_attachments(
+        self,
+        message_id,
+        destination,
+    ):
+        return (
+            destination
+            / message_id
+        )
+
 class FakeFolderOpener:
 
     def __init__(self):
@@ -156,6 +167,13 @@ class FakeFolderOpener:
             directory
         )
 
+def attachment_directory_factory(
+    message_id,
+):
+    return (
+        Path("/materialized")
+        / message_id
+    )
 
 def test_tk_main_window_builds_dashboard_sections():
     root = tk.Tk()
@@ -168,7 +186,10 @@ def test_tk_main_window_builds_dashboard_sections():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
-        )
+                attachment_directory_factory=(
+                    attachment_directory_factory
+                ),
+            )
 
         assert (
             window.application_section
@@ -228,7 +249,8 @@ def test_tk_main_window_binds_received_and_sent_sections():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         assert (
             window.received_message_list_section.view_model
@@ -264,6 +286,9 @@ def test_tk_main_window_selects_mailbox_for_received_and_sent():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -297,6 +322,9 @@ def test_tk_main_window_has_no_compose_without_view_model():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),  
         )
 
         assert (
@@ -340,6 +368,9 @@ def test_tk_main_window_builds_compose_section():
                 compose=compose,
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -374,6 +405,9 @@ def test_tk_main_window_loads_selected_mailbox_messages():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
         )
 
         assert (
@@ -412,7 +446,9 @@ def test_tk_main_window_loads_selected_mailbox_messages():
         root.destroy()
 
 
-def test_tk_main_window_displays_selected_message_preview():
+def test_tk_main_window_displays_selected_message_preview(
+        tmp_path,
+    ):
     root = tk.Tk()
     root.withdraw()
 
@@ -437,8 +473,14 @@ def test_tk_main_window_displays_selected_message_preview():
 
         window = MainWindow(
             root,
-            view_model, 
+            view_model,
             folder_opener=folder_opener,
+            attachment_directory_factory=(
+                lambda message_id: (
+                    tmp_path
+                    / "materialized"
+                )
+            ),
         )
 
         assert (
@@ -497,7 +539,11 @@ def test_tk_main_window_displays_selected_message_preview():
             .open_attachments_button.invoke()
 
         assert folder_opener.opened == [
-            "/attachments/message-1",
+            (
+                tmp_path
+                / "materialized"
+                / "message-1"
+            ),
         ]
     finally:
         root.destroy()
@@ -528,7 +574,8 @@ def test_tk_main_window_clears_preview_for_deleted_message():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         assert (
             window.mailbox_section
@@ -593,7 +640,8 @@ def test_tk_main_window_clears_sent_preview_for_deleted_message():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         assert (
             window.mailbox_section.select_mailbox(
@@ -656,7 +704,8 @@ def test_tk_main_window_keeps_preview_for_other_deleted_message():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         assert (
             window.mailbox_section
@@ -708,7 +757,8 @@ def test_tk_main_window_refreshes_all_sections():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         refreshed = []
 
@@ -773,7 +823,8 @@ def test_tk_main_window_refreshes_compose_when_present():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         refreshed = []
 
@@ -804,7 +855,8 @@ def test_tk_main_window_has_refresh_button():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
-        )
+            attachment_directory_factory=(attachment_directory_factory),
+            )
 
         assert (
             window.refresh_button.cget("text")
@@ -826,6 +878,7 @@ def test_tk_main_window_refresh_button_refreshes_view():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         refreshed = []
@@ -853,6 +906,7 @@ def test_tk_main_window_has_start_button():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),        
         )
 
         assert (
@@ -877,6 +931,7 @@ def test_tk_main_window_start_button_starts_and_refreshes():
                 controller
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         started = []
@@ -912,6 +967,7 @@ def test_tk_main_window_action_buttons_follow_stopped_state():
                 )
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert (
@@ -949,6 +1005,7 @@ def test_tk_main_window_stop_and_restart_buttons_execute_actions():
                 controller
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert (
@@ -1013,6 +1070,7 @@ def test_tk_main_window_action_error_is_generic_and_refreshes(
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),    
         )
 
         dialogs = []
@@ -1081,6 +1139,7 @@ def test_tk_main_window_refresh_button_refreshes_view_model():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         actions = []
@@ -1114,6 +1173,7 @@ def test_tk_main_window_places_top_dashboard_in_three_columns():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert (
@@ -1218,6 +1278,7 @@ def test_tk_main_window_places_compose_and_messages_layout():
                 compose=compose,
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         compose_info = (
@@ -1298,6 +1359,7 @@ def test_tk_main_window_moves_messages_up_without_compose():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert window.compose_section is None
@@ -1325,6 +1387,7 @@ def test_tk_main_window_dashboard_columns_and_messages_row_expand():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         for column in range(3):
@@ -1381,6 +1444,7 @@ def test_tk_main_window_dashboard_sections_belong_to_content_frame():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert isinstance(
@@ -1428,6 +1492,7 @@ def test_tk_main_window_builds_header_and_action_bar():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert (
@@ -1505,6 +1570,7 @@ def test_tk_main_window_queues_view_model_event_from_worker_thread():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         refresh_calls = []
@@ -1546,6 +1612,7 @@ def test_tk_main_window_schedules_refresh_queue_poll():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert (
@@ -1584,6 +1651,7 @@ def test_tk_main_window_close_stops_polling_and_running_application():
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         listener = window._queue_refresh
@@ -1626,6 +1694,7 @@ def test_tk_main_window_content_has_vertical_scrollbar():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert window.content_canvas is not None
@@ -1664,6 +1733,7 @@ def test_tk_main_window_messages_are_visible_at_bottom_of_scroll():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
         window.pack(
             fill="both",
@@ -1709,6 +1779,7 @@ def test_tk_main_window_messages_container_uses_grid_layout():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
 
         assert (
@@ -1736,6 +1807,7 @@ def test_tk_main_window_mouse_wheel_scrolls_content_on_linux():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
         window.pack(
             fill="both",
@@ -1771,6 +1843,7 @@ def test_tk_main_window_mouse_wheel_scrolls_over_content_widget():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
         window.pack(
             fill="both",
@@ -1808,6 +1881,7 @@ def test_tk_main_window_keeps_message_preview_visible_before_selection():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(attachment_directory_factory),
         )
         window.pack(
             fill="both",
@@ -1849,11 +1923,12 @@ def test_tk_main_window_keeps_message_preview_visible_before_selection():
         root.destroy()
 
 
-def test_tk_main_window_displays_selected_sent_message_preview():
+def test_tk_main_window_displays_selected_sent_message_preview(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
     try:
+        folder_opener = FakeFolderOpener()
         received_explorer = FakeMessageExplorer()
         sent_explorer = FakeMessageExplorer()
 
@@ -1882,7 +1957,13 @@ def test_tk_main_window_displays_selected_sent_message_preview():
         window = MainWindow(
             root,
             view_model,
-            folder_opener=FakeFolderOpener(),
+            folder_opener=folder_opener,
+            attachment_directory_factory=(
+                lambda message_id: (
+                    tmp_path
+                    / "materialized"
+                )
+            ),
         )
 
         assert (
@@ -1932,6 +2013,17 @@ def test_tk_main_window_displays_selected_sent_message_preview():
             .cget("text")
             == "Open attachments folder"
         )
+
+        window.sent_message_preview_section \
+            .open_attachments_button.invoke()
+
+        assert folder_opener.opened == [
+            (
+                tmp_path
+                / "materialized"
+                / "message-1"
+            ),
+        ]
 
         assert (
             view_model.received_message_preview.message_id

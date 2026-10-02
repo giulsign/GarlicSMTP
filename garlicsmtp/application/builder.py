@@ -129,6 +129,9 @@ from garlicsmtp.application.attachment_policy_stage import (
 from garlicsmtp.storage.attachment_store import (
     AttachmentStore,
 )
+from garlicsmtp.application.attachment_limit_admin import (
+    AttachmentLimitAdminStore,
+)
 
 
 class ApplicationBuilder:
@@ -169,6 +172,15 @@ class ApplicationBuilder:
         self,
     ) -> ApplicationContext:
         self.paths.create_directories()
+
+        attachment_limit = None
+
+        if self.paths.attachment_limit_file.exists():
+            attachment_limit = (
+                AttachmentLimitAdminStore(
+                    path=self.paths.attachment_limit_file
+                ).get_limit()
+            )
 
         settings = (
             self.settings
@@ -212,7 +224,8 @@ class ApplicationBuilder:
             encryption_key_store=(
                 encryption_key_store
             ),
-            transport=transport,    
+            transport=transport,
+            attachment_limit=attachment_limit,
         )
 
         signing_identity = SigningIdentity(
@@ -429,6 +442,7 @@ class ApplicationBuilder:
         local_domains: set[str],
         encryption_key_store,
         transport: TransportManager,
+        attachment_limit: int | None = None,
     ) -> Pipeline:
         queue_stage = QueueStage(
             queue
@@ -440,8 +454,19 @@ class ApplicationBuilder:
             LoggerStage()
         )
 
+        if attachment_limit is None:
+            attachment_policy_stage = (
+                AttachmentPolicyStage()
+            )
+        else:
+            attachment_policy_stage = (
+                AttachmentPolicyStage(
+                    limit_bytes=attachment_limit
+                )
+            )
+
         pipeline.add(
-            AttachmentPolicyStage()
+            attachment_policy_stage
         )
 
         default_transport = (

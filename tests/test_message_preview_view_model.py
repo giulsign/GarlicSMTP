@@ -125,6 +125,16 @@ class FakeExplorer:
     ):
         return f"/attachments/{message_id}"
 
+    def materialize_attachments(
+        self,
+        message_id,
+        destination,
+    ):
+        return (
+            destination,
+            message_id,
+        )
+
 
 def test_message_preview_starts_empty():
     view_model = MessagePreviewViewModel(
@@ -583,4 +593,35 @@ def test_message_preview_exposes_attachment_directory():
     assert (
         view_model.attachment_directory
         == "/attachments/message-1"
+    )
+
+
+def test_message_preview_materializes_selected_attachments(
+    tmp_path,
+):
+    explorer = FakeExplorer()
+
+    view_model = MessagePreviewViewModel(
+        explorer
+    )
+
+    view_model.select_message(
+        mailbox="bob@test.onion",
+        message_id="message-1",
+    )
+
+    destination = (
+        tmp_path
+        / "materialized"
+    )
+
+    result = (
+        view_model.materialize_attachments(
+            destination
+        )
+    )
+
+    assert result == (
+        destination,
+        "message-1",
     )

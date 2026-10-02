@@ -14,6 +14,8 @@ class AttachmentLimitExceeded(
 
 def validate_attachment_sizes(
     sizes,
+    *,
+    limit_bytes=ATTACHMENT_LIMIT_BYTES,
 ) -> None:
     total = 0
 
@@ -33,7 +35,7 @@ def validate_attachment_sizes(
 
         total += size
 
-    if total > ATTACHMENT_LIMIT_BYTES:
+    if total > limit_bytes:
         raise AttachmentLimitExceeded(
-            "attachment total exceeds 1 MiB"
+            "attachment total exceeds limit"
         )

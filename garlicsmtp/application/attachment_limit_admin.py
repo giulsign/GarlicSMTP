@@ -102,3 +102,23 @@ class AttachmentLimitAdminStore:
             json.dumps(data),
             encoding="utf-8",
         )
+
+    def get_limit(self) -> int:
+        data = json.loads(
+            self.path.read_text(
+                encoding="utf-8"
+            )
+        )
+
+        limit_bytes = data["limit_bytes"]
+
+        if (
+            isinstance(limit_bytes, bool)
+            or not isinstance(limit_bytes, int)
+            or limit_bytes <= 0
+        ):
+            raise ValueError(
+                "limit_bytes must be a positive integer"
+            )
+
+        return limit_bytes

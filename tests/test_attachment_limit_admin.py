@@ -234,3 +234,60 @@ def test_attachment_limit_admin_store_rejects_invalid_limits(
     )
 
     assert data["limit_bytes"] == 1_048_576
+
+
+def test_attachment_limit_admin_store_reads_current_limit(
+    tmp_path,
+):
+    path = tmp_path / "attachment-limit.json"
+
+    store = AttachmentLimitAdminStore(
+        path=path
+    )
+
+    store.create(
+        password="secret-password"
+    )
+
+    store.change_limit(
+        password="secret-password",
+        limit_bytes=2_097_152,
+    )
+
+    assert store.get_limit() == 2_097_152
+
+
+@pytest.mark.parametrize(
+    "invalid_limit",
+    [
+        0,
+        -1,
+        True,
+        False,
+        1.5,
+        "2097152",
+        None,
+    ],
+)
+def test_attachment_limit_admin_store_rejects_invalid_stored_limit(
+    tmp_path,
+    invalid_limit,
+):
+    path = tmp_path / "attachment-limit.json"
+
+    path.write_text(
+        json.dumps(
+            {
+                "limit_bytes": invalid_limit,
+                "password_hash": "unused",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    store = AttachmentLimitAdminStore(
+        path=path
+    )
+
+    with pytest.raises(ValueError):
+        store.get_limit()

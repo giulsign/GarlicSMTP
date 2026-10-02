@@ -56,6 +56,7 @@ class MainWindow(ttk.Frame):
         view_model: ApplicationViewModel,
         *,
         folder_opener,
+        attachment_directory_factory,
     ) -> None:
         super().__init__(
             master,
@@ -64,6 +65,9 @@ class MainWindow(ttk.Frame):
 
         self.view_model = view_model
         self.folder_opener = folder_opener
+        self.attachment_directory_factory = (
+            attachment_directory_factory
+        )
 
         self.view_model = view_model
 
@@ -214,6 +218,9 @@ class MainWindow(ttk.Frame):
                     self.view_model.received_message_preview
                 ),
                 folder_opener=self.folder_opener,
+                attachment_directory_factory=(
+                    self.attachment_directory_factory
+                ),
             )
         )
 
@@ -233,6 +240,9 @@ class MainWindow(ttk.Frame):
                     self.view_model.sent_message_preview
                 ),
                 folder_opener=self.folder_opener,
+                attachment_directory_factory=(
+                    self.attachment_directory_factory
+                ),
             )
         )
 
