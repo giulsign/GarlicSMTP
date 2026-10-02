@@ -44,3 +44,8 @@ class QueueBackend(ABC):
     def update(self, item):
         """Persist changes made to an existing QueueItem."""
         pass
+
+    @abstractmethod
+    def retry_pending(self):
+        """Make suspended queue items immediately eligible for retry."""
+        pass

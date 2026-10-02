@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+import queue
+
 from garlicsmtp.queue.backend import QueueBackend
 from garlicsmtp.queue.manager import QueueManager
 from datetime import UTC, datetime, timedelta
@@ -51,6 +53,12 @@ class SpyBackend(QueueBackend):
         self.calls.append(("update", item))
         return True
 
+    def retry_pending(self):
+        self.calls.append(
+            ("retry_pending",)
+        )
+        return 0
+
 
 def test_queue_manager_delegates_to_backend():
 
@@ -69,6 +77,7 @@ def test_queue_manager_delegates_to_backend():
     queue.size()
     queue.empty()
     queue.update(marker)
+    queue.retry_pending()
 
     assert backend.calls == [
         ("enqueue", marker),
@@ -77,7 +86,8 @@ def test_queue_manager_delegates_to_backend():
         ("nack", marker),
         ("size",),
         ("empty",),
-        ("update", marker)
+        ("update", marker),
+        ("retry_pending",)
     ]
 
 
@@ -133,3 +143,43 @@ def test_memory_queue_ack_removes_ready_item_not_at_head(
     assert backend.peek() is second
     assert backend.ack(second) is True
     assert backend.size() == 1
+
+
+def test_memory_queue_retry_pending_makes_suspended_items_ready(
+    message,
+):
+    backend = MemoryQueueBackend()
+
+    suspended = QueueFactory.create(
+        message
+    )
+    suspended.attempts = 8
+    suspended.last_error = "TemporaryDeliveryError"
+    suspended.next_retry = (
+        datetime.now(UTC)
+        + timedelta(hours=2)
+    )
+
+    ready = QueueFactory.create(
+        message
+    )
+    ready.attempts = 1
+    ready.last_error = None
+    ready.next_retry = None
+
+    backend.enqueue(suspended)
+    backend.enqueue(ready)
+
+    retried = backend.retry_pending()
+
+    assert retried == 1
+
+    item = backend.peek()
+
+    assert item is suspended
+    assert item.next_retry is None
+    assert item.attempts == 8
+    assert (
+        item.last_error
+        == "TemporaryDeliveryError"
+    )

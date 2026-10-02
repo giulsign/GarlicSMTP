@@ -39,3 +39,6 @@ class QueueManager:
     
     def update(self, item):
         return self.backend.update(item)
+
+    def retry_pending(self):
+        return self.backend.retry_pending()

@@ -255,6 +255,29 @@ def test_application_controller_returns_status():
     )
 
 
+def test_application_controller_retries_pending_messages():
+    context = build_context()
+
+    calls = []
+
+    def retry_pending():
+        calls.append("retry_pending")
+        return 3
+
+    context.queue.retry_pending = retry_pending
+
+    controller = ApplicationController(
+        context
+    )
+
+    retried = controller.retry_pending()
+
+    assert retried == 3
+    assert calls == [
+        "retry_pending",
+    ]
+
+
 def test_application_controller_records_start_event():
     context = build_context()
 

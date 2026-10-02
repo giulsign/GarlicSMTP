@@ -102,6 +102,46 @@ class SQLiteQueueBackend(QueueBackend):
 
             return cursor.rowcount == 1
 
+    def retry_pending(self):
+        retried = 0
+
+        with self._lock:
+            rows = self.connection.execute(
+                """
+                SELECT id, payload
+                FROM queue_items
+                ORDER BY rowid ASC
+                """
+            ).fetchall()
+
+            for item_id, payload in rows:
+                item = QueueSerializer.from_json(
+                    payload
+                )
+
+                if item.next_retry is None:
+                    continue
+
+                item.next_retry = None
+
+                self.connection.execute(
+                    """
+                    UPDATE queue_items
+                    SET payload = ?
+                    WHERE id = ?
+                    """,
+                    (
+                        QueueSerializer.to_json(item),
+                        item_id,
+                    ),
+                )
+
+                retried += 1
+
+            self.connection.commit()
+
+        return retried
+
     def dequeue(self):
         with self._lock:
             item = self.peek()

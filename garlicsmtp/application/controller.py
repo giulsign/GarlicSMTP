@@ -98,6 +98,11 @@ class ApplicationController:
             listener
         )
 
+    def retry_pending(
+        self,
+    ) -> int:
+        return self.context.queue.retry_pending()
+
 
     def unsubscribe(
         self,

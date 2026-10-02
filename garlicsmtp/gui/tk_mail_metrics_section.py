@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+from tkinter import ttk
+
 from garlicsmtp.application import (
     ApplicationViewModel,
 )
@@ -48,6 +50,12 @@ class MailMetricsSection(DashboardCard):
             )
         )
 
+        self.retry_pending_button = ttk.Button(
+            self.content,
+            text="Retry pending",
+            command=self._retry_pending,
+        )
+
         self.queue_metric.grid(
             row=0,
             column=0,
@@ -75,6 +83,14 @@ class MailMetricsSection(DashboardCard):
             sticky="nsew",
             padx=(9, 0),
             pady=(7, 0),
+        )
+
+        self.retry_pending_button.grid(
+            row=2,
+            column=0,
+            columnspan=2,
+            sticky="e",
+            pady=(10, 0),
         )
 
         self.content.columnconfigure(
@@ -105,6 +121,11 @@ class MailMetricsSection(DashboardCard):
         return (
             self.imap_connections_metric.value
         )
+
+    def _retry_pending(
+        self,
+    ) -> None:
+        self.view_model.retry_pending()
 
     def refresh_view(
         self,

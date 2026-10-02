@@ -64,3 +64,34 @@ def test_mail_metrics_section_displays_metrics():
 
     finally:
         root.destroy()
+
+
+def test_mail_metrics_section_retries_pending_messages():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        controller = FakeController()
+        calls = []
+
+        def retry_pending():
+            calls.append("retry_pending")
+            return 2
+
+        controller.retry_pending = retry_pending
+
+        section = MailMetricsSection(
+            root,
+            view_model=ApplicationViewModel(
+                controller
+            ),
+        )
+
+        section.retry_pending_button.invoke()
+
+        assert calls == [
+            "retry_pending",
+        ]
+
+    finally:
+        root.destroy()

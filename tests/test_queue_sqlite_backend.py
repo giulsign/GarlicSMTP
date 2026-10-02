@@ -165,3 +165,45 @@ def test_sqlite_queue_peek_skips_not_ready_item(
     assert item.id == second.id
 
 
+def test_sqlite_queue_retry_pending_makes_suspended_items_ready(
+    tmp_path,
+    message,
+):
+    backend = SQLiteQueueBackend(
+        tmp_path / "queue.db"
+    )
+
+    suspended = QueueFactory.create(
+        message
+    )
+    suspended.attempts = 8
+    suspended.last_error = "TemporaryDeliveryError"
+    suspended.next_retry = (
+        datetime.now(UTC)
+        + timedelta(hours=2)
+    )
+
+    ready = QueueFactory.create(
+        message
+    )
+    ready.attempts = 1
+    ready.last_error = None
+    ready.next_retry = None
+
+    backend.enqueue(suspended)
+    backend.enqueue(ready)
+
+    retried = backend.retry_pending()
+
+    assert retried == 1
+
+    item = backend.peek()
+
+    assert item is not None
+    assert item.id == suspended.id
+    assert item.next_retry is None
+    assert item.attempts == 8
+    assert (
+        item.last_error
+        == "TemporaryDeliveryError"
+    )

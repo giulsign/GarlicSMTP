@@ -246,6 +246,11 @@ class ApplicationViewModel:
 
         return self._status
 
+    def retry_pending(
+        self,
+    ) -> int:
+        return self.controller.retry_pending()
+
     @property
     def application_name(
         self,

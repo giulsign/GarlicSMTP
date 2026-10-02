@@ -91,6 +91,7 @@ class FakeApplicationController:
         self.start_calls = 0
         self.stop_calls = 0
         self.restart_calls = 0
+        self.retry_pending_calls = 0
 
     def status(self):
         return self.current_status
@@ -128,6 +129,12 @@ class FakeApplicationController:
         )
 
         return self.current_status
+
+    def retry_pending(self):
+        self.retry_pending_calls += 1
+        return 3
+
+        #return self.current_status
 
 def test_application_view_model_reports_stopped_state():
     controller = FakeApplicationController()
@@ -303,6 +310,21 @@ def test_application_view_model_restarts_application():
 
     assert controller.restart_calls == 1
     assert view_model.is_running is True
+
+
+def test_application_view_model_retries_pending_messages():
+    controller = FakeApplicationController()
+
+    view_model = ApplicationViewModel(
+        controller
+    )
+
+    retried = view_model.retry_pending()
+
+    assert retried == 3
+    assert controller.retry_pending_calls == 1
+
+    
 
 def test_application_view_model_refreshes_status():
     controller = FakeApplicationController()

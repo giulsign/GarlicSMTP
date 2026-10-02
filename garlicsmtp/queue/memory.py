@@ -61,3 +61,15 @@ class MemoryQueueBackend(QueueBackend):
 
     def update(self, item):
         return True
+
+    def retry_pending(self):
+        retried = 0
+
+        for item in self.queue:
+            if item.next_retry is None:
+                continue
+
+            item.next_retry = None
+            retried += 1
+
+        return retried
