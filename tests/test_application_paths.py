@@ -179,6 +179,20 @@ def test_application_paths_derive_imap_credentials_file(
     )
 
 
+def test_application_paths_derive_account_credentials_file(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path,
+    )
+
+    assert (
+        paths.account_credentials_file
+        == paths.state_dir
+        / "account-credentials.json"
+    )
+
+
 def test_application_paths_derives_attachment_limit_file(
     tmp_path,
 ):

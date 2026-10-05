@@ -105,6 +105,15 @@ class ApplicationPaths:
         )
 
     @property
+    def account_credentials_file(
+        self,
+    ) -> Path:
+        return (
+            self.state_dir
+            / "account-credentials.json"
+        )
+
+    @property
     def mailbox_database(self) -> Path:
         return self.data_dir / "mailboxes.db"
 

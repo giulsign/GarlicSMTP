@@ -5,6 +5,7 @@
 
 import sys
 import tkinter as tk
+from tkinter import messagebox
 
 from garlicsmtp.application import (
     ApplicationBuilder,
@@ -48,6 +49,13 @@ from garlicsmtp.storage.attachment_store import (
 from garlicsmtp.gui.folder_opener import (
     FolderOpener,
     open_directory,
+)
+from garlicsmtp.security.auth.account_credentials import (
+    AccountCredentialStore,
+)
+from garlicsmtp.gui.tk_authentication import (
+    prompt_login,
+    prompt_setup,
 )
 
 
@@ -120,10 +128,71 @@ def build_view_model(
     )
 
 
+def authenticate_application(
+    *,
+    paths,
+    prompt,
+    setup_prompt=None,
+    invalid_credentials=None,
+    invalid_setup=None,
+) -> bool:
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    if not paths.account_credentials_file.exists():
+        while True:
+            credentials = setup_prompt()
+
+            if credentials is None:
+                return False
+
+            username, password, password_confirmation = credentials
+
+            if password != password_confirmation:
+                if invalid_setup is not None:
+                    invalid_setup(
+                        "Passwords do not match"
+                    )
+                continue
+
+            try:
+                store.create(
+                    username=username,
+                    password=password,
+                )
+            except ValueError as exc:
+                if invalid_setup is not None:
+                    invalid_setup(
+                        str(exc)
+                    )
+                continue
+
+            return True
+
+    while True:
+        credentials = prompt()
+
+        if credentials is None:
+            return False
+
+        username, password = credentials
+
+        if store.authenticate(
+            username=username,
+            password=password,
+        ):
+            return True
+
+        if invalid_credentials is not None:
+            invalid_credentials()
+
+
 def run_gui(
     argv: list[str] | None = None,
     *,
     paths=None,
+    authenticate=None,
 ) -> int:
     root = tk.Tk()
 
@@ -140,6 +209,31 @@ def run_gui(
         if paths is not None
         else ApplicationPaths.for_user()
     )
+
+    if authenticate is None:
+        authenticated = authenticate_application(
+            paths=application_paths,
+            prompt=lambda: prompt_login(root),
+            setup_prompt=lambda: prompt_setup(root),
+            invalid_credentials=lambda: messagebox.showerror(
+                "GarlicSMTP login",
+                "Invalid username or password",
+                parent=root,
+            ),
+            invalid_setup=lambda message: messagebox.showerror(
+                "GarlicSMTP account setup",
+                message,
+                parent=root,
+            ),
+        )
+    else:
+        authenticated = authenticate(
+            paths=application_paths,
+        )
+
+    if not authenticated:
+        root.destroy()
+        return 1
 
     view_model = build_view_model(
         paths=application_paths,

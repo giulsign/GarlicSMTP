@@ -3,6 +3,15 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+from types import SimpleNamespace
+
+import garlicsmtp.gui.application as gui_application
+
+from tests.support import (
+    make_application_status,
+)
+
 from garlicsmtp.application import (
     MessageListViewModel,
 )
@@ -10,8 +19,23 @@ from garlicsmtp.gui.application import (
     build_view_model,
 )
 from garlicsmtp.configuration import (
-    ApplicationPaths,
-)
+        ApplicationPaths,
+        ApplicationSettings,
+    )
+from garlicsmtp.application import (
+        ApplicationBuilder,
+    )
+import garlicsmtp.gui as gui
+
+from garlicsmtp.gui.tk_main_window import (
+        MainWindow as TkMainWindow,
+    )
+from garlicsmtp.gui.application import (
+        authenticate_application,
+    )
+from garlicsmtp.security.auth.account_credentials import (
+        AccountCredentialStore,
+    )
 
 
 def test_gui_builds_message_list_view_model(
@@ -93,14 +117,6 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.application import (
-        ApplicationBuilder,
-    )
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-        ApplicationSettings,
-    )
-
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
     )
@@ -202,15 +218,6 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
     finally:
         context.queue.backend.close()
         context.store.backend.close()
-
-
-from types import SimpleNamespace
-
-import garlicsmtp.gui.application as gui_application
-
-from tests.support import (
-    make_application_status,
-)
 
 
 class FakePipeline:
@@ -484,13 +491,6 @@ def test_real_gui_composer_delivers_to_local_mailbox(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.application import (
-        ApplicationBuilder,
-    )
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-        ApplicationSettings,
-    )
 
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
@@ -591,13 +591,6 @@ def test_real_gui_composer_separates_received_and_sent_mail(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.application import (
-        ApplicationBuilder,
-    )
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-        ApplicationSettings,
-    )
 
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
@@ -738,9 +731,6 @@ def test_run_gui_uses_user_application_paths(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-    )
 
     expected_paths = ApplicationPaths.for_user(
         home=tmp_path,
@@ -856,6 +846,7 @@ def test_run_gui_uses_user_application_paths(
 
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
+        authenticate=lambda **kwargs: True,
     )
 
     assert received["folder_opener"] is not None
@@ -898,9 +889,6 @@ def test_run_gui_uses_provided_application_paths(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-    )
 
     expected_paths = (
         ApplicationPaths.for_development(
@@ -988,6 +976,7 @@ def test_run_gui_uses_provided_application_paths(
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
         paths=expected_paths,
+        authenticate=lambda **kwargs: True,
     )
 
     assert result == 0
@@ -1134,6 +1123,7 @@ def test_run_gui_closes_window_before_destroying_root(
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
         paths=object(),
+        authenticate=lambda **kwargs: True,
     )
 
     assert result == 0
@@ -1145,11 +1135,6 @@ def test_run_gui_closes_window_before_destroying_root(
 
 
 def test_gui_package_exports_tk_main_window():
-    import garlicsmtp.gui as gui
-
-    from garlicsmtp.gui.tk_main_window import (
-        MainWindow as TkMainWindow,
-    )
 
     assert gui.MainWindow is TkMainWindow
 
@@ -1158,14 +1143,6 @@ def test_real_gui_sent_mail_persists_across_rebuild(
     tmp_path,
     monkeypatch,
 ):
-    from garlicsmtp.application import (
-        ApplicationBuilder,
-    )
-    from garlicsmtp.configuration import (
-        ApplicationPaths,
-        ApplicationSettings,
-    )
-
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
     )
@@ -1274,3 +1251,1095 @@ def test_real_gui_sent_mail_persists_across_rebuild(
         second_context.queue.backend.close()
         second_context.store.backend.close()
         second_sent_store.backend.close()
+
+
+def test_run_gui_authenticates_by_default_before_building_view_model(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def destroy(
+            self,
+        ):
+            pass
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    def default_authenticate(
+        *,
+        paths,
+        prompt,
+        setup_prompt,
+        invalid_credentials,
+        invalid_setup,
+    ):
+        events.append("authenticate")
+        return False
+
+    monkeypatch.setattr(
+        gui_application,
+        "authenticate_application",
+        default_authenticate,
+    )
+
+    def fail_if_built(
+        *,
+        paths=None,
+    ):
+        raise AssertionError(
+            "build_view_model must not run "
+            "before default authentication"
+        )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fail_if_built,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+    assert events == [
+        "authenticate",
+    ]
+
+
+def test_run_gui_does_not_build_view_model_when_authentication_fails(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def destroy(
+            self,
+        ):
+            pass
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    def fail_if_built(
+        *,
+        paths=None,
+    ):
+        raise AssertionError(
+            "build_view_model must not run "
+            "before successful authentication"
+        )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fail_if_built,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=lambda **kwargs: False,
+    )
+
+    assert result == 1
+
+
+def test_run_gui_builds_view_model_after_successful_authentication(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def protocol(
+            self,
+            name,
+            callback,
+        ):
+            pass
+
+        def mainloop(
+            self,
+        ):
+            pass
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+        ):
+            pass
+
+        def pack(
+            self,
+            **kwargs,
+        ):
+            pass
+
+        def close(
+            self,
+        ):
+            pass
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    def authenticate(
+        *,
+        paths,
+    ):
+        events.append("authenticate")
+        return True
+
+    def fake_build_view_model(
+        *,
+        paths,
+    ):
+        events.append("build_view_model")
+        return object()
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fake_build_view_model,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=authenticate,
+    )
+
+    assert result == 0
+    assert events == [
+        "authenticate",
+        "build_view_model",
+    ]
+
+
+def test_authenticate_application_accepts_existing_account(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    AccountCredentialStore(
+        path=paths.account_credentials_file,
+    ).create(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: (
+            "alice",
+            "Garlic1!",
+        ),
+    )
+
+    assert result is True
+
+
+def test_authenticate_application_rejects_invalid_credentials(
+    tmp_path,
+):
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    AccountCredentialStore(
+        path=paths.account_credentials_file,
+    ).create(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "Wrong2!",
+            ),
+            None,
+        ]
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: next(
+            credentials
+        ),
+    )
+
+    assert result is False
+
+
+
+def test_authenticate_application_creates_account_when_missing(
+    tmp_path,
+):
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: (
+            "unused",
+            "Unused1!",
+        ),
+        setup_prompt=lambda: (
+            "alice",
+            "Garlic1!",
+            "Garlic1!",
+        ),
+    )
+
+    assert result is True
+    assert paths.account_credentials_file.exists()
+
+    assert AccountCredentialStore(
+        path=paths.account_credentials_file,
+    ).authenticate(
+        username="alice",
+        password="Garlic1!",
+    ) is True
+
+
+def test_authenticate_application_rejects_cancelled_account_setup(
+    tmp_path,
+):
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: (
+            "unused",
+            "Unused1!",
+        ),
+        setup_prompt=lambda: None,
+    )
+
+    assert result is False
+    assert not paths.account_credentials_file.exists()
+
+
+def test_authenticate_application_rejects_mismatched_setup_passwords(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "Garlic1!",
+                "Different2!",
+            ),
+            None,
+        ]
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: (
+            "unused",
+            "Unused1!",
+        ),
+        setup_prompt=lambda: next(
+            credentials
+        ),
+    )
+
+    assert result is False
+    assert not paths.account_credentials_file.exists()
+
+
+def test_authenticate_application_returns_false_when_login_is_cancelled(
+    tmp_path,
+):
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    AccountCredentialStore(
+        path=paths.account_credentials_file,
+    ).create(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: None,
+    )
+
+    assert result is False
+
+
+def test_run_gui_default_authentication_wires_login_prompt_to_root(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def destroy(
+            self,
+        ):
+            pass
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    def fake_prompt_login(
+        master,
+    ):
+        events.append(
+            ("login_prompt", master)
+        )
+        return (
+            "alice",
+            "Garlic1!",
+        )
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_login",
+        fake_prompt_login,
+    )
+
+    def fake_authenticate_application(
+        *,
+        paths,
+        prompt,
+        setup_prompt,
+        invalid_credentials,
+        invalid_setup,
+    ):
+        events.append(
+            ("authenticate", paths)
+        )
+        credentials = prompt()
+        events.append(
+            ("credentials", credentials)
+        )
+        return False
+
+    monkeypatch.setattr(
+        gui_application,
+        "authenticate_application",
+        fake_authenticate_application,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: (
+            pytest.fail(
+                "build_view_model must not run"
+            )
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+    assert events == [
+        ("authenticate", paths),
+        ("login_prompt", root),
+        (
+            "credentials",
+            (
+                "alice",
+                "Garlic1!",
+            ),
+        ),
+    ]
+
+
+def test_run_gui_default_authentication_wires_setup_prompt_to_root(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def destroy(
+            self,
+        ):
+            pass
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    def fake_prompt_setup(
+        master,
+    ):
+        events.append(
+            ("setup_prompt", master)
+        )
+        return (
+            "alice",
+            "Garlic1!",
+            "Garlic1!",
+        )
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_setup",
+        fake_prompt_setup,
+    )
+
+    def fake_authenticate_application(
+        *,
+        paths,
+        prompt,
+        setup_prompt,
+        invalid_credentials,
+        invalid_setup,
+    ):
+        events.append(
+            ("authenticate", paths)
+        )
+        credentials = setup_prompt()
+        events.append(
+            ("credentials", credentials)
+        )
+        return False
+
+    monkeypatch.setattr(
+        gui_application,
+        "authenticate_application",
+        fake_authenticate_application,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: (
+            pytest.fail(
+                "build_view_model must not run"
+            )
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+    assert events == [
+        ("authenticate", paths),
+        ("setup_prompt", root),
+        (
+            "credentials",
+            (
+                "alice",
+                "Garlic1!",
+                "Garlic1!",
+            ),
+        ),
+    ]
+
+
+def test_authenticate_application_retries_after_invalid_credentials(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    AccountCredentialStore(
+        path=paths.account_credentials_file,
+    ).create(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "Wrong2!",
+            ),
+            (
+                "alice",
+                "Garlic1!",
+            ),
+        ]
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: next(
+            credentials
+        ),
+    )
+
+    assert result is True
+
+
+def test_authenticate_application_reports_invalid_credentials_before_retry(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    AccountCredentialStore(
+        path=paths.account_credentials_file,
+    ).create(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    events = []
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "Wrong2!",
+            ),
+            None,
+        ]
+    )
+
+    def prompt():
+        credentials_value = next(
+            credentials
+        )
+        events.append(
+            ("prompt", credentials_value)
+        )
+        return credentials_value
+
+    def invalid_credentials():
+        events.append(
+            ("invalid",)
+        )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=prompt,
+        invalid_credentials=invalid_credentials,
+    )
+
+    assert result is False
+
+    assert events == [
+        (
+            "prompt",
+            (
+                "alice",
+                "Wrong2!",
+            ),
+        ),
+        ("invalid",),
+        ("prompt", None),
+    ]
+
+
+def test_run_gui_default_authentication_shows_generic_invalid_credentials_error(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    dialogs = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def destroy(
+            self,
+        ):
+            pass
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    def fake_authenticate_application(
+        *,
+        paths,
+        prompt,
+        setup_prompt,
+        invalid_credentials,
+        invalid_setup,
+    ):
+        invalid_credentials()
+        return False
+
+    monkeypatch.setattr(
+        gui_application,
+        "authenticate_application",
+        fake_authenticate_application,
+    )
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showerror",
+        lambda title, message, **kwargs: (
+            dialogs.append(
+                (
+                    title,
+                    message,
+                    kwargs,
+                )
+            )
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+
+    assert dialogs == [
+        (
+            "GarlicSMTP login",
+            "Invalid username or password",
+            {
+                "parent": root,
+            },
+        ),
+    ]
+
+
+def test_run_gui_default_authentication_shows_invalid_setup_error(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    dialogs = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def destroy(
+            self,
+        ):
+            pass
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    def fake_authenticate_application(
+        *,
+        paths,
+        prompt,
+        setup_prompt,
+        invalid_credentials,
+        invalid_setup,
+    ):
+        invalid_setup(
+            "Account password must contain an uppercase letter"
+        )
+        return False
+
+    monkeypatch.setattr(
+        gui_application,
+        "authenticate_application",
+        fake_authenticate_application,
+    )
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showerror",
+        lambda title, message, **kwargs: (
+            dialogs.append(
+                (
+                    title,
+                    message,
+                    kwargs,
+                )
+            )
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+
+    assert dialogs == [
+        (
+            "GarlicSMTP account setup",
+            "Account password must contain an uppercase letter",
+            {
+                "parent": root,
+            },
+        ),
+    ]
+
+
+def test_authenticate_application_retries_setup_after_password_mismatch(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "Garlic1!",
+                "Different2!",
+            ),
+            (
+                "alice",
+                "Garlic1!",
+                "Garlic1!",
+            ),
+        ]
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: None,
+        setup_prompt=lambda: next(
+            credentials
+        ),
+    )
+
+    assert result is True
+
+    assert paths.account_credentials_file.exists()
+
+
+def test_authenticate_application_retries_setup_after_invalid_credentials(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "garlic1!",
+                "garlic1!",
+            ),
+            (
+                "alice",
+                "Garlic1!",
+                "Garlic1!",
+            ),
+        ]
+    )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: None,
+        setup_prompt=lambda: next(
+            credentials
+        ),
+    )
+
+    assert result is True
+    assert paths.account_credentials_file.exists()
+
+
+def test_authenticate_application_reports_invalid_setup_before_retry(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "garlic1!",
+                "garlic1!",
+            ),
+            None,
+        ]
+    )
+
+    def setup_prompt():
+        credentials_value = next(
+            credentials
+        )
+        events.append(
+            ("prompt", credentials_value)
+        )
+        return credentials_value
+
+    def invalid_setup(message):
+        events.append(
+            ("invalid", message)
+        )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: None,
+        setup_prompt=setup_prompt,
+        invalid_setup=invalid_setup,
+    )
+
+    assert result is False
+
+    assert events == [
+        (
+            "prompt",
+            (
+                "alice",
+                "garlic1!",
+                "garlic1!",
+            ),
+        ),
+        (
+            "invalid",
+            "Account password must contain an uppercase letter",
+        ),
+        ("prompt", None),
+    ]
+
+    assert not paths.account_credentials_file.exists()
+
+
+def test_authenticate_application_reports_password_mismatch_before_retry(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    credentials = iter(
+        [
+            (
+                "alice",
+                "Garlic1!",
+                "Different2!",
+            ),
+            None,
+        ]
+    )
+
+    def setup_prompt():
+        credentials_value = next(
+            credentials
+        )
+        events.append(
+            ("prompt", credentials_value)
+        )
+        return credentials_value
+
+    def invalid_setup(message):
+        events.append(
+            ("invalid", message)
+        )
+
+    result = authenticate_application(
+        paths=paths,
+        prompt=lambda: None,
+        setup_prompt=setup_prompt,
+        invalid_setup=invalid_setup,
+    )
+
+    assert result is False
+
+    assert events == [
+        (
+            "prompt",
+            (
+                "alice",
+                "Garlic1!",
+                "Different2!",
+            ),
+        ),
+        (
+            "invalid",
+            "Passwords do not match",
+        ),
+        ("prompt", None),
+    ]
+
+    assert not paths.account_credentials_file.exists()
