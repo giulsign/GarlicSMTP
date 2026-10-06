@@ -71,6 +71,16 @@ def test_application_paths_for_user():
     )
 
 
+def test_application_paths_for_user_exposes_application_icon():
+    paths = ApplicationPaths.for_user(
+        home=Path("/home/alice")
+    )
+
+    assert paths.application_icon == Path(
+        "/home/alice/.local/share/garlicsmtp/garlicsmtp.png"
+    )
+
+
 def test_application_paths_create_directories(
     tmp_path,
 ):
@@ -129,6 +139,27 @@ def test_application_paths_for_development(
         / ".local"
         / "share"
         / "garlicsmtp"
+    )
+
+
+def test_application_paths_for_development_exposes_project_icon(
+    tmp_path,
+):
+    project_root = (
+        tmp_path
+        / "GarlicSMTP"
+    )
+
+    paths = ApplicationPaths.for_development(
+        project_root=project_root,
+        home=tmp_path / "home",
+    )
+
+    assert paths.application_icon == (
+        project_root
+        / "install"
+        / "assets"
+        / "garlicsmtp.png"
     )
 
 

@@ -212,6 +212,17 @@ def run_gui(
         else ApplicationPaths.for_user()
     )
 
+    icon = tk.PhotoImage(
+        file=str(
+            application_paths.application_icon
+        )
+    )
+
+    root.iconphoto(
+        True,
+        icon,
+    )
+
     if authenticate is None:
         authenticated = authenticate_application(
             paths=application_paths,

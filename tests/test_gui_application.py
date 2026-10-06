@@ -5,6 +5,7 @@
 
 import pytest
 from types import SimpleNamespace
+from pathlib import Path
 
 import garlicsmtp.gui.application as gui_application
 
@@ -727,10 +728,149 @@ def test_real_gui_composer_separates_received_and_sent_mail(
         context.store.backend.close()
 
 
+def test_run_gui_sets_application_icon(
+    monkeypatch,
+):
+    icon_calls = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            icon_calls.append(
+                (default, image)
+            )
+
+        def withdraw(
+            self,
+        ):
+            pass
+
+        def deiconify(
+            self,
+        ):
+            pass
+
+        def protocol(
+            self,
+            name,
+            callback,
+        ):
+            pass
+
+        def mainloop(
+            self,
+        ):
+            pass
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+        ):
+            pass
+
+        def pack(
+            self,
+            **kwargs,
+        ):
+            pass
+
+        def close(
+            self,
+        ):
+            pass
+
+    icon = object()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    loaded_files = []
+
+    def fake_photo_image(
+        **kwargs,
+    ):
+        loaded_files.append(
+            kwargs["file"]
+        )
+        return icon
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        fake_photo_image,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: object(),
+    )
+
+    class FakePaths:
+        application_icon = Path(
+            "/application/garlicsmtp.png"
+        )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=FakePaths(),
+        authenticate=lambda **kwargs: True,
+    )
+
+    assert result == 0
+    assert loaded_files == [
+        str(
+            Path(
+                "/application"
+            )
+            / "garlicsmtp.png"
+        ),
+    ]
+    assert icon_calls == [
+        (True, icon),
+    ]
+
+
 def test_run_gui_hides_root_until_authentication_succeeds(
     monkeypatch,
 ):
     events = []
+
+    class FakePaths:
+        application_icon = Path(
+            "/application/garlicsmtp.png"
+        )
 
     class FakeRoot:
 
@@ -767,6 +907,13 @@ def test_run_gui_hides_root_until_authentication_succeeds(
             self,
         ):
             events.append("mainloop")
+
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
 
     class FakeWindow:
 
@@ -815,9 +962,15 @@ def test_run_gui_hides_root_until_authentication_succeeds(
         lambda **kwargs: object(),
     )
 
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
-        paths=object(),
+        paths=FakePaths(),
         authenticate=authenticate,
     )
 
@@ -894,6 +1047,13 @@ def test_run_gui_uses_user_application_paths(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     class FakeWindow:
 
         def __init__(
@@ -956,6 +1116,12 @@ def test_run_gui_uses_user_application_paths(
         gui_application,
         "build_view_model",
         fake_build_view_model,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -1049,6 +1215,13 @@ def test_run_gui_uses_provided_application_paths(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     class FakeWindow:
 
         def __init__(
@@ -1095,6 +1268,12 @@ def test_run_gui_uses_provided_application_paths(
         gui_application,
         "build_view_model",
         fake_build_view_model,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -1172,6 +1351,11 @@ def test_run_gui_closes_window_before_destroying_root(
     events = []
     received = {}
 
+    class FakePaths:
+        application_icon = Path(
+            "/application/garlicsmtp.png"
+        )
+
     class FakeRoot:
 
         def title(
@@ -1210,6 +1394,13 @@ def test_run_gui_closes_window_before_destroying_root(
 
         def deiconify(
             self,
+        ):
+            pass
+
+        def iconphoto(
+            self,
+            default,
+            image,
         ):
             pass
 
@@ -1254,9 +1445,15 @@ def test_run_gui_closes_window_before_destroying_root(
         lambda **kwargs: object(),
     )
 
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
-        paths=object(),
+        paths=FakePaths(),
         authenticate=lambda **kwargs: True,
     )
 
@@ -1421,6 +1618,13 @@ def test_run_gui_authenticates_by_default_before_building_view_model(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -1459,6 +1663,12 @@ def test_run_gui_authenticates_by_default_before_building_view_model(
         gui_application,
         "build_view_model",
         fail_if_built,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -1504,6 +1714,13 @@ def test_run_gui_does_not_build_view_model_when_authentication_fails(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -1525,6 +1742,12 @@ def test_run_gui_does_not_build_view_model_when_authentication_fails(
         gui_application,
         "build_view_model",
         fail_if_built,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -1582,6 +1805,13 @@ def test_run_gui_builds_view_model_after_successful_authentication(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     class FakeWindow:
 
         def __init__(
@@ -1635,6 +1865,12 @@ def test_run_gui_builds_view_model_after_successful_authentication(
         gui_application,
         "build_view_model",
         fake_build_view_model,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -1854,6 +2090,13 @@ def test_run_gui_default_authentication_wires_login_prompt_to_root(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -1912,6 +2155,12 @@ def test_run_gui_default_authentication_wires_login_prompt_to_root(
         ),
     )
 
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
         paths=paths,
@@ -1962,6 +2211,13 @@ def test_run_gui_default_authentication_wires_setup_prompt_to_root(
 
         def withdraw(
             self,
+        ):
+            pass
+
+        def iconphoto(
+            self,
+            default,
+            image,
         ):
             pass
 
@@ -2022,6 +2278,12 @@ def test_run_gui_default_authentication_wires_setup_prompt_to_root(
                 "build_view_model must not run"
             )
         ),
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -2176,6 +2438,13 @@ def test_run_gui_default_authentication_shows_generic_invalid_credentials_error(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -2213,6 +2482,12 @@ def test_run_gui_default_authentication_shows_generic_invalid_credentials_error(
                 )
             )
         ),
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(
@@ -2267,6 +2542,13 @@ def test_run_gui_default_authentication_shows_invalid_setup_error(
         ):
             pass
 
+        def iconphoto(
+            self,
+            default,
+            image,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -2306,6 +2588,12 @@ def test_run_gui_default_authentication_shows_invalid_setup_error(
                 )
             )
         ),
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
     )
 
     result = gui_application.run_gui(

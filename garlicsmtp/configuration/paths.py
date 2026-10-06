@@ -96,6 +96,20 @@ class ApplicationPaths:
         return self.config_dir / "settings.toml"
 
     @property
+    def application_icon(self) -> Path:
+        if self.configuration_file is not None:
+            return (
+                self.configuration_file
+                .parent
+                .parent
+                / "install"
+                / "assets"
+                / "garlicsmtp.png"
+            )
+
+        return self.root_dir / "garlicsmtp.png"
+
+    @property
     def imap_credentials_file(
         self,
     ) -> Path:
