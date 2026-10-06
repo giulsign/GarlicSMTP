@@ -727,6 +727,110 @@ def test_real_gui_composer_separates_received_and_sent_mail(
         context.store.backend.close()
 
 
+def test_run_gui_hides_root_until_authentication_succeeds(
+    monkeypatch,
+):
+    events = []
+
+    class FakeRoot:
+
+        def title(
+            self,
+            value,
+        ):
+            pass
+
+        def geometry(
+            self,
+            value,
+        ):
+            pass
+
+        def withdraw(
+            self,
+        ):
+            events.append("withdraw")
+
+        def deiconify(
+            self,
+        ):
+            events.append("deiconify")
+
+        def protocol(
+            self,
+            name,
+            callback,
+        ):
+            pass
+
+        def mainloop(
+            self,
+        ):
+            events.append("mainloop")
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+        ):
+            events.append("window")
+
+        def pack(
+            self,
+            **kwargs,
+        ):
+            pass
+
+        def close(
+            self,
+        ):
+            pass
+
+    def authenticate(
+        **kwargs,
+    ):
+        events.append("authenticate")
+        return True
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: object(),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=object(),
+        authenticate=authenticate,
+    )
+
+    assert result == 0
+    assert events == [
+        "withdraw",
+        "authenticate",
+        "deiconify",
+        "window",
+        "mainloop",
+    ]
+
+
 def test_run_gui_uses_user_application_paths(
     tmp_path,
     monkeypatch,
@@ -779,6 +883,16 @@ def test_run_gui_uses_user_application_paths(
             self,
         ):
             received["destroyed"] = True
+
+        def withdraw(
+            self,
+        ):
+            pass
+
+        def deiconify(
+            self,
+        ):
+            pass
 
     class FakeWindow:
 
@@ -921,6 +1035,16 @@ def test_run_gui_uses_provided_application_paths(
             pass
 
         def mainloop(
+            self,
+        ):
+            pass
+
+        def withdraw(
+            self,
+        ):
+            pass
+
+        def deiconify(
             self,
         ):
             pass
@@ -1078,6 +1202,16 @@ def test_run_gui_closes_window_before_destroying_root(
             self,
         ):
             events.append("destroy")
+
+        def withdraw(
+            self,
+        ):
+            pass
+
+        def deiconify(
+            self,
+        ):
+            pass
 
     class FakeWindow:
 
@@ -1282,6 +1416,11 @@ def test_run_gui_authenticates_by_default_before_building_view_model(
         ):
             pass
 
+        def withdraw(
+            self,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -1360,6 +1499,11 @@ def test_run_gui_does_not_build_view_model_when_authentication_fails(
         ):
             pass
 
+        def withdraw(
+            self,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -1424,6 +1568,16 @@ def test_run_gui_builds_view_model_after_successful_authentication(
             pass
 
         def mainloop(
+            self,
+        ):
+            pass
+
+        def withdraw(
+            self,
+        ):
+            pass
+
+        def deiconify(
             self,
         ):
             pass
@@ -1695,6 +1849,11 @@ def test_run_gui_default_authentication_wires_login_prompt_to_root(
         ):
             pass
 
+        def withdraw(
+            self,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -1797,6 +1956,11 @@ def test_run_gui_default_authentication_wires_setup_prompt_to_root(
             pass
 
         def destroy(
+            self,
+        ):
+            pass
+
+        def withdraw(
             self,
         ):
             pass
@@ -2007,6 +2171,11 @@ def test_run_gui_default_authentication_shows_generic_invalid_credentials_error(
         ):
             pass
 
+        def withdraw(
+            self,
+        ):
+            pass
+
     root = FakeRoot()
 
     monkeypatch.setattr(
@@ -2089,6 +2258,11 @@ def test_run_gui_default_authentication_shows_invalid_setup_error(
             pass
 
         def destroy(
+            self,
+        ):
+            pass
+
+        def withdraw(
             self,
         ):
             pass

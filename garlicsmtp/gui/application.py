@@ -204,6 +204,8 @@ def run_gui(
         "980x720"
     )
 
+    root.withdraw()
+
     application_paths = (
         paths
         if paths is not None
@@ -234,6 +236,8 @@ def run_gui(
     if not authenticated:
         root.destroy()
         return 1
+
+    root.deiconify()
 
     view_model = build_view_model(
         paths=application_paths,
