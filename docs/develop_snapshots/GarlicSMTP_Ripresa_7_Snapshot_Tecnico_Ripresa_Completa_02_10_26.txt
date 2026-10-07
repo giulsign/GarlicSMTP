@@ -1,0 +1,339 @@
+==============================================================================
+GarlicSMTP
+Ripresa 7 - Snapshot Tecnico e Handoff Completo
+==============================================================================
+Stato consolidato al 02/10/2026
+Documento autosufficiente per la ripresa dello sviluppo in una nuova conversazione. Il repository reale resta sempre la fonte di verità.
+
+==============================================================================
+1. SCOPO E REGOLA DI UTILIZZO
+==============================================================================
+Questo documento raccoglie la baseline storica fornita all'inizio del ramo, le decisioni architetturali già consolidate, il lavoro svolto nel ramo corrente e il punto di ripresa. È pensato per essere allegato a una nuova chat così da evitare di reinviare manualmente l'intera cronologia tecnica.
+IMPORTANTE: l'handoff non sostituisce il repository. Prima di generare qualunque patch, la nuova chat deve vedere il sorgente reale corrente, i test pertinenti e l'eventuale output del failure. Se handoff e repository divergono, prevale il repository.
+
+==============================================================================
+2. MODUS OPERANDI OBBLIGATORIO
+==============================================================================
+- Prima di generare codice: inspect del file reale e dei test reali interessati.
+- Un solo RED focalizzato alla volta; verificare che fallisca per la ragione prevista.
+- Applicare il GREEN minimo, senza refactoring collaterali.
+- Eseguire test mirato, poi regressione correlata, poi full pytest.
+- Quando si attraversa un confine di sistema, completare con validazione su Ubuntu 24.04 VM.
+- Niente patch ricostruite da memoria, analogia, handoff o grep evitabile.
+- Niente overengineering, refactoring cosmetico o generalizzazioni preventive.
+- Niente subprocess privilegiati reali nei test.
+- Indicare sempre con precisione file, test, funzione/blocco e file che NON devono essere modificati.
+- Non inventare mai conteggi di test o risultati: riportare solo output effettivamente osservati.
+- Fermarsi al primo failure inatteso e ispezionare il codice reale prima di correggere.
+
+==============================================================================
+3. VINCOLI ARCHITETTURALI DA PRESERVARE
+==============================================================================
+Il core GarlicSMTP funzionante è congelato e può essere riaperto solo davanti a un failure concreto e riproducibile che non sia risolvibile correttamente negli strati application/GUI.
+- SMTP, IMAP, store/queue, crypto, Tor e semantiche pipeline/delivery non vanno modificati preventivamente.
+- La GUI non deve bypassare ApplicationViewModel/ApplicationController per comandare direttamente il backend.
+- Le consegne devono continuare a passare dal normale QueueWorker/TransportManager/OnionTransport.
+- Le modifiche al retry non devono alterare E2EE, ack/nack o semantiche di duplicate delivery.
+- TorStatus.ready descrive la disponibilità locale Tor/SOCKS/control; NON prova la raggiungibilità di uno specifico destinatario .onion.
+
+==============================================================================
+4. BASELINE ALPHA STORICA E STATO PRECEDENTE CONSOLIDATO
+==============================================================================
+
+4.1 Freeze alpha
+----------------
+Baseline alpha congelata: tag v0.0.1-alpha sul commit f249621a21afd75ca83571e62be7c8405c15705d.
+
+4.2 Received + Sent simultanei e store separati
+-----------------------------------------------
+- La GUI espone sezioni Received e Sent simultanee.
+- Received resta su context.store / mailboxes.db.
+- Sent usa data/sent.db nello strato GUI/application.
+- MailComposerService salva in Sent soltanto quando accepted è vero e conserva la rappresentazione leggibile catturata prima che DeliveryStage possa sostituire context.message con la wire representation cifrata.
+- accepted NON equivale a conferma di consegna remota.
+Nel precedente audit era stata valutata una modifica al refresh Sent di ApplicationViewModel, ma era stata esplicitamente scartata e il comportamento precedente ripristinato. Non riaprire quel punto senza un nuovo failure concreto.
+
+4.3 Validazione precedente
+--------------------------
+- La full suite locale risultava verde al 27/09/2026.
+- Test manuale reale: ricezione corretta e nuove entry Sent con Subject/body leggibili.
+- Nota operativa preservata: in caso di mancato invio/ricezione, prima eseguire il refresh dei servizi Tor dal pannello GarlicSMTP; se persiste, valutare il cambio della connessione Internet. Molti casi possono dipendere da congestione della rete Tor e non da un guasto del core.
+
+==============================================================================
+5. LAVORO CONSOLIDATO PRIMA DEL FIX QUEUE/RETRY NEL RAMO CORRENTE
+==============================================================================
+
+5.1 Attachment
+--------------
+La feature/debug attachment è stata completata e committata prima dell'analisi queue. La validazione automatica finale di quella fase era 1616 test passati e il test manuale developer self-send aveva confermato l'allegato corretto. Non riaprire l'attachment senza un nuovo caso riproducibile.
+
+==============================================================================
+6. PROBLEMA AFFRONTATO: MESSAGGI APPARENTEMENTE BLOCCATI IN QUEUE
+==============================================================================
+
+6.1 Sintomo
+-----------
+Alcuni messaggi, sia in ambiente developer sia in VM, rimanevano pending per tempi molto lunghi. L'obiettivo era capire se esistesse uno stall reale e consentire un nuovo tentativo quando il destinatario Tor tornava raggiungibile, senza rompere le semantiche di delivery.
+
+6.2 QueueWorker osservato
+-------------------------
+class QueueWorker(Service, Tickable):
+    def process(self):
+        item = self.queue.peek()
+        if item is None:
+            return False
+        if not item.ready():
+            return False
+        try:
+            delivered = self.transport.deliver(item)
+        except TemporaryDeliveryError as exc:
+            item.attempts += 1
+            item.last_error = type(exc).__name__
+            item.next_retry = self.retry_policy.next_retry(item.attempts)
+            self.queue.update(item)
+            self.queue.nack(item)
+            raise
+        except PermanentDeliveryError:
+            self.queue.ack(item)
+            raise
+        if delivered:
+            self.queue.ack(item)
+        else:
+            self.queue.nack(item)
+        return delivered
+Il runtime chiama tick() circa ogni secondo. SQLiteQueueBackend.peek() scorre gli item in ordine di rowid e restituisce il primo item ready(), quindi non è stato riscontrato head-of-line blocking dovuto a un item con next_retry futuro.
+
+6.3 RetryPolicy e diagnosi
+--------------------------
+class RetryPolicy:
+    def __init__(self, base_delay=60, multiplier=2, max_delay=86400):
+        ...
+
+    def next_retry(self, attempts):
+        delay = self.base_delay * (self.multiplier ** max(0, attempts - 1))
+        delay = min(delay, self.max_delay)
+        return datetime.now(UTC) + timedelta(seconds=delay)
+Il backoff di default cresce 1m, 2m, 4m, 8m, 16m, 32m, 64m, 128m, 256m, 512m (8h32), 1024m (17h04) e poi resta limitato a 24h. La causa più plausibile del comportamento percepito come 'blocco' era quindi il normale exponential backoff diventato molto lungo dopo ripetuti TemporaryDeliveryError.
+La rete non mostrava un'attesa infinita evidente: OnionTransport/Socks5Connection/TextConnection usavano timeout socket di circa 30 secondi. Inoltre TorStatus.ready non indica che uno specifico remote .onion sia raggiungibile.
+
+6.4 Decisioni escluse
+---------------------
+- NON ridurre semplicemente max_delay: un backoff lungo resta utile quando un onion è realmente offline.
+- NON risvegliare automaticamente tutta la queue quando TorStatus passa a ready: sarebbe un segnale locale troppo debole e potrebbe produrre retry storm.
+- NON fare delivery diretto dal pulsante GUI: il tentativo deve passare dal QueueWorker normale.
+
+==============================================================================
+7. SOLUZIONE IMPLEMENTATA: RETRY PENDING
+==============================================================================
+
+7.1 Contratto funzionale
+------------------------
+- Agisce soltanto sugli item sospesi, cioè con next_retry non None.
+- Imposta next_retry = None, rendendo l'item immediatamente eleggibile al prossimo tick.
+- Preserva attempts.
+- Preserva last_error.
+- Restituisce il numero di item risvegliati.
+- Non effettua direttamente alcuna consegna.
+La scelta di NON azzerare attempts è intenzionale: in caso contrario ripetuti click manuali potrebbero aggirare di fatto la logica di backoff.
+
+7.2 Modifiche queue/backend
+---------------------------
+
+garlicsmtp/queue/sqlite.py
+Aggiunto SQLiteQueueBackend.retry_pending(): sotto lock legge gli item, deserializza quelli con next_retry valorizzato, azzera soltanto next_retry, persiste il payload aggiornato, esegue commit e restituisce il conteggio.
+
+garlicsmtp/queue/memory.py
+Aggiunto MemoryQueueBackend.retry_pending() con la stessa semantica, iterando sulla deque in memoria.
+
+garlicsmtp/queue/backend.py
+Formalizzato retry_pending() come metodo astratto del contratto QueueBackend.
+
+garlicsmtp/queue/manager.py
+Aggiunto QueueManager.retry_pending(), delegato al backend corrente.
+
+7.3 Modifiche application
+-------------------------
+
+garlicsmtp/application/controller.py
+def retry_pending(
+    self,
+) -> int:
+    return self.context.queue.retry_pending()
+ApplicationController è il confine applicativo che raggiunge context.queue. La GUI non chiama direttamente QueueManager.
+
+garlicsmtp/application/view_model.py
+def retry_pending(
+    self,
+) -> int:
+    return self.controller.retry_pending()
+ApplicationViewModel delega al controller e restituisce il numero di item risvegliati. Non forza _status: il normale refresh resta responsabile dell'aggiornamento dello stato visualizzato.
+
+7.4 Modifiche GUI
+-----------------
+
+garlicsmtp/gui/tk_mail_metrics_section.py
+- Aggiunto ttk.Button con testo 'Retry pending'.
+- Il pulsante è posizionato sotto le quattro metriche della MailMetricsSection.
+- L'handler _retry_pending() chiama self.view_model.retry_pending().
+- Nessun popup, refresh forzato o log aggiuntivo è stato introdotto senza test/requisito.
+Percorso finale:
+GUI Button.invoke()
+    -> MailMetricsSection._retry_pending()
+    -> ApplicationViewModel.retry_pending()
+    -> ApplicationController.retry_pending()
+    -> QueueManager.retry_pending()
+    -> MemoryQueueBackend / SQLiteQueueBackend
+    -> next QueueWorker tick
+    -> normale delivery path
+
+==============================================================================
+8. TDD ESEGUITO NEL RAMO QUEUE/RETRY
+==============================================================================
+
+8.1 SQLite backend
+------------------
+- RED: test_sqlite_queue_retry_pending_makes_suspended_items_ready -> AttributeError: SQLiteQueueBackend senza retry_pending.
+- GREEN: implementazione SQLite; regressione tests/test_queue_sqlite_backend.py -> 9 passed.
+
+8.2 QueueManager con SQLite
+---------------------------
+- RED: test_queue_manager_can_retry_pending_sqlite_items -> AttributeError: QueueManager senza retry_pending.
+- GREEN: delega QueueManager -> backend; test focalizzato e file di test verdi.
+
+8.3 Memory backend
+------------------
+- RED: test_memory_queue_retry_pending_makes_suspended_items_ready -> AttributeError: MemoryQueueBackend senza retry_pending.
+- GREEN + regressione tests/test_queue_backend.py -> 4 passed.
+
+8.4 Contratto astratto
+----------------------
+- RED intenzionale: dopo aver aggiunto retry_pending astratto, SpyBackend non era istanziabile perché non implementava il nuovo metodo.
+- GREEN: SpyBackend aggiornato e test di delega esteso a queue.retry_pending(); tests/test_queue_backend.py -> 4 passed.
+
+8.5 Regressione queue
+---------------------
+- tests/test_queue_backend.py + test_queue_sqlite_backend.py + test_queue_manager_sqlite.py + test_queue_worker.py -> 30 passed.
+
+8.6 ApplicationController
+-------------------------
+- RED: test_application_controller_retries_pending_messages -> AttributeError: ApplicationController senza retry_pending.
+- GREEN + regressione controller -> 9 passed.
+
+8.7 ApplicationViewModel
+------------------------
+- RED: test_application_view_model_retries_pending_messages -> AttributeError: ApplicationViewModel senza retry_pending.
+- Durante la regressione emerse un failure non production: nel FakeApplicationController il return di restart() era stato accidentalmente spostato sotto retry_pending(), facendo restituire None. Corretto soltanto il fake.
+- GREEN + regressione view-model -> 20 passed.
+
+8.8 GUI MailMetricsSection
+--------------------------
+- RED: test_mail_metrics_section_retries_pending_messages -> AttributeError: MailMetricsSection senza retry_pending_button.
+- GREEN: aggiunto pulsante ttk e handler; test GUI riportati verdi.
+
+8.9 Gate finali
+---------------
+- Regressione integrata backend -> GUI: 61 passed.
+- Full suite finale: 1622 passed.
+- Test manuale reale: i messaggi presenti in coda sono stati correttamente inviati dopo Retry pending.
+- Il fix è stato chiuso e committato dall'utente.
+
+==============================================================================
+9. STATO ATTUALE CONSOLIDATO AL 02/10/2026
+==============================================================================
+- Baseline alpha storica: v0.0.1-alpha @ f249621a21afd75ca83571e62be7c8405c15705d.
+- Received + Sent simultanei e store separati: consolidati.
+- Sent leggibile prima della wire representation cifrata: consolidato.
+- Attachment: completato, validato e committato; precedente gate 1616 passed + manual self-send corretto.
+- Queue Retry pending: completato, validato e committato.
+- Full suite più recente osservata: 1622 passed.
+- Validazione manuale più recente: messaggi pending risvegliati e consegnati correttamente.
+- Nessun failure aperto noto nel punto di chiusura di questo ramo.
+Nota: l'hash del commit più recente non è stato riportato nella conversazione. La nuova chat deve ricavarlo dal repository reale con git log -1 --oneline e verificare git status --short.
+
+==============================================================================
+10. FILE CHIAVE COINVOLTI O RILEVANTI
+==============================================================================
+- garlicsmtp/queue/backend.py
+- garlicsmtp/queue/memory.py
+- garlicsmtp/queue/sqlite.py
+- garlicsmtp/queue/manager.py
+- garlicsmtp/queue/worker.py
+- garlicsmtp/queue/retry.py
+- garlicsmtp/application/controller.py
+- garlicsmtp/application/view_model.py
+- garlicsmtp/application/status.py
+- garlicsmtp/application/status_provider.py
+- garlicsmtp/application/tor_status.py
+- garlicsmtp/application/tor_monitor_service.py
+- garlicsmtp/gui/tk_mail_metrics_section.py
+- garlicsmtp/gui/tk_dashboard_widgets.py
+- tests/test_queue_backend.py
+- tests/test_queue_sqlite_backend.py
+- tests/test_queue_manager_sqlite.py
+- tests/test_queue_worker.py
+- tests/test_application_controller.py
+- tests/test_application_view_model.py
+- tests/test_gui_tk_mail_metrics_section.py
+
+==============================================================================
+11. RISCHI E OSSERVAZIONI DA RICORDARE
+==============================================================================
+- QueueWorker: se transport.deliver(item) restituisse False invece di sollevare TemporaryDeliveryError, il codice osservato esegue nack senza incrementare attempts/next_retry. È solo un'osservazione: non modificarlo senza evidenza riproducibile che sia coinvolto in un bug.
+- Concorrenza GUI/runtime: SQLite retry_pending usa lock; Memory backend non ha lock aggiuntivi. Non introdurre sincronizzazione preventiva senza failure/test che la richieda.
+- TorStatus.ready non è remote-onion reachability. Evitare automatismi basati solo sul passaggio a ready.
+- Retry pending è un override manuale dell'attesa, non un nuovo algoritmo di retry e non una conferma di consegna.
+- Non riaprire attachment, refresh Sent o core delivery senza un nuovo caso concreto.
+
+==============================================================================
+12. PUNTO DI RIPRESA CONSIGLIATO NELLA NUOVA CHAT
+==============================================================================
+Leggere questo handoff come contesto, non come sorgente.
+Chiedere all'utente il nuovo obiettivo/failure.
+Per qualunque modifica, leggere prima file reali e test reali pertinenti.
+Se serve verificare la baseline corrente, eseguire git log -1 --oneline e git status --short.
+Se il lavoro attraversa Tor/GUI/runtime/filesystem, pianificare anche il gate Ubuntu 24.04 VM.
+Preservare il ciclo inspect -> RED -> GREEN minimo -> regressioni -> full suite -> manual/VM quando necessario.
+
+==============================================================================
+13. PRIMO MESSAGGIO PRONTO PER LA NUOVA CONVERSAZIONE
+==============================================================================
+Copiare integralmente il testo seguente come PRIMO MESSAGGIO della nuova chat e allegare questo DOCX.
+Sto proseguendo lo sviluppo e la validazione alpha di GarlicSMTP. Considera l'handoff tecnico allegato “GarlicSMTP_Ripresa_7_Snapshot_Tecnico_Ripresa_Completa_02_10_26.docx” come cronologia, baseline e contesto operativo, ma NON come sostituto del repository reale.
+
+REGOLA OBBLIGATORIA E PRIORITARIA: PRIMA DI GENERARE CODICE DEVI VEDERE SORGENTE E TEST REALI. Non generare patch da memoria, per analogia o soltanto sulla base dell'handoff. Prima di ogni modifica chiedi/leggi il file reale, i test pertinenti e l'eventuale output del failure. Se handoff e repository divergono, prevale il repository.
+
+Sii molto preciso nell'indicare le modifiche: specifica sempre il path esatto del file, il test/funzione/blocco da modificare, dove inserire il cambiamento e quali file NON devono essere toccati. Evita di farmi cercare con grep informazioni che sono già note. Non inventare mai risultati o conteggi di test.
+
+Metodo obbligatorio: inspect -> un solo RED focalizzato -> verifica del RED -> GREEN minimo -> test mirato -> regressione correlata -> full pytest -> Ubuntu 24.04 VM quando il confine è di sistema. Al primo failure inatteso fermati, chiedi/leggi sorgente e test reali e correggi soltanto ciò che il failure dimostra. Niente overengineering, niente refactoring cosmetico, niente generalizzazioni preventive, niente subprocess privilegiati reali nei test.
+
+Il core GarlicSMTP funzionante è congelato e può essere toccato solo in casi di estrema necessità con failure concreto e riproducibile. SMTP, IMAP, store/queue, crypto, Tor e semantiche pipeline/delivery non vanno riaperti preventivamente.
+
+Baseline alpha storica congelata: tag v0.0.1-alpha sul commit f249621a21afd75ca83571e62be7c8405c15705d. Dopo il freeze sono state consolidate la GUI con Received e Sent simultanei e gli store separati: Received resta su context.store/mailboxes.db; Sent usa data/sent.db nello strato GUI/application. MailComposerService salva Sent soltanto se accepted e conserva la rappresentazione leggibile catturata prima che DeliveryStage possa sostituire context.message con la wire representation cifrata. accepted NON equivale a conferma di consegna remota. Una precedente ipotesi di modifica al refresh Sent di ApplicationViewModel è stata scartata e ripristinata: non riaprirla senza un nuovo failure.
+
+La feature/debug attachment è stata completata, validata e committata. La sua validazione finale precedente era 1616 test passati e un test manuale developer self-send con allegato corretto. Non riaprire attachment senza un nuovo caso riproducibile.
+
+È stato inoltre risolto e committato il problema dei messaggi che apparivano bloccati a lungo in queue. La diagnosi ha mostrato che il normale exponential backoff poteva portare next_retry a 8h32, 17h04 e poi 24h dopo ripetuti TemporaryDeliveryError. Non è stato ridotto il max_delay e non è stato introdotto un auto-retry basato su TorStatus.ready, perché Tor ready misura lo stato locale e non la raggiungibilità del remote .onion.
+
+È stata implementata la funzione manuale “Retry pending”. Il contratto è: agisce solo sugli item con next_retry valorizzato; imposta next_retry=None; preserva attempts e last_error; restituisce il numero di item risvegliati; NON consegna direttamente. La consegna resta affidata al normale QueueWorker al tick successivo, preservando TransportManager/OnionTransport, E2EE e ack/nack. Il percorso è GUI MailMetricsSection -> ApplicationViewModel.retry_pending() -> ApplicationController.retry_pending() -> QueueManager.retry_pending() -> backend Memory/SQLite -> QueueWorker.
+
+I file modificati per questa feature includono garlicsmtp/queue/backend.py, memory.py, sqlite.py, manager.py, garlicsmtp/application/controller.py, garlicsmtp/application/view_model.py e garlicsmtp/gui/tk_mail_metrics_section.py, con i relativi test. QueueWorker e RetryPolicy sono stati analizzati ma non modificati per cambiare la semantica di retry.
+
+Validazione più recente al 02/10/2026: regressione integrata 61 passed; full suite `pytest -q` 1622 passed; test manuale reale riuscito, con i messaggi pending correttamente inviati dopo “Retry pending”. Il fix è stato chiuso e committato. L'hash del commit più recente non è riportato nell'handoff: se serve la baseline Git corrente, esegui prima `git log -1 --oneline` e `git status --short`.
+
+Nota tecnica da preservare: TorStatus.ready NON dimostra che uno specifico destinatario .onion sia raggiungibile. In caso di mancato invio/ricezione reale, eseguire prima il refresh dei servizi Tor dal pannello GarlicSMTP; se persiste, valutare il cambio della connessione Internet. Molti casi possono dipendere dalla congestione Tor e non da un malfunzionamento del core.
+
+Non modificare preventivamente QueueWorker per il caso in cui transport.deliver() restituisca False senza eccezione: è stata annotata come possibile area da osservare, ma non esiste al momento un failure riproducibile che giustifichi una modifica.
+
+PUNTO DI RIPRESA: il ramo precedente è chiuso, committato e con suite verde. Chiedimi il prossimo obiettivo o il prossimo failure. Quando te lo fornisco, riparti obbligatoriamente dall'inspect del sorgente/test reale pertinente e applica il ciclo TDD sopra descritto.
+
+==============================================================================
+14. CHECKLIST DI CONTINUITÀ PER LA NUOVA CHAT
+==============================================================================
+- Handoff allegato e letto.
+- Repository reale considerato fonte di verità.
+- Nessuna patch prima dell'inspect.
+- Nuovo obiettivo/failure identificato.
+- RED focalizzato prima del GREEN.
+- Core congelato salvo necessità dimostrata.
+- Risultati dei test riportati esattamente.
+- Gate VM/manuale applicato quando il confine lo richiede.

@@ -31,6 +31,7 @@ class ServicesSection(DashboardCard):
 
         self.smtp_value = StatusBadge(
             self.content,
+            status_colors=True,
         )
         self.smtp_endpoint_value = SelectableValue(
             self.content,

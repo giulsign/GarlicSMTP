@@ -5,7 +5,9 @@
 
 import sys
 import tkinter as tk
+from tkinter import font as tkfont
 from tkinter import messagebox
+
 
 from garlicsmtp.application import (
     ApplicationBuilder,
@@ -188,6 +190,25 @@ def authenticate_application(
             invalid_credentials()
 
 
+def configure_application_fonts(
+    root,
+) -> None:
+    for font_name in (
+        "TkDefaultFont",
+        "TkTextFont",
+        "TkFixedFont",
+        "TkMenuFont",
+        "TkHeadingFont",
+    ):
+        font = tkfont.nametofont(
+            font_name,
+            root=root,
+        )
+        font.configure(
+            size=font.cget("size") + 2,
+        )           
+
+
 def run_gui(
     argv: list[str] | None = None,
     *,
@@ -195,6 +216,10 @@ def run_gui(
     authenticate=None,
 ) -> int:
     root = tk.Tk()
+
+    configure_application_fonts(
+        root,
+    )
 
     root.title(
         "GarlicSMTP Monitor"

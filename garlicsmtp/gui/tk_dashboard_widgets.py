@@ -127,6 +127,7 @@ class StatusBadge(SelectableValue):
         *,
         text: str = "",
         status_key: str = "",
+        status_colors: bool = False,
     ):
         super().__init__(
             master,
@@ -134,6 +135,8 @@ class StatusBadge(SelectableValue):
         )
 
         self.status_key = status_key
+        self.status_colors = status_colors
+        self._update_status_style()
 
     def set_status(
         self,
@@ -143,6 +146,28 @@ class StatusBadge(SelectableValue):
     ) -> None:
         self.status_key = status_key
         self.set_text(text)
+        self._update_status_style()
+
+    def _update_status_style(
+        self,
+    ) -> None:
+        if not self.status_colors:
+            self.configure(
+                style="Garlic.Readonly.TEntry"
+            )
+            return
+
+        styles = {
+            "running": "Garlic.StatusRunning.TEntry",
+            "stopped": "Garlic.StatusStopped.TEntry",
+        }
+
+        self.configure(
+            style=styles.get(
+                self.status_key,
+                "Garlic.Readonly.TEntry",
+            )
+        )
 
 
 class MetricValue(ttk.Frame):

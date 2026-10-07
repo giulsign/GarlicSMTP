@@ -17,13 +17,26 @@ class LoginForm(ttk.Frame):
     ) -> None:
         super().__init__(
             master,
+            style="Garlic.Auth.TFrame",
         )
+
+        style = ttk.Style(self)
+        style.configure(
+            "Garlic.Auth.TFrame",
+            background="#ff8c00",
+        )
+        style.configure(
+            "Garlic.Auth.TLabel",
+            background="#ff8c00",
+            foreground="#000000",
+        ) 
+        
         self.on_submit = on_submit
 
         ttk.Label(
             self,
             text="Username",
-            style="Garlic.TLabel",
+            style="Garlic.Auth.TLabel",
         ).grid(
             row=0,
             column=0,
@@ -35,7 +48,7 @@ class LoginForm(ttk.Frame):
         ttk.Label(
             self,
             text="Password",
-            style="Garlic.TLabel",
+            style="Garlic.Auth.TLabel",
         ).grid(
             row=1,
             column=0,
@@ -243,6 +256,21 @@ class LoginDialog(tk.Toplevel):
             row=0,
             column=0,
             sticky="nsew",
+        )
+
+        self.update_idletasks()
+
+        x = (
+            self.winfo_screenwidth()
+            - self.winfo_width()
+        ) // 2
+        y = (
+            self.winfo_screenheight()
+            - self.winfo_height()
+        ) // 2
+
+        self.geometry(
+            f"+{x}+{y}"
         )
 
     def accept(

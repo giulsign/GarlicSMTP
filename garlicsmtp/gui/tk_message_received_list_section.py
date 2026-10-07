@@ -140,7 +140,7 @@ class MessageReceivedListSection(DashboardCard):
 
         self.table.tag_configure(
             "unread",
-            font=("", 10, "bold"),
+            font=("", 12, "bold"),
         )
 
         self.table.grid(

@@ -15,6 +15,10 @@ class GarlicTheme:
 
     SELECTION_BACKGROUND = "#ff8c00"
 
+    STATUS_RUNNING_BACKGROUND = "#B5FFA8"
+    STATUS_STOPPED_BACKGROUND = "#ff8282"
+    STATUS_FOREGROUND = "#000000"
+
 
 def configure_garlic_theme(
     style: ttk.Style,
@@ -34,7 +38,7 @@ def configure_garlic_theme(
         "Garlic.Header.TLabel",
         background=GarlicTheme.FRAME_BACKGROUND,
         foreground=GarlicTheme.TEXT_FOREGROUND,
-        font=("", 10, "bold"),
+        font=("", 12, "bold"),
     )
 
     style.configure(
@@ -53,7 +57,7 @@ def configure_garlic_theme(
         "Garlic.CardTitle.TLabel",
         background=GarlicTheme.FRAME_BACKGROUND,
         foreground=GarlicTheme.TEXT_FOREGROUND,
-        font=("", 11, "bold"),
+        font=("", 14, "bold"),
     )
 
     style.configure(
@@ -61,6 +65,54 @@ def configure_garlic_theme(
         fieldbackground=GarlicTheme.INPUT_BACKGROUND,
         foreground=GarlicTheme.INPUT_FOREGROUND,
         selectbackground=GarlicTheme.SELECTION_BACKGROUND,
+    )
+
+    style.configure(
+        "Garlic.StatusRunning.TEntry",
+        fieldbackground=(
+            GarlicTheme.STATUS_RUNNING_BACKGROUND
+        ),
+        foreground=GarlicTheme.STATUS_FOREGROUND,
+    )
+
+    style.map(
+        "Garlic.StatusRunning.TEntry",
+        fieldbackground=[
+            (
+                "readonly",
+                GarlicTheme.STATUS_RUNNING_BACKGROUND,
+            ),
+        ],
+        foreground=[
+            (
+                "readonly",
+                GarlicTheme.STATUS_FOREGROUND,
+            ),
+        ],
+    )
+
+    style.configure(
+        "Garlic.StatusStopped.TEntry",
+        fieldbackground=(
+            GarlicTheme.STATUS_STOPPED_BACKGROUND
+        ),
+        foreground=GarlicTheme.STATUS_FOREGROUND,
+    )
+
+    style.map(
+        "Garlic.StatusStopped.TEntry",
+        fieldbackground=[
+            (
+                "readonly",
+                GarlicTheme.STATUS_STOPPED_BACKGROUND,
+            ),
+        ],
+        foreground=[
+            (
+                "readonly",
+                GarlicTheme.STATUS_FOREGROUND,
+            ),
+        ],
     )
 
     style.configure(

@@ -39,6 +39,23 @@ from garlicsmtp.security.auth.account_credentials import (
     )
 
 
+@pytest.fixture(
+    autouse=True,
+)
+def stub_run_gui_application_fonts(
+    request,
+    monkeypatch,
+):
+    if request.node.name.startswith(
+        "test_run_gui_"
+    ):
+        monkeypatch.setattr(
+            gui_application,
+            "configure_application_fonts",
+            lambda root: None,
+        )
+
+
 def test_gui_builds_message_list_view_model(
     tmp_path,
     monkeypatch,
@@ -726,6 +743,73 @@ def test_real_gui_composer_separates_received_and_sent_mail(
     finally:
         context.queue.backend.close()
         context.store.backend.close()
+
+
+def test_configure_application_fonts_increases_named_fonts(
+    monkeypatch,
+):
+    configured = []
+    received_roots = []
+
+    class FakeFont:
+
+        def __init__(
+            self,
+            name,
+        ):
+            self.name = name
+
+        def cget(
+            self,
+            option,
+        ):
+            assert option == "size"
+            return 10
+
+        def configure(
+            self,
+            *,
+            size,
+        ):
+            configured.append(
+                (self.name, size)
+            )
+
+    expected_root = object()
+
+    def fake_nametofont(
+        name,
+        *,
+        root,
+    ):
+        received_roots.append(root)
+        return FakeFont(name)
+
+    monkeypatch.setattr(
+        gui_application.tkfont,
+        "nametofont",
+        fake_nametofont,
+    )
+
+    gui_application.configure_application_fonts(
+        expected_root,
+    )
+
+    assert received_roots == [
+        expected_root,
+        expected_root,
+        expected_root,
+        expected_root,
+        expected_root,
+    ]
+
+    assert configured == [
+        ("TkDefaultFont", 12),
+        ("TkTextFont", 12),
+        ("TkFixedFont", 12),
+        ("TkMenuFont", 12),
+        ("TkHeadingFont", 12),
+    ]
 
 
 def test_run_gui_sets_application_icon(

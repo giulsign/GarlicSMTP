@@ -31,6 +31,7 @@ class ApplicationSection(DashboardCard):
 
         self.runtime_value = StatusBadge(
             self.content,
+            status_colors=True,
         )
         self.hostname_value = SelectableValue(
             self.content,

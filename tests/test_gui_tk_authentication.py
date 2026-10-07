@@ -4,6 +4,7 @@
 # See LICENSE for the full license terms.
 
 import tkinter as tk
+from tkinter import ttk
 
 from garlicsmtp.gui.tk_authentication import (
     LoginDialog,
@@ -54,6 +55,54 @@ def test_login_form_masks_password():
         assert (
             form.password_entry.cget("show")
             == "*"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_login_form_uses_orange_background_and_black_text():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        form = LoginForm(
+            root,
+        )
+
+        style = ttk.Style(root)
+
+        assert form.cget("style") == "Garlic.Auth.TFrame"
+
+        assert (
+            style.lookup(
+                "Garlic.Auth.TFrame",
+                "background",
+            )
+            == "#ff8c00"
+        )
+        assert (
+            style.lookup(
+                "Garlic.Auth.TLabel",
+                "background",
+            )
+            == "#ff8c00"
+        )
+        assert (
+            style.lookup(
+                "Garlic.Auth.TLabel",
+                "foreground",
+            )
+            == "#000000"
+        )
+
+        assert (
+            form.username_entry.cget("style")
+            == ""
+        )
+        assert (
+            form.password_entry.cget("style")
+            == ""
         )
 
     finally:
@@ -479,6 +528,35 @@ def test_setup_form_lays_out_controls():
         )
 
     finally:
+        root.destroy()
+
+
+def test_login_dialog_is_centered_on_screen():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = LoginDialog(
+            root,
+        )
+
+        dialog.update_idletasks()
+
+        expected_x = (
+            dialog.winfo_screenwidth()
+            - dialog.winfo_width()
+        ) // 2
+        expected_y = (
+            dialog.winfo_screenheight()
+            - dialog.winfo_height()
+        ) // 2
+
+        assert dialog.geometry().endswith(
+            f"+{expected_x}+{expected_y}"
+        )
+
+    finally:
+        dialog.destroy()
         root.destroy()
 
 

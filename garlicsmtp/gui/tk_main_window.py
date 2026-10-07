@@ -88,16 +88,19 @@ class MainWindow(ttk.Frame):
             self.header_frame,
             text="GarlicSMTP",
             style="Garlic.TLabel",
+            font=("", 18, "bold"),
         )
 
         self.subtitle_label = ttk.Label(
             self.header_frame,
             text="Private mail infrastructure monitor",
             style="Garlic.TLabel",
+            font=("", 16, "bold"),
         )
 
         self.runtime_badge = StatusBadge(
             self.header_frame,
+            status_colors=True,
         )
 
         self.action_frame = ttk.Frame(

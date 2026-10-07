@@ -31,6 +31,7 @@ class TorSection(DashboardCard):
 
         self.status_value = StatusBadge(
             self.content,
+            status_colors=True,
         )
         self.socks_value = SelectableValue(
             self.content,
