@@ -16,6 +16,9 @@ from install.system import (
     execute_machine_system_installation,
     configure_profile_tor,
     build_refreshed_user_action,
+    build_tor_configuration_removal_action,
+    remove_profile_tor_configuration,
+    remove_managed_profile_tor_configuration,
 )
 from pathlib import Path    
 
@@ -1151,3 +1154,171 @@ def test_build_refreshed_user_action_forwards_input():
         "requires_privileges": False,
         "input": "secret-password\n",
     }
+
+
+def test_build_tor_configuration_removal_action_is_privileged():
+    action = build_tor_configuration_removal_action(
+        torrc_path=Path("/etc/tor/torrc"),
+        configuration_text=(
+            "SocksPort 9050\n"
+            "\n"
+            "Log notice file /var/log/tor/notices.log\n"
+        ),
+    )
+
+    assert action == {
+        "command": [
+            "tee",
+            "/etc/tor/torrc",
+        ],
+        "requires_privileges": True,
+        "input": (
+            "SocksPort 9050\n"
+            "\n"
+            "Log notice file /var/log/tor/notices.log\n"
+        ),
+    }
+
+
+def test_remove_profile_tor_configuration_executes_privileged_rewrite():
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    torrc_path = Path("/etc/tor/torrc")
+    configuration_text = (
+        "SocksPort 9050\n"
+        "\n"
+        "Log notice file /var/log/tor/notices.log\n"
+    )
+
+    calls = []
+
+    def execute_action(profile_arg, action, run_arg):
+        calls.append(
+            (profile_arg, action, run_arg)
+        )
+
+    runner = object()
+
+    remove_profile_tor_configuration(
+        profile=profile,
+        torrc_path=torrc_path,
+        configuration_text=configuration_text,
+        run=runner,
+        execute_action=execute_action,
+    )
+
+    assert calls == [
+        (
+            profile,
+            build_tor_configuration_removal_action(
+                torrc_path=torrc_path,
+                configuration_text=configuration_text,
+            ),
+            runner,
+        ),
+        (
+            profile,
+            {
+                "command": [
+                    "systemctl",
+                    "restart",
+                    "tor@default.service",
+                ],
+                "requires_privileges": True,
+            },
+            runner,
+        ),
+    ]
+
+
+def test_remove_managed_profile_tor_configuration_cleans_before_rewrite():
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+
+    torrc_path = Path("/etc/tor/torrc")
+
+    configuration_text = (
+        "ControlPort 127.0.0.1:9999\n"
+        "\n"
+        "# GarlicSMTP Tor Control\n"
+        "ControlPort 127.0.0.1:19051\n"
+        "\n"
+        "SocksPort 9050\n"
+    )
+
+    calls = []
+
+    def remove_configuration(**kwargs):
+        calls.append(kwargs)
+
+    remove_managed_profile_tor_configuration(
+        profile=profile,
+        torrc_path=torrc_path,
+        configuration_text=configuration_text,
+        run="runner",
+        remove_configuration=remove_configuration,
+    )
+
+    assert calls == [
+        {
+            "profile": profile,
+            "torrc_path": torrc_path,
+            "configuration_text": (
+                "ControlPort 127.0.0.1:9999\n"
+                "\n"
+                "SocksPort 9050\n"
+            ),
+            "run": "runner",
+        },
+    ]
+
+
+def test_remove_profile_tor_configuration_restarts_tor_after_rewrite():
+    profile = {
+        "privilege_elevation": "sudo",
+    }
+    torrc_path = Path("/etc/tor/torrc")
+    calls = []
+
+    def execute_action(profile_arg, action, run_arg):
+        calls.append(
+            (
+                profile_arg,
+                action,
+                run_arg,
+            )
+        )
+
+    remove_profile_tor_configuration(
+        profile=profile,
+        torrc_path=torrc_path,
+        configuration_text="SocksPort 9050\n",
+        run="runner",
+        execute_action=execute_action,
+    )
+
+    assert calls == [
+        (
+            profile,
+            build_tor_configuration_removal_action(
+                torrc_path=torrc_path,
+                configuration_text="SocksPort 9050\n",
+            ),
+            "runner",
+        ),
+        (
+            profile,
+            {
+                "command": [
+                    "systemctl",
+                    "restart",
+                    "tor@default.service",
+                ],
+                "requires_privileges": True,
+            },
+            "runner",
+        ),
+    ]

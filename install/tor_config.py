@@ -6,6 +6,57 @@ from pathlib import Path
 
 TOR_MANAGED_MARKER = "# GarlicSMTP Tor Control"
 
+def remove_tor_managed_block_from_text(
+    *,
+    configuration_text: str,
+    marker: str,
+) -> str:
+    lines = configuration_text.splitlines(
+        keepends=True,
+    )
+
+    for index, line in enumerate(lines):
+        if line.rstrip("\r\n") != marker:
+            continue
+
+        end = index + 1
+
+        if (
+            end < len(lines)
+            and lines[end].startswith("ControlPort ")
+        ):
+            end += 1
+
+        if (
+            index > 0
+            and lines[index - 1].strip() == ""
+        ):
+            index -= 1
+
+        del lines[index:end]
+        break
+
+    return "".join(lines)
+
+def remove_tor_managed_block(
+    *,
+    torrc_path: Path,
+    marker: str,
+) -> None:
+    configuration_text = torrc_path.read_text(
+        encoding="utf-8",
+    )
+
+    cleaned_text = remove_tor_managed_block_from_text(
+        configuration_text=configuration_text,
+        marker=marker,
+    )
+
+    torrc_path.write_text(
+        cleaned_text,
+        encoding="utf-8",
+    )
+
 def build_tor_configuration_plan(
     *,
     tor_state: str,

@@ -11,7 +11,9 @@ from install.tor_config import (
     build_tor_configuration_actions,
     build_tor_configuration_plan,
     execute_tor_configuration_plan,
+    remove_tor_managed_block,
     tor_managed_block_present,
+    remove_tor_managed_block_from_text,
 )
 
 
@@ -399,3 +401,110 @@ def test_execute_tor_configuration_plan_resumes_after_managed_block(
             "tor@default.service",
         ],
     ]
+
+
+def test_remove_tor_managed_block_preserves_unrelated_configuration(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "SocksPort 9050\n"
+        "\n"
+        "# GarlicSMTP Tor Control\n"
+        "ControlPort 127.0.0.1:9051\n"
+        "\n"
+        "Log notice file /var/log/tor/notices.log\n",
+        encoding="utf-8",
+    )
+
+    remove_tor_managed_block(
+        torrc_path=torrc_path,
+        marker="# GarlicSMTP Tor Control",
+    )
+
+    assert torrc_path.read_text(
+        encoding="utf-8",
+    ) == (
+        "SocksPort 9050\n"
+        "\n"
+        "Log notice file /var/log/tor/notices.log\n"
+    )
+
+
+def test_remove_tor_managed_block_removes_configured_control_port(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+
+    plan = build_tor_configuration_plan(
+        tor_state="configuration_required",
+        torrc_path=torrc_path,
+        runtime_user="alice",
+        control_host="127.0.0.1",
+        control_port=19051,
+    )
+
+    torrc_path.write_text(
+        "SocksPort 9050\n"
+        + plan["append_text"],
+        encoding="utf-8",
+    )
+
+    remove_tor_managed_block(
+        torrc_path=torrc_path,
+        marker=plan["marker"],
+    )
+
+    assert torrc_path.read_text(
+        encoding="utf-8",
+    ) == "SocksPort 9050\n"
+
+
+def test_remove_tor_managed_block_preserves_unrelated_control_port(
+    tmp_path,
+):
+    torrc_path = tmp_path / "torrc"
+    torrc_path.write_text(
+        "ControlPort 127.0.0.1:9999\n"
+        "\n"
+        "# GarlicSMTP Tor Control\n"
+        "ControlPort 127.0.0.1:19051\n"
+        "\n"
+        "SocksPort 9050\n",
+        encoding="utf-8",
+    )
+
+    remove_tor_managed_block(
+        torrc_path=torrc_path,
+        marker="# GarlicSMTP Tor Control",
+    )
+
+    assert torrc_path.read_text(
+        encoding="utf-8",
+    ) == (
+        "ControlPort 127.0.0.1:9999\n"
+        "\n"
+        "SocksPort 9050\n"
+    )
+
+
+def test_remove_tor_managed_block_from_text_returns_clean_configuration():
+    configuration_text = (
+        "ControlPort 127.0.0.1:9999\n"
+        "\n"
+        "# GarlicSMTP Tor Control\n"
+        "ControlPort 127.0.0.1:19051\n"
+        "\n"
+        "SocksPort 9050\n"
+    )
+
+    cleaned_text = remove_tor_managed_block_from_text(
+        configuration_text=configuration_text,
+        marker="# GarlicSMTP Tor Control",
+    )
+
+    assert cleaned_text == (
+        "ControlPort 127.0.0.1:9999\n"
+        "\n"
+        "SocksPort 9050\n"
+    )

@@ -16,6 +16,8 @@ from pathlib import Path
 from install.tor_config import (
     build_tor_configuration_plan,
     execute_tor_configuration_plan,
+    TOR_MANAGED_MARKER,
+    remove_tor_managed_block_from_text,
 )   
 
 def build_package_install_action(
@@ -179,6 +181,73 @@ def build_machine_system_install_action(
         plan,
     )
 
+def build_tor_configuration_removal_action(
+    *,
+    torrc_path: Path,
+    configuration_text: str,
+) -> dict:
+    return {
+        "command": [
+            "tee",
+            str(torrc_path),
+        ],
+        "requires_privileges": True,
+        "input": configuration_text,
+    }
+
+def remove_profile_tor_configuration(
+    *,
+    profile: dict,
+    torrc_path: Path,
+    configuration_text: str,
+    run,
+    execute_action=execute_profile_system_action,
+) -> None:
+    action = build_tor_configuration_removal_action(
+        torrc_path=torrc_path,
+        configuration_text=configuration_text,
+    )
+
+    execute_action(
+        profile,
+        action,
+        run,
+    )
+
+    restart_action = {
+        "command": [
+            "systemctl",
+            "restart",
+            "tor@default.service",
+        ],
+        "requires_privileges": True,
+    }
+
+    execute_action(
+        profile,
+        restart_action,
+        run,
+    )
+
+def remove_managed_profile_tor_configuration(
+    *,
+    profile: dict,
+    torrc_path: Path,
+    configuration_text: str,
+    run,
+    remove_configuration=remove_profile_tor_configuration,
+) -> None:
+    cleaned_text = remove_tor_managed_block_from_text(
+        configuration_text=configuration_text,
+        marker=TOR_MANAGED_MARKER,
+    )
+
+    remove_configuration(
+        profile=profile,
+        torrc_path=torrc_path,
+        configuration_text=cleaned_text,
+        run=run,
+    )
 
 def configure_profile_tor(
     *,
