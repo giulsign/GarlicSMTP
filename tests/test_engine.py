@@ -43,12 +43,14 @@ def test_engine_start_stop():
 
 def test_application_uses_context_runtime(
     tmp_path,
+    dek,
 ):
     context = ApplicationBuilder(
         paths=ApplicationPaths(
             root_dir=tmp_path / "garlicsmtp"
         ),
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     app = GarlicSMTP(

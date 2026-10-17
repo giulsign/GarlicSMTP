@@ -147,7 +147,9 @@ class ApplicationBuilder:
         message_store_backend: MessageStoreBackend | None = None,
         logger: Logger | None = None,
         imap_authenticator: Authenticator | None = None,
+        dek: bytes | None = None,
     ) -> None:
+        self.dek = dek
         self.paths = (
             paths
             if paths is not None
@@ -171,6 +173,9 @@ class ApplicationBuilder:
     def build(
         self,
     ) -> ApplicationContext:
+        if not isinstance(self.dek, bytes) or len(self.dek) != 32:
+            raise ValueError("DEK non valida o mancante")
+
         self.paths.create_directories()
 
         attachment_limit = None
@@ -362,14 +367,16 @@ class ApplicationBuilder:
         backend = (
             self.message_store_backend
             or SQLiteMessageStoreBackend(
-                self.paths.mailbox_database
+                self.paths.mailbox_database,
+                dek=self.dek,
             )
         )   
 
         return MessageStore(
             backend=backend,
             attachment_store=AttachmentStore(
-                self.paths.attachments_dir
+                self.paths.attachments_dir,
+                dek=self.dek,
             ),
         )
     
@@ -379,7 +386,8 @@ class ApplicationBuilder:
         backend = (
             self.queue_backend
             or SQLiteQueueBackend(
-                self.paths.queue_database
+                self.paths.queue_database,
+                dek=self.dek,
             )
         )
 

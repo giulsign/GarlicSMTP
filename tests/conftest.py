@@ -22,3 +22,7 @@ def message():
         ),
         headers=MailHeaders(),
     )
+
+@pytest.fixture
+def dek():
+    return bytes(range(32))

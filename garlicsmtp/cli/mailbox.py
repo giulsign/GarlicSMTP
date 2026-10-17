@@ -13,9 +13,12 @@ from garlicsmtp.storage.store import MessageStore
 
 def build_mailbox_store(
     database_path: str,
+    *,
+    dek: bytes,
 ) -> MessageStore:
     backend = SQLiteMessageStoreBackend(
-        database_path
+        database_path,
+        dek=dek,
     )
 
     return MessageStore(
@@ -36,9 +39,12 @@ def format_flags(
 
 def list_mailboxes(
     database_path: str,
+    *,
+    dek: bytes,
 ) -> int:
     store = build_mailbox_store(
-        database_path
+        database_path,
+        dek=dek,
     )
 
     try:
@@ -76,9 +82,12 @@ def list_mailboxes(
 def list_messages(
     database_path: str,
     mailbox: str,
+    *,
+    dek: bytes,
 ) -> int:
     store = build_mailbox_store(
-        database_path
+        database_path,
+        dek=dek,
     )
 
     try:
@@ -132,9 +141,12 @@ def show_message(
     database_path: str,
     mailbox: str,
     message_reference: str,
+    *,
+    dek: bytes,
 ) -> int:
     store = build_mailbox_store(
-        database_path
+        database_path,
+        dek=dek,
     )
 
     try:
@@ -243,9 +255,12 @@ def update_flags(
     message_reference: str,
     operation: str,
     flags: set[str],
+    *,
+    dek:bytes,
 ) -> int:
     store = build_mailbox_store(
-        database_path
+        database_path,
+        dek=dek,
     )
 
     try:

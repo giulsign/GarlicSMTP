@@ -253,9 +253,11 @@ def test_message_store_rejects_subscription_to_missing_mailbox():
 def test_message_store_deletes_attachments_with_message(
     tmp_path,
     message,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -295,9 +297,11 @@ def test_message_store_deletes_attachments_with_message(
 def test_message_store_deletes_mailbox_attachments(
     tmp_path,
     message,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -355,9 +359,11 @@ def test_message_store_deletes_mailbox_attachments(
 def test_message_store_delete_mailbox_preserves_other_attachments(
     tmp_path,
     message,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -415,9 +421,11 @@ def test_message_store_delete_mailbox_preserves_other_attachments(
 def test_message_store_copies_attachments_with_message(
     tmp_path,
     message,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -480,9 +488,11 @@ def test_message_store_copy_rolls_back_when_attachment_copy_fails(
     tmp_path,
     message,
     monkeypatch,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(

@@ -48,7 +48,7 @@ def run_app(app):
     app.start()
     app.run()
 
-def test_smtp_real_client_delivers_to_queue(tmp_path):
+def test_smtp_real_client_delivers_to_queue(tmp_path, dek):
 
     config = GarlicSMTPConfig(
         listen_host="127.0.0.1",
@@ -65,6 +65,7 @@ def test_smtp_real_client_delivers_to_queue(tmp_path):
     bootstrap = Bootstrap(
         config,
         default_transport=spy,
+        dek=dek,
     )
 
     app = bootstrap.build()

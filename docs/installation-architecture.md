@@ -1,3 +1,147 @@
+# GarlicSMTP Installation Architecture — aggiornamento documentale
+
+> **Aggiornamento milestone — 18/10/2026**
+>
+> Le osservazioni dell'08/10/2026 e la baseline P1–P46
+> rimangono conservate come documentazione storica.
+>
+> **Implementazione in sviluppo:** gestione della DEK,
+> wrapping mediante password e recovery key offline,
+> integrazione SQLCipher nei backend SQLite interessati,
+> cifratura degli allegati nelle componenti interessate,
+> recupero della password applicativa e rotazione della
+> recovery key senza rigenerazione della DEK.
+>
+> **Verifiche eseguite:** suite completa `python -m pytest -q`
+> con 1830 test superati; recupero password verificato
+> manualmente nell'ambiente di sviluppo.
+>
+> **Validazioni ancora aperte:** installazione e packaging
+> della nuova build su Ubuntu 24.04 VM, migrazione sicura
+> dei dati persistenti preesistenti e verifica end-to-end
+> della protezione di database, allegati, metadati,
+> residui temporanei e backup. Non dichiarare soddisfatti
+> integralmente i requisiti S1–S7 sulla sola base dei test.
+>
+
+**Data aggiornamento:** 08/10/2026
+**Stato:** requisiti architetturali P1–P46 preservati; stato di implementazione aggiornato dagli snapshot fino alla ripresa 8.
+**Gerarchia delle fonti:** repository e test reali > evidenze di validazione successive > snapshot recenti > baseline storiche. Questa edizione BIS include una verifica statica dei file ufficiali pubblicati su GitHub, esclusa la cartella `docs/`. Non costituisce una nuova prova runtime.
+
+## Guida alla lettura
+
+Il testo originale del 06/09/2026 è conservato integralmente nella sezione «Baseline normativa P1–P46» per non perdere numerazione, vincoli o decisioni. Le sezioni che precedono e seguono la baseline ne aggiornano **lo stato**, non ne cancellano le prescrizioni. Dove la baseline dice «non ancora deciso», leggere anche gli aggiornamenti successivi: alcune scelte sono state nel frattempo implementate. Dove la baseline descrive una GUI Qt, il prodotto successivo utilizza Tkinter.
+
+## Stato verificato documentalmente al 08/10/2026
+
+| Area | Evidenza più recente | Stato |
+|---|---|---|
+| Sistema operativo | clean install e flusso SMTP/Tor su VM Ubuntu 24.04 | validato per Ubuntu 24.04; non estendere ad altre distro |
+| Ambiente Python | Python >=3.12; venv isolato; metadata in pyproject.toml | realizzato |
+| Installer | `./install.sh` generato da manifest/progetto, rootless, detect-before-modify, idempotente | validato su VM Ubuntu 24.04 |
+| Tor | Control locale 127.0.0.1:9051, SAFECOOKIE, cookie della stessa istanza Tor, gestione Onion dinamica | validato su VM |
+| GUI | launcher `garlicsmtp-gui` per produzione; `python -m garlicsmtp.gui` per development | Tkinter attuale; Qt/PySide6 è storia |
+| Launcher Desktop | PNG, `.desktop`, trust GNOME | validato nella fase successiva al clean install |
+| Account GUI | scrypt, `state/account-credentials.json`, creazione 0600 e controlli su symlink | implementato e testato in fase successiva |
+| Dati persistenti | `data/mailboxes.db`, `data/sent.db`, `state/queue.db`, allegati bin/json | persistenza esistente; cifratura a riposo completa NON implementata |
+| Recupero password | recovery key offline, DEK e doppia KEK | requisiti approvati, NON implementati |
+| Disinstallazione | preservare `~/GarlicSMTP` sorgente; rimuovere solo risorse proprie secondo policy | test VM riportato nelle fasi successive |
+
+**Non equiparare** la cifratura E2EE durante il trasporto alla cifratura dei database a riposo. L'account GUI non sblocca ancora una DEK. Le decisioni di SQLCipher, migrazione e recovery sono ancora aperte.
+
+## Regole di installazione aggiornate
+
+- Eseguire `./install.sh` come utente normale **dalla radice del repository**. Non usare `sudo ./install.sh`, `sudo pip`, `pip --user` o `--break-system-packages`.
+- Per il primo avvio in produzione usare `~/.local/share/garlicsmtp/venv/bin/garlicsmtp-gui` o il launcher Desktop installato; per lo sviluppo usare `python -m garlicsmtp.gui` da repository e venv attiva. I due percorsi hanno configurazioni differenti.
+- Il profilo realmente validato è Ubuntu 24.04 con `apt-get`, Tor di sistema e sessione grafica GNOME. La disponibilità su altre distribuzioni, macOS e Windows nativo **non è attestata**.
+- Se l'utente viene aggiunto al gruppo `debian-tor`, può essere necessario **logout/login grafico completo** prima di avviare la GUI: la sessione esistente può avere gruppi supplementari obsoleti.
+- L'installer deve conservare Onion identity, Ed25519, X25519, trust, pin remoti, archivi e credenziali nelle reinstallazioni idempotenti e negli upgrade.
+- I test che simulano operazioni di sistema non devono eseguire realmente comandi privilegiati.
+
+## Layout persistente attuale e responsabilità
+
+`ApplicationPaths.for_user()` è autoritativo. Gli snapshot più recenti confermano la radice `~/.local/share/garlicsmtp/`, il venv sotto `venv/`, la configurazione in `config/settings.toml`, i messaggi ricevuti in `data/mailboxes.db`, gli inviati in `data/sent.db`, la coda in `state/queue.db` e le credenziali GUI in `state/account-credentials.json`. Esistono inoltre allegati e file di identità/chiavi gestiti dai rispettivi componenti; **non derivare automaticamente l'intero layout da questa lista**. Verificare sempre `garlicsmtp/configuration/paths.py`, `application/builder.py`, il manifest e il codice installer corrente prima di modificare i percorsi.
+
+## Aggiornamenti cronologici che superano le osservazioni del 06/09
+
+- **09/09:** milestone Tor P45 conclusa, commit storico `d86ce64`, full suite allora `1273 passed`. Il documento intermedio che riportava P45.4 RED è superato dal successivo snapshot che dichiara P45 chiuso.
+- **15–17/09:** installer/first-run, runtime-config, packaging e validazione da Ubuntu 24.04 vergine. Correzioni documentate: probe venv/ensurepip; wiring Tor ControlPort; dipendenza `libxcb-cursor0` allora necessaria per GUI Qt; refresh gruppi; distinzione development/production paths. Il prerequisito Qt è **storico** dopo migrazione GUI a Tkinter.
+- **18–27/09:** launcher Desktop PNG/trust GNOME; migrazione PySide6 → Tkinter; baseline alpha tag `v0.0.1-alpha` su `f249621a21afd75ca83571e62be7c8405c15705d`; archivi Received/Sent separati.
+- **02/10:** allegati validati (precedente checkpoint `1616 passed`); pulsante manuale `Retry pending` validato (`1622 passed` full suite); non cambia l'algoritmo di retry né conferma la consegna remota.
+- **Fasi successive riportate nella ripresa 8:** credenziali account GUI con scrypt e file 0600, test dedicati 18 passed, ultimo full pytest riferito `1712 passed`; disinstallazione testata su Ubuntu 24.04 preservando sorgenti. Questi numeri sono checkpoint storici, non test rieseguiti per questa redazione.
+- **08/10:** audit dei percorsi persistenti e della crittografia; recovery offline e cifratura integrale a riposo restano solo in progettazione.
+
+---
+
+## Indice completo dei punti di sviluppo P e S (non retroattivi)
+
+Questo indice riunisce tutti i punti in un unico elenco consultabile. I testi normativi **P1–P46** rimangono invariati nelle rispettive sezioni; i punti **S1–S7** sono requisiti successivi, **non retroattivi**, e non modificano né rinumerano i P. L’indice non attribuisce a nessun punto lo stato di implementazione.
+
+### Principi P — baseline storica (P1–P46)
+
+- **P1 — Mandatory isolated virtual environment**
+- **P2 — GarlicSMTP never runs as root**
+- **P3 — Detect before modifying**
+- **P4 — Bootstrap is idempotent**
+- **P5 — Installation is phased and verifiable**
+- **P6 — Deterministic versions and dependencies**
+- **P7 — No implicit remote script execution**
+- **P8 — Installation manifest as a source of release truth**
+- **P9 — Detect project/installer divergence**
+- **P10 — Installer is generated**
+- **P11 — Contemporaneous versioned documentation**
+- **P12 — Upgrade is not reinstall**
+- **P13 — Software and persistent state are separated**
+- **P14 — Persistent state belongs to the runtime user**
+- **P15 — Restrictive secret permissions**
+- **P16 — ApplicationPaths.for_user() is authoritative for V1**
+- **P17 — No persistent writes outside declared layout**
+- **P18 — Persistent layout changes are migrations**
+- **P19 — First-run is determined from real state**
+- **P20 — No default or shared secrets**
+- **P21 — Cryptographic secrets are generated by their responsible components**
+- **P22 — Creation is not regeneration**
+- **P23 — Generated configuration is minimal**
+- **P24 — Existing configuration is not silently overwritten**
+- **P25 — First-run is resumable**
+- **P26 — Persistent local IMAP credentials**
+- **P27 — Passwords use a dedicated password-hashing scheme**
+- **P28 — Credential state is separate from settings.toml**
+- **P29 — Credentials are created once**
+- **P30 — Password reset is not reinstall**
+- **P31 — Authentication remains separate from IMAP protocol logic**
+- **P32 — Onion Service is the network-identity authority**
+- **P33 — Canonical V1 mail address derives from the real Onion hostname**
+- **P34 — test.onion is not an installed identity**
+- **P35 — Onion identity is persistent**
+- **P36 — GUI sender remains backend-derived**
+- **P37 — IMAP authentication identity and Onion identity are distinct**
+- **P38 — First-run verifies the real Onion identity**
+- **P39 — Tor is a system prerequisite**
+- **P40 — GarlicSMTP owns the Onion Service lifecycle**
+- **P41 — Tor Control remains local**
+- **P42 — SAFECOOKIE is mandatory**
+- **P43 — Tor's advertised cookie is authoritative**
+- **P44 — SAFECOOKIE access without root runtime**
+- **P45 — Detect Tor state before modifying it**
+- **P46 — First-run performs end-to-end Tor verification**
+
+### Requisiti S — successivi e non retroattivi (S1–S7)
+
+- **S1 — cifratura integrale:**: proteggere mailboxes.db, sent.db, queue.db, metadati, allegati e residui SQLite (WAL, SHM, journal, temp e backup) con una strategia verificata, anche dopo crash.
+- **S2 — gerarchia chiavi:**: DEK indipendente da password e recovery key; due KEK indipendenti per proteggere la stessa DEK; nessun segreto salvato in chiaro.
+- **S3 — recovery offline:**: generazione casuale, visualizzazione una sola volta, conferma di conservazione, reset password senza vecchia password, rotazione e invalidazione della vecchia chiave; non è login alternativo.
+- **S4 — continuità:**: migrazione developer e nuove installazioni devono conservare messaggi, allegati, Ed25519, X25519 e identità Onion; niente bypass developer.
+- **S5 — accesso e lifecycle:**: login prima di avvio ricezione; chiusura GUI ferma la ricezione; accessi diretti da CLI/bootstrap non devono aggirare lo sblocco degli archivi.
+- **S6 — E2E di sicurezza:**: ricezione reale, chiusura, copia DB non leggibile, riavvio, recovery offline, lettura dello stesso messaggio, identità immutate.
+- **S7 — packaging:**: prima di scegliere SQLCipher, verificare build, distribuzione, dipendenze e compatibilità Ubuntu 24.04. `cryptography>=46,<47` non cifra da sola un database SQLite.
+
+---
+
+## Baseline normativa P1–P46 (testo storico conservato)
+
+> Nota editoriale: le affermazioni «currently», «not yet» e i dettagli Qt nel testo seguente sono riferiti **al 06/09/2026**; le sezioni di aggiornamento sopra e sotto hanno priorità temporale.
+
 # GarlicSMTP Installation Architecture
 
 **Status:** Design baseline  
@@ -590,3 +734,43 @@ Installer development must prefer composition around these components.
 Existing application code is changed only when an installer requirement
 demonstrates a real missing boundary or API, and such a change follows
 the normal RED -> minimal implementation -> GREEN process.
+
+
+---
+
+## Requisiti nuovi da progettare — NON implementati
+
+Questi requisiti sono registrati qui come backlog di sicurezza, **non** aggiunti retroattivamente ai principi P1–P46:
+
+- **S1 / cifratura integrale:** proteggere mailboxes.db, sent.db, queue.db, metadati, allegati e residui SQLite (WAL, SHM, journal, temp e backup) con una strategia verificata, anche dopo crash.
+- **S2 / gerarchia chiavi:** DEK indipendente da password e recovery key; due KEK indipendenti per proteggere la stessa DEK; nessun segreto salvato in chiaro.
+- **S3 / recovery offline:** generazione casuale, visualizzazione una sola volta, conferma di conservazione, reset password senza vecchia password, rotazione e invalidazione della vecchia chiave; non è login alternativo.
+- **S4 / continuità:** migrazione developer e nuove installazioni devono conservare messaggi, allegati, Ed25519, X25519 e identità Onion; niente bypass developer.
+- **S5 / accesso e lifecycle:** login prima di avvio ricezione; chiusura GUI ferma la ricezione; accessi diretti da CLI/bootstrap non devono aggirare lo sblocco degli archivi.
+- **S6 / E2E di sicurezza:** ricezione reale, chiusura, copia DB non leggibile, riavvio, recovery offline, lettura dello stesso messaggio, identità immutate.
+- **S7 / packaging:** prima di scegliere SQLCipher, verificare build, distribuzione, dipendenze e compatibilità Ubuntu 24.04. `cryptography>=46,<47` non cifra da sola un database SQLite.
+
+## Criterio per modificare architettura e installer
+
+Ogni modifica segue: lettura sorgente reale + test pertinenti → RED singolo e confermato → GREEN minimo → test mirato → regressioni correlate → `pytest -q` → gate VM Ubuntu 24.04 se necessario. Core SMTP, IMAP, queue/store, E2EE e Tor congelato salvo failure concreto. Nessun commit o test va dichiarato senza output reale. Aggiornare questo documento soltanto dopo aver classificato evidenze e cambiamenti.
+
+## Provenienza
+
+Fonti: `installation-architecture(1).md` (baseline 06/09), documenti 03/09 e 06/09, snapshot 09/09 e 15/09, validazione alpha 17/09, handoff 27/09, ripresa 7 del 02/10, ripresa 8 del 08/10 e recap 31/07. La redazione non ha avuto accesso al repository Git corrente: le istruzioni operative sono derivate dagli snapshot.
+
+
+## Addendum BIS — riscontro repository ufficiale (08/10/2026)
+
+Repository `https://github.com/giulsign/GarlicSMTP.git`, branch predefinito `main`. Esclusa la cartella GitHub `docs/`; la baseline P1–P46 sopra proviene dai documenti forniti dall’utente.
+
+- `pyproject.toml`: versione `0.0.1-alpha`, Python `>=3.12`, dipendenze `dnspython>=2.8,<3` e `cryptography>=46,<47`, entrypoint `garlicsmtp` e `garlicsmtp-gui`.
+- `README.md` e `SECURITY.md`: alpha, nessun audit indipendente, nessuna garanzia di anonimato/sicurezza; PolyForm Noncommercial 1.0.0 e licenza commerciale separata.
+- `install.sh`: invoca `/usr/bin/python3 -m install.installer`.
+- `install/manifest.toml`: unico profilo Ubuntu 24.04; `apt-get`, Tor `127.0.0.1:9051` SAFECOOKIE, `python3-venv`, `python3-tk`.
+- `install/installer.py`: chiede password **IMAP**, crea venv utente, installa package e configura runtime/launcher; richiede logout/login per gruppo Tor. Password IMAP distinta dall’account GUI.
+- `install/uninstaller.py`: comando `python3 -m install.uninstaller`, conferma `DELETE`; elimina dati applicativi, chiavi e Onion identity, non il checkout Git. Non esiste `uninstall.sh` nella root esaminata.
+- `garlicsmtp/gui/application.py`: setup/login prima dell’avvio runtime e della visualizzazione della finestra.
+- `garlicsmtp/security/auth/account_credentials.py`: hash scrypt e permessi 0600.
+- `garlicsmtp/storage/sqlite/backend.py` e `garlicsmtp/storage/attachment_store.py`: SQLite standard e allegati/metadati in chiaro. Cifratura integrale at-rest, DEK e recovery key ancora da implementare.
+
+Confronto statico, senza nuove esecuzioni pytest o VM. Gli esiti storici restano tali.

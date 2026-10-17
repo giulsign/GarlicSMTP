@@ -7,6 +7,7 @@
 from garlicsmtp.security.auth.password_hasher import (
     PasswordHasher,
 )
+from unittest.mock import patch
 
 
 def test_password_hasher_verifies_password():
@@ -68,3 +69,23 @@ def test_password_hasher_encodes_algorithm_parameters_salt_and_hash():
     assert int(length) > 0
     assert salt
     assert derived
+
+
+def test_password_hasher_uses_constant_time_comparison():
+    hasher = PasswordHasher()
+
+    encoded = hasher.hash_password(
+        "correct horse battery staple"
+    )
+
+    with patch(
+        "garlicsmtp.security.auth.password_hasher.hmac.compare_digest",
+        wraps=__import__("hmac").compare_digest,
+        create=True,
+    ) as compare_digest:
+        assert hasher.verify_password(
+            "correct horse battery staple",
+            encoded,
+        ) is True
+
+    compare_digest.assert_called_once()

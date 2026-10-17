@@ -48,7 +48,6 @@ from garlicsmtp.security.decryptor import (
 from garlicsmtp.security.encryptor import (
     ENCRYPTION_HEADER,
 )
-import sqlite3
 from garlicsmtp.transport.onion.transport import (
     OnionTransport,
 )
@@ -96,10 +95,14 @@ from garlicsmtp.smtp.mime import (
 from garlicsmtp.application.attachment_limit_admin import (
     AttachmentLimitAdminStore,
 )
+from garlicsmtp.security.encrypted_sqlite import (
+    connect_encrypted_sqlite,
+)
 
 
 def test_application_builder_creates_context(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -110,6 +113,7 @@ def test_application_builder_creates_context(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     assert context.paths is paths
@@ -142,6 +146,7 @@ def test_application_builder_creates_context(
 def test_application_builder_uses_persistent_backends(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -150,6 +155,7 @@ def test_application_builder_uses_persistent_backends(
     first = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     first.store.save(
@@ -163,6 +169,7 @@ def test_application_builder_uses_persistent_backends(
     second = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     assert second.store.count(
@@ -176,6 +183,7 @@ def test_application_builder_uses_persistent_backends(
 
 def test_application_builder_loads_settings(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -196,7 +204,8 @@ socks_port = 9150
     )
 
     context = ApplicationBuilder(
-        paths=paths
+        paths=paths,
+        dek=dek,
     ).build()
 
     assert context.settings.hostname == (
@@ -215,7 +224,8 @@ socks_port = 9150
 
 def test_application_builder_connects_runtime_services(
     tmp_path,
-):
+    dek,
+    ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
     )
@@ -223,6 +233,7 @@ def test_application_builder_connects_runtime_services(
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     assert context.runtime.services == [
@@ -445,6 +456,7 @@ def test_application_builder_delegates_onion_service_creation(
 
 def test_application_builder_disables_onion_service_when_tor_disabled(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -457,6 +469,7 @@ def test_application_builder_disables_onion_service_when_tor_disabled(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     assert context.onion_service is None
@@ -512,6 +525,7 @@ def test_application_builder_connects_onion_hostname_to_tor_status(
 
 def test_application_builder_trusts_local_onion_sender_key(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -523,6 +537,7 @@ def test_application_builder_trusts_local_onion_sender_key(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     onion_service = context.onion_service
@@ -563,6 +578,7 @@ def test_application_builder_trusts_local_onion_sender_key(
 
 def test_application_builder_wires_trust_aware_verifier_into_smtp_server(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -571,6 +587,7 @@ def test_application_builder_wires_trust_aware_verifier_into_smtp_server(
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     verifier = context.smtp_server.verifier
@@ -593,6 +610,7 @@ def test_application_builder_wires_trust_aware_verifier_into_smtp_server(
 
 def test_application_builder_preserves_trusted_key_across_builds(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -601,6 +619,7 @@ def test_application_builder_preserves_trusted_key_across_builds(
     first_context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     first_store = (
@@ -620,6 +639,7 @@ def test_application_builder_preserves_trusted_key_across_builds(
     second_context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     second_store = (
@@ -636,6 +656,7 @@ def test_application_builder_preserves_trusted_key_across_builds(
 
 def test_application_builder_configures_e2ee_capability(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -647,6 +668,7 @@ def test_application_builder_configures_e2ee_capability(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     identity = EncryptionIdentity(
@@ -670,6 +692,7 @@ def test_application_builder_configures_e2ee_capability(
 
 def test_application_builder_builds_persistent_encryption_key_store(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -678,6 +701,7 @@ def test_application_builder_builds_persistent_encryption_key_store(
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     assert isinstance(
@@ -695,6 +719,7 @@ def test_application_builder_builds_persistent_encryption_key_store(
 
 def test_application_builder_pins_discovered_e2ee_key(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -703,6 +728,7 @@ def test_application_builder_pins_discovered_e2ee_key(
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     onion_transport = (
@@ -739,6 +765,7 @@ def test_application_builder_pins_discovered_e2ee_key(
 def test_application_builder_wires_remote_encryption_before_queue(
         tmp_path,
         message,
+        dek,
     ):
         paths = ApplicationPaths(
             root_dir=tmp_path,
@@ -750,6 +777,7 @@ def test_application_builder_wires_remote_encryption_before_queue(
         context = ApplicationBuilder(
             paths=paths,
             settings=settings,
+            dek=dek,
         ).build()
 
         host = "b" * 56 + ".onion"
@@ -824,6 +852,7 @@ def test_application_builder_wires_remote_encryption_before_queue(
 def test_application_queue_persists_remote_message_as_ciphertext(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -835,6 +864,7 @@ def test_application_queue_persists_remote_message_as_ciphertext(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     host = "c" * 56 + ".onion"
@@ -875,8 +905,9 @@ def test_application_queue_persists_remote_message_as_ciphertext(
         assert result.accepted is True
         assert context.queue.size() == 1
 
-        connection = sqlite3.connect(
-            paths.queue_database
+        connection = connect_encrypted_sqlite(
+            paths.queue_database,
+            dek=dek,
         )
 
         try:
@@ -926,6 +957,7 @@ def test_application_queue_persists_remote_message_as_ciphertext(
 def test_application_builder_wires_first_contact_discovery_before_queue(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -972,6 +1004,7 @@ def test_application_builder_wires_first_contact_discovery_before_queue(
         paths=paths,
         settings=settings,
         default_transport=transport,
+        dek=dek,
     ).build()
 
     transport.key_store = (
@@ -1022,6 +1055,7 @@ def test_application_builder_wires_first_contact_discovery_before_queue(
 
 def test_application_builder_first_contact_pins_discovered_onion_key(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1098,6 +1132,7 @@ def test_application_builder_first_contact_pins_discovered_onion_key(
         paths=paths,
         settings=settings,
         default_transport=onion,
+        dek=dek,
     ).build()
 
     try:
@@ -1138,6 +1173,7 @@ def test_application_builder_first_contact_pins_discovered_onion_key(
 def test_application_builder_first_contact_persists_ciphertext(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1213,6 +1249,7 @@ def test_application_builder_first_contact_persists_ciphertext(
         paths=paths,
         settings=settings,
         default_transport=onion,
+        dek=dek,
     ).build()
 
     try:
@@ -1254,8 +1291,9 @@ def test_application_builder_first_contact_persists_ciphertext(
             is True
         )
 
-        connection = sqlite3.connect(
-            paths.queue_database
+        connection = connect_encrypted_sqlite(
+            paths.queue_database,
+            dek=dek,
         )
 
         try:
@@ -1316,6 +1354,7 @@ def test_application_builder_first_contact_persists_ciphertext(
 
 def test_application_builder_wires_inbound_e2ee_decryption(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1327,6 +1366,7 @@ def test_application_builder_wires_inbound_e2ee_decryption(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     try:
@@ -1368,6 +1408,7 @@ def test_application_builder_wires_inbound_e2ee_decryption(
 
 def test_application_builder_delivers_inbound_e2ee_plaintext_to_mailbox(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1379,6 +1420,7 @@ def test_application_builder_delivers_inbound_e2ee_plaintext_to_mailbox(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     try:
@@ -1512,6 +1554,7 @@ def test_application_builder_delivers_inbound_e2ee_plaintext_to_mailbox(
 
 def test_application_builder_verifies_signed_inbound_e2ee_message(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1523,6 +1566,7 @@ def test_application_builder_verifies_signed_inbound_e2ee_message(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     try:
@@ -1677,6 +1721,7 @@ def test_application_builder_verifies_signed_inbound_e2ee_message(
 
 def test_application_builder_preserves_plaintext_smtp_inbound_delivery(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1688,6 +1733,7 @@ def test_application_builder_preserves_plaintext_smtp_inbound_delivery(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     try:
@@ -1806,6 +1852,7 @@ def test_application_builder_preserves_plaintext_smtp_inbound_delivery(
 
 def test_application_builder_wires_imap_authenticator(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1824,6 +1871,7 @@ def test_application_builder_wires_imap_authenticator(
         paths=paths,
         settings=settings,
         imap_authenticator=authenticator,
+        dek=dek,
     ).build()
 
     try:
@@ -1838,6 +1886,7 @@ def test_application_builder_wires_imap_authenticator(
 
 def test_application_builder_uses_persistent_imap_authenticator_by_default(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1849,6 +1898,7 @@ def test_application_builder_uses_persistent_imap_authenticator_by_default(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     try:
@@ -1869,6 +1919,7 @@ def test_application_builder_uses_persistent_imap_authenticator_by_default(
 def test_application_builder_wires_attachment_policy_before_delivery(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path,
@@ -1880,6 +1931,7 @@ def test_application_builder_wires_attachment_policy_before_delivery(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     message.envelope.recipients = [
@@ -1918,6 +1970,7 @@ def test_application_builder_wires_attachment_policy_before_delivery(
 def test_application_builder_uses_admin_attachment_limit(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -1941,6 +1994,7 @@ def test_application_builder_uses_admin_attachment_limit(
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     try:
@@ -1976,6 +2030,7 @@ def test_application_builder_uses_admin_attachment_limit(
 def test_application_builder_uses_default_attachment_limit_when_admin_file_missing(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -1984,6 +2039,7 @@ def test_application_builder_uses_default_attachment_limit_when_admin_file_missi
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     try:
@@ -2012,6 +2068,7 @@ def test_application_builder_uses_default_attachment_limit_when_admin_file_missi
 
 def test_application_builder_rejects_invalid_admin_attachment_limit(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -2039,4 +2096,25 @@ def test_application_builder_rejects_invalid_admin_attachment_limit(
         ApplicationBuilder(
             paths=paths,
             settings=ApplicationSettings(),
+            dek=dek,
         ).build()
+
+
+def test_application_builder_rejects_missing_dek(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="DEK",
+    ):
+        ApplicationBuilder(
+            paths=paths,
+            settings=ApplicationSettings(),
+        ).build()
+
+    assert not paths.mailbox_database.exists()
+    assert not paths.queue_database.exists()

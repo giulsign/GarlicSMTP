@@ -366,9 +366,11 @@ def test_message_explorer_deletes_message():
 
 def test_message_explorer_delete_removes_attachments(
     tmp_path,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -417,9 +419,11 @@ def test_message_explorer_delete_removes_attachments(
 
 def test_message_explorer_lists_attachments(
     tmp_path,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -465,9 +469,11 @@ def test_message_explorer_lists_attachments(
 
 def test_message_explorer_returns_attachment_directory(
     tmp_path,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -495,9 +501,11 @@ def test_message_explorer_returns_attachment_directory(
 
 def test_message_explorer_materializes_attachments_for_user(
     tmp_path,
+    dek,
 ):
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(

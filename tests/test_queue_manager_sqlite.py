@@ -10,10 +10,11 @@ from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.queue.sqlite import SQLiteQueueBackend
 
 
-def test_queue_manager_can_use_sqlite_backend(tmp_path, message):
+def test_queue_manager_can_use_sqlite_backend(tmp_path, message, dek):
 
     backend = SQLiteQueueBackend(
-        tmp_path / "queue.db"
+        tmp_path / "queue.db",
+        dek=dek
     )
 
     queue = QueueManager(
@@ -35,9 +36,11 @@ def test_queue_manager_can_use_sqlite_backend(tmp_path, message):
 def test_queue_manager_can_retry_pending_sqlite_items(
     tmp_path,
     message,
+    dek
 ):
     backend = SQLiteQueueBackend(
-        tmp_path / "queue.db"
+        tmp_path / "queue.db",
+        dek=dek
     )
 
     queue = QueueManager(

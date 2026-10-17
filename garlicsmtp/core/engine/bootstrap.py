@@ -35,7 +35,9 @@ class Bootstrap:
         config: GarlicSMTPConfig | None = None,
         default_transport=None,
         queue_backend=None,
+        dek: bytes | None = None,
     ):
+        self.dek = dek
         self.config = (
             config
             or GarlicSMTPConfig()
@@ -102,9 +104,12 @@ class Bootstrap:
         self,
     ):
         if self._context is None:
+            if not isinstance(self.dek, bytes) or len(self.dek) != 32:
+                raise ValueError("DEK non valida o mancante")
             message_store_backend = (
                 SQLiteMessageStoreBackend(
-                    self.config.mailbox_db
+                    self.config.mailbox_db,
+                    dek=self.dek,
                 )
             )
 
@@ -124,6 +129,7 @@ class Bootstrap:
                         message_store_backend
                     ),
                     logger=self.build_logger(),
+                    dek=self.dek,
                 ).build()
             )
 

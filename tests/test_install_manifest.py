@@ -70,6 +70,7 @@ def test_project_metadata_is_loaded_from_pyproject():
         "dependencies": [
             "dnspython>=2.8,<3",
             "cryptography>=46,<47",
+            "sqlcipher3==0.6.3",
         ],
     }
 

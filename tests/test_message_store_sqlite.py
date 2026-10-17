@@ -6,6 +6,9 @@
 from garlicsmtp.storage.sqlite import (
     SQLiteMessageStoreBackend,
 )
+from garlicsmtp.security.encrypted_sqlite import (
+    connect_encrypted_sqlite,
+)
 import json
 import sqlite3
 from garlicsmtp.storage.serializer import (
@@ -21,12 +24,13 @@ from datetime import UTC, datetime
 def test_sqlite_message_store_persists_message(
     tmp_path,
     message,
+    dek,
 ):
 
     db_path = tmp_path / "mailboxes.db"
 
     backend = SQLiteMessageStoreBackend(
-        db_path
+        db_path, dek=dek,
     )
 
     message.headers.fields[
@@ -44,7 +48,7 @@ def test_sqlite_message_store_persists_message(
 
     restored_backend = (
         SQLiteMessageStoreBackend(
-            db_path
+            db_path,dek=dek,
         )
     )
 
@@ -93,10 +97,11 @@ def test_sqlite_message_store_persists_message(
 def test_sqlite_message_store_lists_mailboxes(
     tmp_path,
     message,
+    dek,
 ):
 
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db", dek=dek
     )
 
     try:
@@ -122,10 +127,11 @@ def test_sqlite_message_store_lists_mailboxes(
 def test_sqlite_message_store_counts_messages(
     tmp_path,
     message,
+    dek,
 ):
 
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db", dek=dek,
     )
 
     try:
@@ -150,14 +156,15 @@ def test_sqlite_message_store_counts_messages(
     finally:
         backend.close()
 
-    def test_sqlite_message_store_assigns_mailbox_uids(
+def test_sqlite_message_store_assigns_mailbox_uids(
         tmp_path,
         message,
+        dek,
     ):
         database = tmp_path / "mailboxes.db"
 
         backend = SQLiteMessageStoreBackend(
-            database
+            database, dek=dek
         )
 
         try:
@@ -209,11 +216,12 @@ def test_sqlite_message_store_counts_messages(
 def test_sqlite_message_store_assigns_mailbox_uids(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database, dek=dek,
     )
 
     try:
@@ -265,11 +273,12 @@ def test_sqlite_message_store_assigns_mailbox_uids(
 def test_sqlite_message_store_saves_entry_metadata(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database, dek=dek,
     )
 
     try:
@@ -302,11 +311,13 @@ def test_sqlite_message_store_saves_entry_metadata(
 def test_sqlite_message_store_migrates_old_schema(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "old-mailboxes.db"
 
-    connection = sqlite3.connect(
-        database
+    connection = connect_encrypted_sqlite(
+        database,
+        dek=dek,
     )
 
     connection.execute(
@@ -333,9 +344,7 @@ def test_sqlite_message_store_migrates_old_schema(
         (
             "old-message",
             "bob@test.onion",
-            MessageSerializer.to_json(
-                message
-            ),
+            MessageSerializer.to_json(message),
             "2030-01-01T12:00:00+00:00",
         ),
     )
@@ -344,7 +353,8 @@ def test_sqlite_message_store_migrates_old_schema(
     connection.close()
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -381,9 +391,11 @@ def test_sqlite_message_store_migrates_old_schema(
 def test_sqlite_message_store_entry_api(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -428,9 +440,11 @@ def test_sqlite_message_store_entry_api(
 def test_sqlite_message_store_updates_flags(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -467,9 +481,11 @@ def test_sqlite_message_store_updates_flags(
 
 def test_sqlite_message_store_returns_false_for_missing_flags_update(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -488,9 +504,11 @@ def test_sqlite_message_store_returns_false_for_missing_flags_update(
 def test_sqlite_message_store_adds_and_removes_flags(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -533,9 +551,11 @@ def test_sqlite_message_store_adds_and_removes_flags(
 def test_sqlite_store_deletes_entry(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     store = MessageStore(
@@ -570,12 +590,14 @@ def test_sqlite_store_deletes_entry(
 def test_sqlite_store_copies_entry(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     store = MessageStore(
         SQLiteMessageStoreBackend(
-            database
+            database,
+            dek=dek,
         )
     )
 
@@ -643,12 +665,14 @@ def test_sqlite_store_copies_entry(
 def test_sqlite_store_copy_returns_none_for_missing_entry(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     store = MessageStore(
         SQLiteMessageStoreBackend(
-            database
+            database,
+            dek=dek,
         )
     )
 
@@ -668,12 +692,14 @@ def test_sqlite_store_copy_returns_none_for_missing_entry(
 def test_sqlite_store_appends_entry_with_metadata(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     store = MessageStore(
         SQLiteMessageStoreBackend(
-            database
+            database,
+            dek=dek,
         )
     )
 
@@ -732,12 +758,14 @@ def test_sqlite_store_appends_entry_with_metadata(
 def test_sqlite_store_append_assigns_next_uid(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     store = MessageStore(
         SQLiteMessageStoreBackend(
-            database
+            database,
+            dek=dek,
         )
     )
 
@@ -764,6 +792,7 @@ def test_sqlite_store_append_assigns_next_uid(
 def test_sqlite_store_append_persists_after_reopen(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
@@ -779,7 +808,8 @@ def test_sqlite_store_append_persists_after_reopen(
 
     first_store = MessageStore(
         SQLiteMessageStoreBackend(
-            database
+            database,
+            dek=dek,
         )
     )
 
@@ -796,7 +826,8 @@ def test_sqlite_store_append_persists_after_reopen(
 
     second_store = MessageStore(
         SQLiteMessageStoreBackend(
-            database
+            database,
+            dek=dek,
         )
     )
 
@@ -820,9 +851,11 @@ def test_sqlite_store_append_persists_after_reopen(
 
 def test_sqlite_store_creates_empty_mailbox(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -848,11 +881,13 @@ def test_sqlite_store_creates_empty_mailbox(
 
 def test_sqlite_store_persists_empty_mailbox(
     tmp_path,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     first_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     assert first_backend.create_mailbox(
@@ -862,7 +897,8 @@ def test_sqlite_store_persists_empty_mailbox(
     first_backend.close()
 
     second_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -877,11 +913,13 @@ def test_sqlite_store_persists_empty_mailbox(
 def test_sqlite_store_migrates_existing_mailboxes(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
-    connection = sqlite3.connect(
-        database
+    connection = connect_encrypted_sqlite(
+        database,
+        dek=dek,
     )
 
     connection.execute(
@@ -930,7 +968,8 @@ def test_sqlite_store_migrates_existing_mailboxes(
     connection.close()
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -945,9 +984,11 @@ def test_sqlite_store_migrates_existing_mailboxes(
 def test_sqlite_store_deletes_mailbox_and_messages(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -972,9 +1013,11 @@ def test_sqlite_store_deletes_mailbox_and_messages(
 
 def test_sqlite_store_delete_returns_false_for_missing_mailbox(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -989,11 +1032,13 @@ def test_sqlite_store_delete_returns_false_for_missing_mailbox(
 def test_sqlite_store_persists_mailbox_deletion(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     first_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     first_backend.save_entry(
@@ -1008,7 +1053,8 @@ def test_sqlite_store_persists_mailbox_deletion(
     first_backend.close()
 
     second_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -1025,9 +1071,11 @@ def test_sqlite_store_persists_mailbox_deletion(
 def test_sqlite_store_recreated_mailbox_restarts_uid(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -1060,9 +1108,11 @@ def test_sqlite_store_recreated_mailbox_restarts_uid(
 def test_sqlite_store_renames_mailbox_and_preserves_messages(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -1105,9 +1155,11 @@ def test_sqlite_store_renames_mailbox_and_preserves_messages(
 
 def test_sqlite_store_rename_rejects_existing_destination(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -1136,11 +1188,13 @@ def test_sqlite_store_rename_rejects_existing_destination(
 def test_sqlite_store_persists_mailbox_rename(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     first_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     entry = first_backend.save_entry(
@@ -1156,7 +1210,8 @@ def test_sqlite_store_persists_mailbox_rename(
     first_backend.close()
 
     second_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -1178,9 +1233,11 @@ def test_sqlite_store_persists_mailbox_rename(
 
 def test_sqlite_store_manages_subscriptions(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -1214,11 +1271,13 @@ def test_sqlite_store_manages_subscriptions(
 
 def test_sqlite_store_persists_subscriptions(
     tmp_path,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     first_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     first_backend.create_mailbox(
@@ -1232,7 +1291,8 @@ def test_sqlite_store_persists_subscriptions(
     first_backend.close()
 
     second_backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -1246,9 +1306,11 @@ def test_sqlite_store_persists_subscriptions(
 
 def test_sqlite_store_delete_removes_subscription(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -1272,9 +1334,11 @@ def test_sqlite_store_delete_removes_subscription(
 
 def test_sqlite_store_rename_moves_subscription(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     try:
@@ -1301,11 +1365,13 @@ def test_sqlite_store_rename_moves_subscription(
 
 def test_sqlite_uid_validity_persists_after_reopen(
     tmp_path,
+    dek,
 ):
     path = tmp_path / "mailboxes.db"
 
     backend = SQLiteMessageStoreBackend(
-        path
+        path,
+        dek=dek,
     )
 
     store = MessageStore(
@@ -1326,7 +1392,8 @@ def test_sqlite_uid_validity_persists_after_reopen(
 
     reopened_backend = (
         SQLiteMessageStoreBackend(
-            path
+            path,
+            dek=dek,
         )
     )
 
@@ -1347,9 +1414,11 @@ def test_sqlite_uid_validity_persists_after_reopen(
 
 def test_sqlite_uid_validity_survives_rename(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     store = MessageStore(
@@ -1384,9 +1453,11 @@ def test_sqlite_uid_validity_survives_rename(
 
 def test_sqlite_recreated_mailbox_gets_new_uid_validity(
     tmp_path,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     store = MessageStore(
@@ -1425,11 +1496,13 @@ def test_sqlite_recreated_mailbox_gets_new_uid_validity(
 def test_sqlite_save_entry_preserves_verification_status(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mail.db"
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -1458,11 +1531,13 @@ def test_sqlite_save_entry_preserves_verification_status(
 def test_sqlite_list_entries_preserves_verification_status(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mail.db"
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -1490,11 +1565,13 @@ def test_sqlite_list_entries_preserves_verification_status(
 def test_sqlite_migrates_legacy_verification_status(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "legacy.db"
 
-    connection = sqlite3.connect(
-        database
+    connection = connect_encrypted_sqlite(
+        database,
+        dek=dek,
     )
 
     try:
@@ -1561,7 +1638,8 @@ def test_sqlite_migrates_legacy_verification_status(
         connection.close()
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:
@@ -1589,3 +1667,66 @@ def test_sqlite_migrates_legacy_verification_status(
         )
     finally:
         backend.close()
+
+
+def test_sqlite_message_store_wrong_dek_preserves_existing_message(
+    tmp_path,
+    message,
+    dek,
+):
+    from sqlcipher3 import dbapi2 as sqlcipher
+    import pytest
+
+    database = tmp_path / "mailboxes.db"
+    mailbox = "bob@test.onion"
+
+    message.headers.fields["Subject"] = (
+        "Preserved after wrong DEK"
+    )
+    message.body = "GARLICSMTP_PRESERVED_MESSAGE"
+
+    backend = SQLiteMessageStoreBackend(
+        database,
+        dek=dek,
+    )
+
+    try:
+        message_id = backend.save(
+            mailbox,
+            message,
+        )
+    finally:
+        backend.close()
+
+    original_bytes = database.read_bytes()
+
+    with pytest.raises(sqlcipher.DatabaseError):
+        SQLiteMessageStoreBackend(
+            database,
+            dek=bytes(reversed(range(32))),
+        )
+
+    assert database.read_bytes() == original_bytes
+
+    restored_backend = SQLiteMessageStoreBackend(
+        database,
+        dek=dek,
+    )
+
+    try:
+        restored = restored_backend.get(
+            mailbox,
+            message_id,
+        )
+
+        assert restored is not None
+        assert (
+            restored.headers.fields["Subject"]
+            == "Preserved after wrong DEK"
+        )
+        assert (
+            restored.body
+            == "GARLICSMTP_PRESERVED_MESSAGE"
+        )
+    finally:
+        restored_backend.close()

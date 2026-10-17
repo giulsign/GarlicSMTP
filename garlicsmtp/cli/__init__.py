@@ -5,6 +5,7 @@
 
 
 import argparse
+import getpass
 
 from garlicsmtp.cli.mailbox import (
     list_mailboxes,
@@ -14,6 +15,10 @@ from garlicsmtp.cli.mailbox import (
 )
 from garlicsmtp.core.engine import Bootstrap
 from garlicsmtp.version import print_version
+from garlicsmtp.configuration.paths import ApplicationPaths
+from garlicsmtp.security.auth.account_credentials import (
+    AccountCredentialStore,
+)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -24,7 +29,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     parser.add_argument(
         "--mailbox-db",
-        default="mailboxes.db",
+        default=None,
         help=(
             "Path to the mailbox SQLite database. "
             "Default: mailboxes.db"
@@ -121,6 +126,26 @@ def run_server() -> int:
 
     return 0
 
+def unlock_cli_dek(paths: ApplicationPaths) -> bytes | None:
+    credentials_file = paths.account_credentials_file
+
+    if not credentials_file.exists():
+        print("Account credentials not found.")
+        return None
+
+    store = AccountCredentialStore(path=credentials_file)
+
+    try:
+        username = input("Username: ")
+        password = getpass.getpass("Password: ")
+
+        return store.unlock_dek_with_password(
+            username=username,
+            password=password,
+        )
+    except (ValueError, PermissionError, OSError, EOFError):
+        print("Unable to unlock account.")
+        return None
 
 def main(argv=None) -> int:
     parser = build_parser()
@@ -130,31 +155,50 @@ def main(argv=None) -> int:
         return run_server()
 
     if args.command == "mailbox":
+        paths = ApplicationPaths.for_user()
+
+        database_path = (
+            args.mailbox_db
+            if args.mailbox_db is not None
+            else str(paths.mailbox_database)
+        )
+
+        if database_path != str(paths.mailbox_database):
+            print("Custom mailbox database paths are not yet supported.")
+            return 2
+
+        dek = unlock_cli_dek(paths)
+        if dek is None:
+            return 1
         if args.mailbox_command == "list":
             return list_mailboxes(
-                args.mailbox_db
+                database_path,
+                dek=dek,
             )
 
         if args.mailbox_command == "messages":
             return list_messages(
-                args.mailbox_db,
+                database_path,
                 args.mailbox,
+                dek=dek,
             )
 
         if args.mailbox_command == "show":
             return show_message(
-                args.mailbox_db,
+                database_path,
                 args.mailbox,
                 args.message,
+                dek=dek,
             )
         
         if args.mailbox_command == "flags":
             return update_flags(
-                database_path=args.mailbox_db,
+                database_path=database_path,
                 mailbox=args.mailbox,
                 message_reference=args.message,
                 operation=args.operation,
                 flags=set(args.flags),
+                dek=dek,
             )
 
     parser.error("Unsupported command")

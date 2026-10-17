@@ -120,7 +120,12 @@ def test_build_verify_environment_action_uses_venv_python():
                 "import garlicsmtp.cli.__main__; "
                 "import garlicsmtp.gui.application; "
                 "import garlicsmtp.install_runtime_config; "
-                "import garlicsmtp.install_first_run"
+                "import garlicsmtp.install_first_run; "
+                "from sqlcipher3 import dbapi2 as sqlcipher; "
+                "connection = sqlcipher.connect(':memory:'); "
+                "version = connection.execute('PRAGMA cipher_version').fetchone(); "
+                "connection.close(); "
+                "assert version and version[0], 'SQLCipher engine unavailable'"
             ),
         ],
         "requires_privileges": False,
@@ -177,7 +182,12 @@ def test_build_environment_actions_orders_create_install_and_verify():
                     "import garlicsmtp.cli.__main__; "
                     "import garlicsmtp.gui.application; "
                     "import garlicsmtp.install_runtime_config; "
-                    "import garlicsmtp.install_first_run"
+                    "import garlicsmtp.install_first_run; "
+                    "from sqlcipher3 import dbapi2 as sqlcipher; "
+                    "connection = sqlcipher.connect(':memory:'); "
+                    "version = connection.execute('PRAGMA cipher_version').fetchone(); "
+                    "connection.close(); "
+                    "assert version and version[0], 'SQLCipher engine unavailable'"
                 ),
             ],
             "requires_privileges": False,
@@ -265,3 +275,23 @@ def test_execute_environment_actions_stops_after_verification_failure():
         ["install"],
         ["verify"],
     ]
+
+
+def test_verify_environment_checks_sqlcipher_engine():
+    venv_dir = Path("/home/alice/.local/share/garlicsmtp/venv")
+
+    action = build_verify_environment_action(
+        venv_dir=venv_dir,
+    )
+
+    command = action["command"]
+
+    assert command[:2] == [
+        str(venv_dir / "bin" / "python"),
+        "-c",
+    ]
+
+    verification_code = command[2]
+
+    assert "sqlcipher3" in verification_code
+    assert "cipher_version" in verification_code

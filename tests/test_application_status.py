@@ -22,12 +22,14 @@ from garlicsmtp.queue.factory import (
 
 def test_application_status_reports_stopped_state(
     tmp_path,
+    dek,
 ):
     context = ApplicationBuilder(
         paths=ApplicationPaths(
             root_dir=tmp_path / "garlicsmtp"
         ),
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     status = ApplicationStatusProvider(
@@ -71,12 +73,14 @@ def test_application_status_reports_stopped_state(
 def test_application_status_reports_data(
     tmp_path,
     message,
+    dek,
 ):
     context = ApplicationBuilder(
         paths=ApplicationPaths(
             root_dir=tmp_path / "garlicsmtp"
         ),
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     context.store.create_mailbox(
@@ -107,12 +111,14 @@ def test_application_status_reports_data(
 
 def test_application_status_is_a_fresh_snapshot(
     tmp_path,
+    dek,
 ):
     context = ApplicationBuilder(
         paths=ApplicationPaths(
             root_dir=tmp_path / "garlicsmtp"
         ),
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     provider = ApplicationStatusProvider(
@@ -137,6 +143,7 @@ def test_application_status_is_a_fresh_snapshot(
 def test_status_provider_builds_mailbox_summaries(
     tmp_path,
     message,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -145,6 +152,7 @@ def test_status_provider_builds_mailbox_summaries(
     context = ApplicationBuilder(
         paths=paths,
         settings=ApplicationSettings(),
+        dek=dek,
     ).build()
 
     mailbox = "alice@test.onion"

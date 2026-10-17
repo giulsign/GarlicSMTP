@@ -13,6 +13,7 @@ from garlicsmtp.gui.tk_authentication import (
     SetupForm,
     prompt_login,
     prompt_setup,
+    RecoveryDialog,
 )
 
 
@@ -692,3 +693,370 @@ def test_prompt_setup_grabs_dialog_before_waiting(
         ("grab",),
         ("wait",),
     ]
+
+
+def test_recovery_dialog_cancel_keeps_result_false():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = RecoveryDialog(
+            root,
+            "test-recovery-key",
+        )
+
+        assert dialog.result is False
+
+        dialog.cancel()
+
+        assert dialog.result is False
+        assert not dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_accept_confirms_recovery():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = RecoveryDialog(
+            root,
+            "test-recovery-key",
+        )
+
+        assert dialog.result is False
+
+        dialog.reentry_entry.insert(0, "test-recovery-key")
+        dialog.accept()
+
+        assert dialog.result == 'test-recovery-key'
+        assert not dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_displays_recovery_key():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        recovery_key = "a1b2c3d4" * 8
+
+        dialog = RecoveryDialog(
+            root,
+            recovery_key,
+        )
+
+        assert dialog.recovery_key_entry.get() == recovery_key
+
+        assert (
+            dialog.recovery_key_entry.winfo_manager()
+            == "grid"
+        )
+
+        assert (
+            str(dialog.recovery_key_entry.cget("state"))
+            == "readonly"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_confirm_button_accepts():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = RecoveryDialog(
+            root,
+            "a1b2c3d4" * 8,
+        )
+
+        assert dialog.result is False
+
+        assert (
+            dialog.confirm_button.winfo_manager()
+            == "grid"
+        )
+
+        dialog.reentry_entry.insert(0, "a1b2c3d4" * 8)
+        dialog.confirm_button.invoke()
+
+        assert dialog.result == 'a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4a1b2c3d4'
+        assert not dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_window_close_cancels():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = RecoveryDialog(
+            root,
+            "a1b2c3d4" * 8,
+        )
+
+        close_command = dialog.protocol(
+            "WM_DELETE_WINDOW"
+        )
+
+        assert close_command
+
+        dialog.tk.call(
+            close_command,
+        )
+
+        assert dialog.result is False
+        assert not dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_displays_security_warning():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = RecoveryDialog(
+            root,
+            "a1b2c3d4" * 8,
+        )
+
+        warning = dialog.warning_label.cget("text")
+
+        assert "save" in warning.lower()
+        assert "recovery key" in warning.lower()
+        assert "lose" in warning.lower()
+
+        assert (
+            dialog.warning_label.winfo_manager()
+            == "grid"
+        )
+
+    finally:
+        root.destroy()
+
+def test_recovery_dialog_key_is_selectable_and_readonly():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        recovery_key = "a1b2c3d4" * 8
+
+        dialog = RecoveryDialog(
+            root,
+            recovery_key,
+        )
+
+        entry = dialog.recovery_key_entry
+
+        assert isinstance(entry, ttk.Entry)
+        assert entry.get() == recovery_key
+        assert str(entry.cget("state")) == "readonly"
+        assert entry.winfo_manager() == "grid"
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_copy_button_copies_key():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        recovery_key = "a1b2c3d4" * 8
+
+        dialog = RecoveryDialog(
+            root,
+            recovery_key,
+        )
+
+        # Intercettiamo gli appunti per non usare
+        # quelli reali durante il test.
+        copied = []
+
+        dialog.clipboard_clear = lambda: copied.append("clear")
+        dialog.clipboard_append = lambda text: copied.append(text)
+
+        assert dialog.copy_button.winfo_manager() == "grid"
+
+        dialog.copy_button.invoke()
+
+        assert copied == ["clear", recovery_key]
+        assert dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_copy_button_copies_key():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        recovery_key = "a1b2c3d4" * 8
+
+        dialog = RecoveryDialog(
+            root,
+            recovery_key,
+        )
+
+        # Intercettiamo gli appunti per non usare
+        # quelli reali durante il test.
+        copied = []
+
+        dialog.clipboard_clear = lambda: copied.append("clear")
+        dialog.clipboard_append = lambda text: copied.append(text)
+
+        assert dialog.copy_button.winfo_manager() == "grid"
+
+        dialog.copy_button.invoke()
+
+        assert copied == ["clear", recovery_key]
+        assert dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_recovery_dialog_cannot_confirm_without_reentering_key():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = RecoveryDialog(
+            root,
+            "a1b2c3d4" * 8,
+        )
+
+        dialog.confirm_button.invoke()
+
+        assert dialog.result is False
+        assert dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_login_form_forgot_password_invokes_callback():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        recovery_requests = []
+        submitted = []
+
+        form = LoginForm(
+            root,
+            on_submit=submitted.append,
+            on_forgot_password=lambda: recovery_requests.append(True),
+        )
+
+        assert form.forgot_password_button.cget("text") == (
+            "Forgotten password?"
+        )
+
+        form.forgot_password_button.invoke()
+
+        assert recovery_requests == [True]
+        assert submitted == []
+
+    finally:
+        root.destroy()
+
+
+def test_login_dialog_forgot_password_returns_recovery_request():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = LoginDialog(root)
+
+        dialog.form.forgot_password_button.invoke()
+
+        assert dialog.result == "forgot_password"
+        assert not dialog.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_password_reset_dialog_collects_credentials_and_masks_secrets():
+    from garlicsmtp.gui.tk_authentication import PasswordResetDialog
+
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = PasswordResetDialog(root)
+
+        assert dialog.recovery_key_entry.cget("show") == "*"
+        assert dialog.new_password_entry.cget("show") == "*"
+        assert dialog.password_confirmation_entry.cget("show") == "*"
+
+        dialog.username_entry.insert(0, "alice")
+        dialog.recovery_key_entry.insert(0, "old-recovery-key")
+        dialog.new_password_entry.insert(0, "NewPassword123!")
+        dialog.password_confirmation_entry.insert(0, "NewPassword123!")
+
+        dialog.reset_button.invoke()
+
+        assert dialog.result == (
+            "alice",
+            "old-recovery-key",
+            "NewPassword123!",
+        )
+        assert not dialog.winfo_exists()
+    finally:
+        root.destroy()
+
+
+def test_password_reset_dialog_rejects_mismatched_passwords():
+    from garlicsmtp.gui.tk_authentication import PasswordResetDialog
+
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = PasswordResetDialog(root)
+
+        dialog.username_entry.insert(0, "alice")
+        dialog.recovery_key_entry.insert(0, "old-recovery-key")
+        dialog.new_password_entry.insert(0, "NewPassword123!")
+        dialog.password_confirmation_entry.insert(0, "DifferentPassword123!")
+
+        dialog.reset_button.invoke()
+
+        assert dialog.result is None
+        assert dialog.winfo_exists()
+    finally:
+        root.destroy()
+
+
+def test_password_reset_dialog_cancel_does_not_submit_credentials():
+    from garlicsmtp.gui.tk_authentication import PasswordResetDialog
+
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        dialog = PasswordResetDialog(root)
+
+        dialog.username_entry.insert(0, "alice")
+        dialog.recovery_key_entry.insert(0, "old-recovery-key")
+        dialog.new_password_entry.insert(0, "NewPassword123!")
+
+        dialog.cancel()
+
+        assert dialog.result is None
+        assert not dialog.winfo_exists()
+    finally:
+        root.destroy()

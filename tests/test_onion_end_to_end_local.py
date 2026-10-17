@@ -44,6 +44,13 @@ from garlicsmtp.storage.entry import (
     VerificationStatus,
 )
 
+@pytest.fixture
+def node_deks():
+    return {
+        "alice": bytes(range(32)),
+        "bob": bytes(range(32, 64)),
+    }
+
 class LocalSocksConnection:
 
     def __init__(
@@ -88,13 +95,15 @@ class LocalSocksClient:
 
 def test_onion_transport_delivers_to_real_smtp_server(
     tmp_path,
+    dek,
 ):
 
     host = "a" * 56 + ".onion"
     port = 2532
 
     backend = SQLiteQueueBackend(
-        tmp_path / "receiver.db"
+        tmp_path / "receiver.db",
+        dek=dek,
     )
 
     queue = QueueManager(
@@ -209,12 +218,13 @@ def test_onion_transport_delivers_to_real_smtp_server(
 
 def test_two_application_nodes_exchange_e2ee_message(
     tmp_path,
+    node_deks,
 ):
     bob_host = "b" * 56 + ".onion"
     bob_port = 2533
 
     bob_paths = ApplicationPaths(
-        root_dir=tmp_path / "bob"
+        root_dir=tmp_path / "bob",
     )
 
     bob_settings = ApplicationSettings()
@@ -227,6 +237,7 @@ def test_two_application_nodes_exchange_e2ee_message(
     bob = ApplicationBuilder(
         paths=bob_paths,
         settings=bob_settings,
+        dek=node_deks["bob"],
     ).build()
 
     bob.smtp_server.start()
@@ -255,7 +266,7 @@ def test_two_application_nodes_exchange_e2ee_message(
         )
 
         alice_paths = ApplicationPaths(
-            root_dir=tmp_path / "alice"
+            root_dir=tmp_path / "alice",
         )
 
         alice_settings = ApplicationSettings()
@@ -265,6 +276,7 @@ def test_two_application_nodes_exchange_e2ee_message(
             paths=alice_paths,
             settings=alice_settings,
             default_transport=alice_transport,
+            dek=node_deks["alice"],
         ).build()
 
         composer = MailComposerService(
@@ -367,12 +379,13 @@ def test_two_application_nodes_exchange_e2ee_message(
 
 def test_two_application_nodes_verify_trusted_e2ee_message(
     tmp_path,
+    node_deks,
 ):
     bob_host = "b" * 56 + ".onion"
     bob_port = 2533
 
     bob_paths = ApplicationPaths(
-        root_dir=tmp_path / "bob"
+        root_dir=tmp_path / "bob",
     )
 
     bob_settings = ApplicationSettings()
@@ -385,6 +398,7 @@ def test_two_application_nodes_verify_trusted_e2ee_message(
     bob = ApplicationBuilder(
         paths=bob_paths,
         settings=bob_settings,
+        dek=node_deks["bob"],
     ).build()
 
     bob.smtp_server.start()
@@ -413,7 +427,7 @@ def test_two_application_nodes_verify_trusted_e2ee_message(
         )
 
         alice_paths = ApplicationPaths(
-            root_dir=tmp_path / "alice"
+            root_dir=tmp_path / "alice",
         )
 
         alice_settings = ApplicationSettings()
@@ -423,6 +437,7 @@ def test_two_application_nodes_verify_trusted_e2ee_message(
             paths=alice_paths,
             settings=alice_settings,
             default_transport=alice_transport,
+            dek=node_deks["alice"],
         ).build()
 
         sender = (
@@ -553,6 +568,7 @@ def test_two_application_nodes_verify_trusted_e2ee_message(
 
 def test_two_application_nodes_reject_changed_e2ee_key(
     tmp_path,
+    node_deks,
 ):
     bob_host = "b" * 56 + ".onion"
     first_bob_port = 2533
@@ -572,6 +588,7 @@ def test_two_application_nodes_reject_changed_e2ee_key(
     bob = ApplicationBuilder(
         paths=bob_paths,
         settings=bob_settings,
+        dek=node_deks["bob"],
     ).build()
 
     bob.smtp_server.start()
@@ -615,6 +632,7 @@ def test_two_application_nodes_reject_changed_e2ee_key(
             paths=alice_paths,
             settings=alice_settings,
             default_transport=alice_transport,
+            dek=node_deks["alice"],
         ).build()
 
         composer = MailComposerService(
@@ -691,6 +709,7 @@ def test_two_application_nodes_reject_changed_e2ee_key(
         second_bob = ApplicationBuilder(
             paths=bob_paths,
             settings=bob_settings,
+            dek=node_deks["bob"],
         ).build()
 
         new_bob_key = (

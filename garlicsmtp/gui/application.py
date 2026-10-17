@@ -56,18 +56,30 @@ from garlicsmtp.security.auth.account_credentials import (
     AccountCredentialStore,
 )
 from garlicsmtp.gui.tk_authentication import (
+    RecoveryDialog,
+    PasswordResetDialog,
     prompt_login,
     prompt_setup,
 )
+from garlicsmtp.security.at_rest_key_manager import (
+    AtRestKeyManager,
+)
+
 
 
 def build_view_model(
     *,
     paths=None,
+    dek: bytes,
 ) -> ApplicationViewModel:
+    if not isinstance(dek, bytes) or len(dek) != 32:
+        raise ValueError("DEK non valida o mancante")
+
     context = ApplicationBuilder(
         paths=paths,
+        dek=dek,
     ).build()
+
 
     controller = ApplicationController(
         context
@@ -78,11 +90,15 @@ def build_view_model(
     )
 
     sent_store = MessageStore(
+
         backend=SQLiteMessageStoreBackend(
-            context.paths.sent_mailbox_database
+            context.paths.sent_mailbox_database,
+            dek=dek,
         ),
+
         attachment_store=AttachmentStore(
-            context.paths.attachments_dir
+            context.paths.attachments_dir,
+            dek=dek,
         ),
     )
 
@@ -128,6 +144,154 @@ def build_view_model(
         compose=compose,
         sent_store=sent_store,
     )
+
+def setup_application_dek(
+    *,
+    paths,
+    username: str,
+    password: str,
+    show_recovery,
+) -> bytes:
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    recovery_key = AtRestKeyManager().generate_recovery_key()
+
+    store.create(
+        username=username,
+        password=password,
+    )
+
+    store.enable_recovery(
+        username=username,
+        password=password,
+        recovery_key=recovery_key,
+    )
+
+    dek = store.unlock_dek_with_password(
+        username=username,
+        password=password,
+    )
+
+    entered_recovery_key = show_recovery(recovery_key)
+
+    if not isinstance(entered_recovery_key, str) or not entered_recovery_key:
+        raise ValueError(
+            "Conferma della recovery obbligatoria"
+        )
+
+    store.confirm_recovery(
+        username=username,
+        recovery_key=entered_recovery_key,
+    )
+
+    return dek
+
+def recover_application_password(
+    *,
+    paths,
+    username: str,
+    recovery_key: str,
+    new_password: str,
+    show_recovery,
+) -> bool:
+    new_recovery_key = AtRestKeyManager().generate_recovery_key()
+
+    confirmed_key = show_recovery(new_recovery_key)
+
+    if confirmed_key != new_recovery_key:
+        return False
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    store.reset_password_with_recovery(
+        username=username,
+        recovery_key=recovery_key,
+        new_password=new_password,
+        new_recovery_key=new_recovery_key,
+    )
+
+    return True
+
+def unlock_application_dek(
+    *,
+    paths,
+    prompt,
+    invalid_credentials=None,
+    show_recovery=None,
+    on_forgot_password=None,
+) -> bytes | None:
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    while True:
+        credentials = prompt()
+
+        if credentials is None:
+            return None
+
+        if credentials == "forgot_password":
+            if on_forgot_password is not None:
+                on_forgot_password()
+            continue
+
+        username, password = credentials
+
+        if not store.authenticate(
+            username=username,
+            password=password,
+        ):
+            if invalid_credentials is not None:
+                invalid_credentials()
+            continue
+
+
+        try:
+            dek = store.unlock_dek_with_password(
+                username=username,
+                password=password,
+            )
+        except ValueError as exc:
+            raise ValueError(
+                "DEK non configurata o non sbloccabile"
+            ) from exc
+
+        data = store._read_credentials()
+
+        if data.get("recovery_confirmed") is not True:
+            if show_recovery is None:
+                raise ValueError(
+                    "Conferma della recovery obbligatoria"
+                )
+
+            recovery_key = AtRestKeyManager().generate_recovery_key()
+
+            store.replace_unconfirmed_recovery(
+                username=username,
+                password=password,
+                new_recovery_key=recovery_key,
+            )
+
+            entered_recovery_key = show_recovery(recovery_key)
+
+            if (
+                not isinstance(entered_recovery_key, str)
+                or not entered_recovery_key
+            ):
+                raise ValueError(
+                    "Conferma della recovery obbligatoria"
+                )
+
+            store.confirm_recovery(
+                username=username,
+                recovery_key=entered_recovery_key,
+            )
+
+        return dek
 
 
 def authenticate_application(
@@ -208,6 +372,59 @@ def configure_application_fonts(
             size=font.cget("size") + 2,
         )           
 
+def show_recovery_key(
+    recovery_key: str,
+    *,
+    master,
+) -> str | bool:
+    dialog = RecoveryDialog(
+        master,
+        recovery_key,
+    )
+    dialog.grab_set()
+    dialog.wait_window()
+    return dialog.result
+
+def prompt_password_reset(master):
+    dialog = PasswordResetDialog(master)
+    dialog.grab_set()
+    dialog.wait_window()
+    return dialog.result
+
+def handle_forgot_password(*, paths, master) -> None:
+    credentials = prompt_password_reset(master)
+
+    if credentials is None:
+        return
+
+    username, recovery_key, new_password = credentials
+
+    try:
+        recovered = recover_application_password(
+            paths=paths,
+            username=username,
+            recovery_key=recovery_key,
+            new_password=new_password,
+            show_recovery=lambda key: show_recovery_key(
+                key,
+                master=master,
+            ),
+        )
+    except ValueError as exc:
+        messagebox.showerror(
+            "GarlicSMTP password recovery",
+            str(exc),
+            parent=master,
+        )
+        return
+
+    if recovered:
+        messagebox.showinfo(
+            "GarlicSMTP password recovery",
+            "Password reset completed. Sign in with your new password.",
+            parent=master,
+        )
+
 
 def run_gui(
     argv: list[str] | None = None,
@@ -249,35 +466,100 @@ def run_gui(
     )
 
     if authenticate is None:
-        authenticated = authenticate_application(
-            paths=application_paths,
-            prompt=lambda: prompt_login(root),
-            setup_prompt=lambda: prompt_setup(root),
-            invalid_credentials=lambda: messagebox.showerror(
-                "GarlicSMTP login",
-                "Invalid username or password",
-                parent=root,
-            ),
-            invalid_setup=lambda message: messagebox.showerror(
-                "GarlicSMTP account setup",
-                message,
-                parent=root,
-            ),
-        )
+        if application_paths.account_credentials_file.exists():
+            try:
+                authenticated = unlock_application_dek(
+                    paths=application_paths,
+                    prompt=lambda: prompt_login(root),
+                    invalid_credentials=lambda: messagebox.showerror(
+                        "GarlicSMTP login",
+                        "Invalid username or password",
+                        parent=root,
+                    ),
+                    show_recovery=lambda recovery_key: show_recovery_key(
+                        recovery_key,
+                        master=root,
+                    ),
+                    on_forgot_password=lambda: handle_forgot_password(
+                        paths=application_paths,
+                        master=root,
+                    ),
+                )
+            except Exception:
+                root.destroy()
+                raise
+        else:
+            while True:
+                credentials = prompt_setup(root)
+
+                if credentials is None:
+                    authenticated = None
+                    break
+
+                username, password, password_confirmation = credentials
+
+                if password != password_confirmation:
+                    messagebox.showerror(
+                        "GarlicSMTP account setup",
+                        "Passwords do not match",
+                        parent=root,
+                    )
+                    continue
+
+                try:
+                    authenticated = setup_application_dek(
+                        paths=application_paths,
+                        username=username,
+                        password=password,
+                        show_recovery=lambda recovery_key: show_recovery_key(
+                            recovery_key,
+                            master=root,
+                        ),
+                    )
+                except ValueError as exc:
+                    messagebox.showerror(
+                        "GarlicSMTP account setup",
+                        str(exc),
+                        parent=root,
+                    )
+                    authenticated = None
+
+                    if application_paths.account_credentials_file.exists():
+                        break
+
+                    continue
+                except Exception:
+                    root.destroy()
+                    raise
+
+                break
     else:
         authenticated = authenticate(
             paths=application_paths,
         )
 
-    if not authenticated:
+
+    if authenticated is False or authenticated is None:
         root.destroy()
         return 1
 
+    if not isinstance(authenticated, bytes) or len(authenticated) != 32:
+        root.destroy()
+        raise ValueError("DEK non valida o mancante")
+
+    dek = authenticated
+
+    try:
+        view_model = build_view_model(
+            paths=application_paths,
+            dek=dek,
+        )
+    except Exception:
+        root.destroy()
+        raise
+
     root.deiconify()
 
-    view_model = build_view_model(
-        paths=application_paths,
-    )
 
     folder_opener = FolderOpener(
         open_directory=open_directory

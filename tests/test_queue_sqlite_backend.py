@@ -8,11 +8,11 @@ from garlicsmtp.queue.sqlite import SQLiteQueueBackend
 from datetime import UTC, datetime, timedelta
 import threading
 
-def test_sqlite_queue_persists_items(tmp_path, message):
+def test_sqlite_queue_persists_items(tmp_path, message, dek):
 
     db_path = tmp_path / "queue.db"
 
-    backend = SQLiteQueueBackend(db_path)
+    backend = SQLiteQueueBackend(db_path, dek=dek)
 
     item = QueueFactory.create(message)
 
@@ -20,17 +20,17 @@ def test_sqlite_queue_persists_items(tmp_path, message):
 
     assert backend.size() == 1
 
-    restored = SQLiteQueueBackend(db_path)
+    restored = SQLiteQueueBackend(db_path, dek=dek)
 
     assert restored.size() == 1
     assert restored.peek().id == item.id
 
 
-def test_sqlite_queue_ack_removes_item(tmp_path, message):
+def test_sqlite_queue_ack_removes_item(tmp_path, message, dek):
 
     db_path = tmp_path / "queue.db"
 
-    backend = SQLiteQueueBackend(db_path)
+    backend = SQLiteQueueBackend(db_path, dek=dek)
 
     item = QueueFactory.create(message)
 
@@ -44,11 +44,11 @@ def test_sqlite_queue_ack_removes_item(tmp_path, message):
     assert backend.peek() is None
 
 
-def test_sqlite_queue_nack_keeps_item(tmp_path, message):
+def test_sqlite_queue_nack_keeps_item(tmp_path, message, dek):
 
     db_path = tmp_path / "queue.db"
 
-    backend = SQLiteQueueBackend(db_path)
+    backend = SQLiteQueueBackend(db_path, dek=dek)
 
     item = QueueFactory.create(message)
 
@@ -60,30 +60,31 @@ def test_sqlite_queue_nack_keeps_item(tmp_path, message):
     assert backend.peek().id == item.id
 
 
-def test_sqlite_queue_empty(tmp_path):
+def test_sqlite_queue_empty(tmp_path, dek):
 
     db_path = tmp_path / "queue.db"
 
-    backend = SQLiteQueueBackend(db_path)
+    backend = SQLiteQueueBackend(db_path, dek=dek)
 
     assert backend.empty() is True
     assert backend.size() == 0
 
 
-def test_sqlite_backend_can_be_closed(tmp_path):
+def test_sqlite_backend_can_be_closed(tmp_path, dek):
 
     backend = SQLiteQueueBackend(
-        tmp_path / "queue.db"
+        tmp_path / "queue.db",
+        dek=dek,
     )
 
     backend.close()
 
 
-def test_sqlite_queue_update_persists_changes(tmp_path, message):
+def test_sqlite_queue_update_persists_changes(tmp_path, message, dek):
 
     db_path = tmp_path / "queue.db"
 
-    backend = SQLiteQueueBackend(db_path)
+    backend = SQLiteQueueBackend(db_path, dek=dek)
 
     item = QueueFactory.create(message)
 
@@ -95,7 +96,7 @@ def test_sqlite_queue_update_persists_changes(tmp_path, message):
 
     assert backend.update(item) is True
 
-    restored = SQLiteQueueBackend(db_path)
+    restored = SQLiteQueueBackend(db_path, dek=dek)
 
     saved = restored.peek()
 
@@ -107,9 +108,11 @@ def test_sqlite_queue_update_persists_changes(tmp_path, message):
 def test_sqlite_queue_can_enqueue_from_another_thread(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteQueueBackend(
-        tmp_path / "queue.db"
+        tmp_path / "queue.db",
+        dek=dek,
     )
 
     item = QueueFactory.create(message)
@@ -136,9 +139,11 @@ def test_sqlite_queue_can_enqueue_from_another_thread(
 def test_sqlite_queue_peek_skips_not_ready_item(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteQueueBackend(
-        tmp_path / "queue.db"
+        tmp_path / "queue.db",
+        dek=dek,
     )
 
     first = QueueFactory.create(
@@ -168,9 +173,11 @@ def test_sqlite_queue_peek_skips_not_ready_item(
 def test_sqlite_queue_retry_pending_makes_suspended_items_ready(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteQueueBackend(
-        tmp_path / "queue.db"
+        tmp_path / "queue.db",
+        dek=dek,
     )
 
     suspended = QueueFactory.create(
@@ -207,3 +214,51 @@ def test_sqlite_queue_retry_pending_makes_suspended_items_ready(
         item.last_error
         == "TemporaryDeliveryError"
     )
+
+
+def test_sqlite_queue_wrong_dek_preserves_existing_item(
+    tmp_path,
+    message,
+    dek,
+):
+    import pytest
+    from sqlcipher3 import dbapi2 as sqlcipher
+
+    database = tmp_path / "queue.db"
+    item = QueueFactory.create(message)
+
+    backend = SQLiteQueueBackend(
+        database,
+        dek=dek,
+    )
+
+    try:
+        backend.enqueue(item)
+        assert backend.size() == 1
+    finally:
+        backend.close()
+
+    original_bytes = database.read_bytes()
+
+    with pytest.raises(sqlcipher.DatabaseError):
+        SQLiteQueueBackend(
+            database,
+            dek=bytes(reversed(range(32))),
+        )
+
+    assert database.read_bytes() == original_bytes
+
+    restored_backend = SQLiteQueueBackend(
+        database,
+        dek=dek,
+    )
+
+    try:
+        assert restored_backend.size() == 1
+
+        restored = restored_backend.peek()
+
+        assert restored is not None
+        assert restored.id == item.id
+    finally:
+        restored_backend.close()

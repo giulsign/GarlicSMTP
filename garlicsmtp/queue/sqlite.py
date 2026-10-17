@@ -3,7 +3,9 @@
 #
 # See LICENSE for the full license terms.
 
-import sqlite3
+from garlicsmtp.security.encrypted_sqlite import (
+    connect_encrypted_sqlite,
+)
 import threading
 
 from garlicsmtp.queue.backend import QueueBackend
@@ -12,13 +14,13 @@ from garlicsmtp.queue.serializer import QueueSerializer
 
 class SQLiteQueueBackend(QueueBackend):
 
-    def __init__(self, path):
+    def __init__(self, path, *, dek: bytes):
         self.path = path
         self._lock = threading.RLock()
 
-        self.connection = sqlite3.connect(
+        self.connection = connect_encrypted_sqlite(
             self.path,
-            check_same_thread=False,
+            dek=dek,
         )
 
         self._create_schema()

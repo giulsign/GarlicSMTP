@@ -6,6 +6,7 @@
 
 import base64
 import os
+import hmac
 
 from cryptography.hazmat.primitives.kdf.scrypt import (
     Scrypt,
@@ -74,8 +75,9 @@ class PasswordHasher:
                 length=int(length),
             )
 
-            return derived == base64.b64decode(
-                expected
+            return hmac.compare_digest(
+                derived,
+                base64.b64decode(expected),
             )
 
         except (

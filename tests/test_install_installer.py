@@ -121,7 +121,12 @@ def test_execute_installation_runs_system_before_environment():
                 "import garlicsmtp.cli.__main__; "
                 "import garlicsmtp.gui.application; "
                 "import garlicsmtp.install_runtime_config; "
-                "import garlicsmtp.install_first_run"
+                "import garlicsmtp.install_first_run; "
+                "from sqlcipher3 import dbapi2 as sqlcipher; "
+                "connection = sqlcipher.connect(':memory:'); "
+                "version = connection.execute('PRAGMA cipher_version').fetchone(); "
+                "connection.close(); "
+                "assert version and version[0], 'SQLCipher engine unavailable'"
             )
         ],
     ]

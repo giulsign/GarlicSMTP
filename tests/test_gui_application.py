@@ -6,6 +6,7 @@
 import pytest
 from types import SimpleNamespace
 from pathlib import Path
+import json
 
 import garlicsmtp.gui.application as gui_application
 
@@ -37,6 +38,19 @@ from garlicsmtp.gui.application import (
 from garlicsmtp.security.auth.account_credentials import (
         AccountCredentialStore,
     )
+from sqlcipher3 import dbapi2 as sqlcipher
+
+from garlicsmtp.models import (
+        Envelope,
+        MailHeaders,
+        MailMessage,
+    )
+from garlicsmtp.storage.sqlite.backend import (
+        SQLiteMessageStoreBackend,
+    )
+from garlicsmtp.storage.attachment_store import (
+        AttachmentStore,
+    )
 
 
 @pytest.fixture(
@@ -59,8 +73,15 @@ def stub_run_gui_application_fonts(
 def test_gui_builds_message_list_view_model(
     tmp_path,
     monkeypatch,
+    dek,
 ):
-    view_model = build_view_model()
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+    view_model = build_view_model(
+        paths=paths,
+        dek=dek,
+    )
 
     assert isinstance(
         view_model.message_list,
@@ -68,8 +89,14 @@ def test_gui_builds_message_list_view_model(
     )
 
 
-def test_gui_builds_received_and_sent_message_view_models():
-    view_model = build_view_model()
+def test_gui_builds_received_and_sent_message_view_models(dek, tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+    view_model = build_view_model(
+        paths=paths,
+        dek=dek,
+    )
 
     context = (
         view_model.controller.context
@@ -134,6 +161,7 @@ def test_gui_builds_received_and_sent_message_view_models():
 def test_real_gui_self_send_separates_received_and_sent_mail(
     tmp_path,
     monkeypatch,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
@@ -145,6 +173,7 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
     real_builder = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     )
 
     class TestBuilder:
@@ -153,6 +182,7 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
             self,
             *,
             paths,
+            dek,
         ):
             pass
 
@@ -168,7 +198,7 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
     )
 
     view_model = (
-        gui_application.build_view_model()
+        gui_application.build_view_model(dek=dek)
     )
 
     context = (
@@ -271,6 +301,7 @@ class FakeController:
 def test_build_view_model_connects_composer_to_application_pipeline(
     tmp_path,
     monkeypatch,
+    dek,
 ):
     pipeline = FakePipeline()
 
@@ -294,6 +325,7 @@ def test_build_view_model_connects_composer_to_application_pipeline(
             self,
             *,
             paths,
+            dek,
         ):
             pass
 
@@ -315,7 +347,7 @@ def test_build_view_model_connects_composer_to_application_pipeline(
     )
 
     view_model = (
-        gui_application.build_view_model()
+        gui_application.build_view_model(dek=dek)
     )
 
     assert view_model.compose is not None
@@ -331,6 +363,7 @@ def test_build_view_model_connects_composer_to_application_pipeline(
 def test_build_view_model_composer_sends_through_pipeline(
     monkeypatch,
     tmp_path,
+    dek,
 ):
 
     paths = ApplicationPaths(
@@ -356,6 +389,7 @@ def test_build_view_model_composer_sends_through_pipeline(
             self,
             *,
             paths,
+            dek,
         ):
             pass
 
@@ -377,7 +411,7 @@ def test_build_view_model_composer_sends_through_pipeline(
     )
 
     view_model = (
-        gui_application.build_view_model()
+        gui_application.build_view_model(dek=dek)
     )
 
     view_model.compose.sender = (
@@ -438,6 +472,7 @@ def test_build_view_model_composer_sends_through_pipeline(
 def test_build_view_model_connects_composer_to_context_signer(
     monkeypatch,
     tmp_path,
+    dek,
 ):
 
     paths = ApplicationPaths(
@@ -466,6 +501,7 @@ def test_build_view_model_connects_composer_to_context_signer(
             self,
             *,
             paths,
+            dek,
         ):
             pass
 
@@ -487,7 +523,7 @@ def test_build_view_model_connects_composer_to_context_signer(
     )
 
     view_model = (
-        gui_application.build_view_model()
+        gui_application.build_view_model(dek=dek)
     )
 
     assert (
@@ -508,6 +544,7 @@ def test_build_view_model_connects_composer_to_context_signer(
 def test_real_gui_composer_delivers_to_local_mailbox(
     tmp_path,
     monkeypatch,
+    dek,
 ):
 
     paths = ApplicationPaths(
@@ -520,6 +557,7 @@ def test_real_gui_composer_delivers_to_local_mailbox(
     real_builder = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     )
 
     class TestBuilder:
@@ -528,6 +566,7 @@ def test_real_gui_composer_delivers_to_local_mailbox(
             self,
             *,
             paths,
+            dek,
         ):
             pass
 
@@ -543,7 +582,7 @@ def test_real_gui_composer_delivers_to_local_mailbox(
     )
 
     view_model = (
-        gui_application.build_view_model()
+        gui_application.build_view_model(dek=dek)
     )
 
     context = (
@@ -608,6 +647,7 @@ def test_real_gui_composer_delivers_to_local_mailbox(
 def test_real_gui_composer_separates_received_and_sent_mail(
     tmp_path,
     monkeypatch,
+    dek,
 ):
 
     paths = ApplicationPaths(
@@ -620,6 +660,7 @@ def test_real_gui_composer_separates_received_and_sent_mail(
     real_builder = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     )
 
     class TestBuilder:
@@ -628,6 +669,7 @@ def test_real_gui_composer_separates_received_and_sent_mail(
             self,
             *,
             paths,
+            dek,
         ):
             pass
 
@@ -643,7 +685,7 @@ def test_real_gui_composer_separates_received_and_sent_mail(
     )
 
     view_model = (
-        gui_application.build_view_model()
+        gui_application.build_view_model(dek=dek)
     )
 
     context = (
@@ -814,6 +856,7 @@ def test_configure_application_fonts_increases_named_fonts(
 
 def test_run_gui_sets_application_icon(
     monkeypatch,
+    dek,
 ):
     icon_calls = []
 
@@ -929,7 +972,7 @@ def test_run_gui_sets_application_icon(
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
         paths=FakePaths(),
-        authenticate=lambda **kwargs: True,
+        authenticate=lambda **kwargs: dek,
     )
 
     assert result == 0
@@ -948,6 +991,7 @@ def test_run_gui_sets_application_icon(
 
 def test_run_gui_hides_root_until_authentication_succeeds(
     monkeypatch,
+    dek,
 ):
     events = []
 
@@ -1026,7 +1070,7 @@ def test_run_gui_hides_root_until_authentication_succeeds(
         **kwargs,
     ):
         events.append("authenticate")
-        return True
+        return dek
 
     monkeypatch.setattr(
         gui_application.tk,
@@ -1071,6 +1115,7 @@ def test_run_gui_hides_root_until_authentication_succeeds(
 def test_run_gui_uses_user_application_paths(
     tmp_path,
     monkeypatch,
+    dek,
 ):
 
     expected_paths = ApplicationPaths.for_user(
@@ -1174,8 +1219,10 @@ def test_run_gui_uses_user_application_paths(
     def fake_build_view_model(
         *,
         paths=None,
+        dek:bytes,
     ):
         received["paths"] = paths
+        received["dek"] = dek
         return view_model
 
     monkeypatch.setattr(
@@ -1210,7 +1257,7 @@ def test_run_gui_uses_user_application_paths(
 
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
-        authenticate=lambda **kwargs: True,
+        authenticate=lambda **kwargs: dek,
     )
 
     assert received["folder_opener"] is not None
@@ -1235,6 +1282,7 @@ def test_run_gui_uses_user_application_paths(
     assert received["paths"] == expected_paths
     assert received["master"] is received["root"]
     assert received["view_model"] is view_model
+    assert received["dek"] == dek
 
     assert (
         received["title"]
@@ -1252,6 +1300,7 @@ def test_run_gui_uses_user_application_paths(
 def test_run_gui_uses_provided_application_paths(
     tmp_path,
     monkeypatch,
+    dek,
 ):
 
     expected_paths = (
@@ -1332,8 +1381,10 @@ def test_run_gui_uses_provided_application_paths(
     def fake_build_view_model(
         *,
         paths=None,
+        dek: bytes,
     ):
         received["paths"] = paths
+        received["dek"] = dek
         return object()
 
     monkeypatch.setattr(
@@ -1363,16 +1414,18 @@ def test_run_gui_uses_provided_application_paths(
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
         paths=expected_paths,
-        authenticate=lambda **kwargs: True,
+        authenticate=lambda **kwargs: dek,
     )
 
     assert result == 0
     assert received["paths"] == expected_paths
+    assert received["dek"] == dek
 
 
 def test_build_view_model_uses_provided_application_paths(
     tmp_path,
     monkeypatch,
+    dek,
 ):  
 
     expected_paths = (
@@ -1402,8 +1455,10 @@ def test_build_view_model_uses_provided_application_paths(
             self,
             *,
             paths,
+            dek,
         ):
             received["paths"] = paths
+            received["dek"] = dek
 
         def build(
             self,
@@ -1423,14 +1478,16 @@ def test_build_view_model_uses_provided_application_paths(
     )
 
     gui_application.build_view_model(
-        paths=expected_paths,
+        paths=expected_paths, dek=dek,
     )
 
     assert received["paths"] == expected_paths
+    assert received["dek"] == dek
 
 
 def test_run_gui_closes_window_before_destroying_root(
     monkeypatch,
+    dek,
 ):
     events = []
     received = {}
@@ -1538,7 +1595,7 @@ def test_run_gui_closes_window_before_destroying_root(
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
         paths=FakePaths(),
-        authenticate=lambda **kwargs: True,
+        authenticate=lambda **kwargs: dek,
     )
 
     assert result == 0
@@ -1557,6 +1614,7 @@ def test_gui_package_exports_tk_main_window():
 def test_real_gui_sent_mail_persists_across_rebuild(
     tmp_path,
     monkeypatch,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
@@ -1571,10 +1629,12 @@ def test_real_gui_sent_mail_persists_across_rebuild(
             self,
             *,
             paths,
+            dek,
         ):
             self.builder = ApplicationBuilder(
                 paths=paths,
                 settings=settings,
+                dek=dek,
             )
 
         def build(
@@ -1590,7 +1650,7 @@ def test_real_gui_sent_mail_persists_across_rebuild(
 
     first_view_model = (
         gui_application.build_view_model(
-            paths=paths,
+            paths=paths, dek=dek,
         )
     )
 
@@ -1635,7 +1695,7 @@ def test_real_gui_sent_mail_persists_across_rebuild(
 
     second_view_model = (
         gui_application.build_view_model(
-            paths=paths,
+            paths=paths, dek=dek,
         )
     )
 
@@ -1717,21 +1777,15 @@ def test_run_gui_authenticates_by_default_before_building_view_model(
         lambda: root,
     )
 
-    def default_authenticate(
-        *,
-        paths,
-        prompt,
-        setup_prompt,
-        invalid_credentials,
-        invalid_setup,
-    ):
-        events.append("authenticate")
-        return False
+    def fake_prompt_setup(master):
+        assert master is root
+        events.append("setup_cancelled")
+        return None
 
     monkeypatch.setattr(
         gui_application,
-        "authenticate_application",
-        default_authenticate,
+        "prompt_setup",
+        fake_prompt_setup,
     )
 
     def fail_if_built(
@@ -1761,9 +1815,8 @@ def test_run_gui_authenticates_by_default_before_building_view_model(
     )
 
     assert result == 1
-    assert events == [
-        "authenticate",
-    ]
+    assert events == ["setup_cancelled"]
+    assert not paths.account_credentials_file.exists()
 
 
 def test_run_gui_does_not_build_view_model_when_authentication_fails(
@@ -1847,11 +1900,15 @@ def test_run_gui_builds_view_model_after_successful_authentication(
     tmp_path,
     monkeypatch,
 ):
+
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
     )
 
     events = []
+    dek = bytes(range(32))
+    expected_paths = paths
+    expected_dek = dek
 
     class FakeRoot:
 
@@ -1936,14 +1993,19 @@ def test_run_gui_builds_view_model_after_successful_authentication(
         paths,
     ):
         events.append("authenticate")
-        return True
+        return dek
+
 
     def fake_build_view_model(
         *,
         paths,
+        dek,
     ):
+        assert paths == expected_paths
+        assert dek == expected_dek
         events.append("build_view_model")
         return object()
+
 
     monkeypatch.setattr(
         gui_application,
@@ -2148,6 +2210,20 @@ def test_run_gui_default_authentication_wires_login_prompt_to_root(
         root_dir=tmp_path / "garlicsmtp",
     )
 
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="test-recovery-key",
+    )
+    store.confirm_recovery(username="alice", recovery_key="test-recovery-key")
+
     events = []
 
     class FakeRoot:
@@ -2206,27 +2282,23 @@ def test_run_gui_default_authentication_wires_login_prompt_to_root(
         fake_prompt_login,
     )
 
-    def fake_authenticate_application(
+    def fake_unlock_application_dek(
         *,
         paths,
         prompt,
-        setup_prompt,
-        invalid_credentials,
-        invalid_setup,
+        invalid_credentials=None,
+        show_recovery=None,
+        on_forgot_password=None,
     ):
-        events.append(
-            ("authenticate", paths)
-        )
+        events.append(("unlock", paths))
         credentials = prompt()
-        events.append(
-            ("credentials", credentials)
-        )
-        return False
+        events.append(("credentials", credentials))
+        return None
 
     monkeypatch.setattr(
         gui_application,
-        "authenticate_application",
-        fake_authenticate_application,
+        "unlock_application_dek",
+        fake_unlock_application_dek,
     )
 
     monkeypatch.setattr(
@@ -2252,7 +2324,7 @@ def test_run_gui_default_authentication_wires_login_prompt_to_root(
 
     assert result == 1
     assert events == [
-        ("authenticate", paths),
+        ("unlock", paths),
         ("login_prompt", root),
         (
             "credentials",
@@ -2313,17 +2385,9 @@ def test_run_gui_default_authentication_wires_setup_prompt_to_root(
         lambda: root,
     )
 
-    def fake_prompt_setup(
-        master,
-    ):
-        events.append(
-            ("setup_prompt", master)
-        )
-        return (
-            "alice",
-            "Garlic1!",
-            "Garlic1!",
-        )
+    def fake_prompt_setup(master):
+        events.append(("setup_prompt", master))
+        return None
 
     monkeypatch.setattr(
         gui_application,
@@ -2350,12 +2414,6 @@ def test_run_gui_default_authentication_wires_setup_prompt_to_root(
 
     monkeypatch.setattr(
         gui_application,
-        "authenticate_application",
-        fake_authenticate_application,
-    )
-
-    monkeypatch.setattr(
-        gui_application,
         "build_view_model",
         lambda **kwargs: (
             pytest.fail(
@@ -2376,18 +2434,11 @@ def test_run_gui_default_authentication_wires_setup_prompt_to_root(
     )
 
     assert result == 1
+    assert result == 1
     assert events == [
-        ("authenticate", paths),
         ("setup_prompt", root),
-        (
-            "credentials",
-            (
-                "alice",
-                "Garlic1!",
-                "Garlic1!",
-            ),
-        ),
     ]
+    assert not paths.account_credentials_file.exists()
 
 
 def test_authenticate_application_retries_after_invalid_credentials(
@@ -2496,6 +2547,20 @@ def test_run_gui_default_authentication_shows_generic_invalid_credentials_error(
         root_dir=tmp_path / "garlicsmtp",
     )
 
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="test-recovery-key",
+    )
+    store.confirm_recovery(username="alice", recovery_key="test-recovery-key")
+
     dialogs = []
 
     class FakeRoot:
@@ -2537,21 +2602,15 @@ def test_run_gui_default_authentication_shows_generic_invalid_credentials_error(
         lambda: root,
     )
 
-    def fake_authenticate_application(
-        *,
-        paths,
-        prompt,
-        setup_prompt,
-        invalid_credentials,
-        invalid_setup,
-    ):
-        invalid_credentials()
-        return False
+    credentials = iter([
+        ("alice", "Wrong2!"),
+        None,
+    ])
 
     monkeypatch.setattr(
         gui_application,
-        "authenticate_application",
-        fake_authenticate_application,
+        "prompt_login",
+        lambda master: next(credentials),
     )
 
     monkeypatch.setattr(
@@ -2641,23 +2700,15 @@ def test_run_gui_default_authentication_shows_invalid_setup_error(
         lambda: root,
     )
 
-    def fake_authenticate_application(
-        *,
-        paths,
-        prompt,
-        setup_prompt,
-        invalid_credentials,
-        invalid_setup,
-    ):
-        invalid_setup(
-            "Account password must contain an uppercase letter"
-        )
-        return False
+    credentials = iter([
+        ("alice", "garlic1!", "garlic1!"),
+        None,
+    ])
 
     monkeypatch.setattr(
         gui_application,
-        "authenticate_application",
-        fake_authenticate_application,
+        "prompt_setup",
+        lambda master: next(credentials),
     )
 
     monkeypatch.setattr(
@@ -2696,6 +2747,8 @@ def test_run_gui_default_authentication_shows_invalid_setup_error(
             },
         ),
     ]
+
+    assert not paths.account_credentials_file.exists()
 
 
 def test_authenticate_application_retries_setup_after_password_mismatch(
@@ -2889,3 +2942,2162 @@ def test_authenticate_application_reports_password_mismatch_before_retry(
     ]
 
     assert not paths.account_credentials_file.exists()
+
+
+def test_gui_unlocks_dek_for_existing_account(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="test-recovery-key",
+    )
+
+    store.confirm_recovery(username="alice", recovery_key="test-recovery-key")
+
+    result = gui_application.unlock_application_dek(
+        paths=paths,
+        prompt=lambda: ("alice", "Garlic1!"),
+    )
+
+    expected_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    assert result == expected_dek
+    assert isinstance(result, bytes)
+    assert len(result) == 32
+
+
+def test_gui_unlock_retries_after_invalid_password(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="test-recovery-key",
+    )
+
+    store.confirm_recovery(username="alice", recovery_key="test-recovery-key")
+
+    attempts = iter([
+        ("alice", "Wrong2!"),
+        ("alice", "Garlic1!"),
+    ])
+
+    result = gui_application.unlock_application_dek(
+        paths=paths,
+        prompt=lambda: next(attempts),
+    )
+
+    assert result == store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+
+def test_gui_unlock_returns_none_when_cancelled(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    result = gui_application.unlock_application_dek(
+        paths=paths,
+        prompt=lambda: None,
+    )
+
+    assert result is None
+
+
+def test_gui_unlock_rejects_account_without_dek(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    prompts = iter([
+        ("alice", "Garlic1!"),
+    ])
+
+    with pytest.raises(
+        ValueError,
+        match="DEK",
+    ):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: next(prompts),
+        )
+
+
+def test_gui_setup_creates_recoverable_dek(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    displayed_recovery_keys = []
+
+    dek = gui_application.setup_application_dek(
+        paths=paths,
+        username="alice",
+        password="Garlic1!",
+        show_recovery=lambda recovery_key: (
+            displayed_recovery_keys.append(recovery_key),
+            recovery_key,
+        )[1],
+    )
+
+    assert isinstance(dek, bytes)
+    assert len(dek) == 32
+
+    assert len(displayed_recovery_keys) == 1
+
+    recovery_key = displayed_recovery_keys[0]
+
+    assert isinstance(recovery_key, str)
+    assert len(recovery_key) == 64
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    credentials = json.loads(
+        paths.account_credentials_file.read_text(
+            encoding="utf-8",
+        )
+    )
+
+    assert credentials["recovery_confirmed"] is True
+
+
+    assert store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    ) == dek
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=recovery_key,
+    ) == dek
+
+    assert recovery_key not in (
+        paths.account_credentials_file.read_text(
+            encoding="utf-8",
+        )
+    )
+
+
+def test_gui_setup_requires_recovery_confirmation(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    displayed_recovery_keys = []
+
+    def show_recovery(recovery_key):
+        displayed_recovery_keys.append(recovery_key)
+        return False
+
+    with pytest.raises(
+        ValueError,
+        match="recovery",
+    ):
+        gui_application.setup_application_dek(
+            paths=paths,
+            username="alice",
+            password="Garlic1!",
+            show_recovery=show_recovery,
+        )
+
+    assert len(displayed_recovery_keys) == 1
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_recovery_keys[0],
+    ) == store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    credentials = json.loads(
+        paths.account_credentials_file.read_text(
+            encoding="utf-8",
+        )
+    )
+    assert credentials["recovery_confirmed"] is False
+
+
+def test_gui_unlock_rejects_unconfirmed_recovery(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="test-recovery-key",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="recovery",
+    ):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: ("alice", "Garlic1!"),
+        )
+
+
+
+def test_build_view_model_passes_dek_to_both_databases(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+    dek = bytes(range(32))
+    received = {}
+
+    class FakeBuilder:
+        def __init__(self, *, paths, dek):
+            received["builder_paths"] = paths
+            received["builder_dek"] = dek
+
+        def build(self):
+            return SimpleNamespace(
+                pipeline=FakePipeline(),
+                store=object(),
+                signer=None,
+                paths=paths,
+            )
+
+    class FakeSQLiteBackend:
+        def __init__(self, path, *, dek):
+            received["sent_path"] = path
+            received["sent_dek"] = dek
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        FakeBuilder,
+    )
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationController",
+        FakeController,
+    )
+    monkeypatch.setattr(
+        gui_application,
+        "SQLiteMessageStoreBackend",
+        FakeSQLiteBackend,
+    )
+
+    gui_application.build_view_model(
+        paths=paths,
+        dek=dek,
+    )
+
+    assert received["builder_paths"] == paths
+    assert received["builder_dek"] == dek
+    assert received["sent_path"] == paths.sent_mailbox_database
+    assert received["sent_dek"] == dek
+
+
+
+def test_run_gui_default_login_unlocks_dek_before_build(
+    tmp_path,
+    monkeypatch,
+    dek,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="test-recovery-key",
+    )
+    store.confirm_recovery(username="alice", recovery_key="test-recovery-key")
+
+    expected_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    events = []
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            events.append("withdraw")
+
+        def deiconify(self):
+            events.append("deiconify")
+
+        def iconphoto(self, default, image):
+            pass
+
+        def protocol(self, name, callback):
+            pass
+
+        def mainloop(self):
+            pass
+
+        def destroy(self):
+            events.append("destroy")
+
+    class FakeWindow:
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+        ):
+            events.append("window")
+
+        def pack(self, **kwargs):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    def fake_prompt_login(root):
+        events.append("login")
+        return ("alice", "Garlic1!")
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_login",
+        fake_prompt_login,
+    )
+
+    def fake_build_view_model(*, paths, dek):
+        assert dek == expected_dek
+        events.append("build")
+        return object()
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fake_build_view_model,
+    )
+
+    result = gui_application.run_gui(
+        paths=paths,
+    )
+
+    assert events == [
+        "withdraw",
+        "login",
+        "build",
+        "deiconify",
+        "window",
+    ]
+
+
+
+def test_run_gui_first_setup_creates_dek_and_confirms_recovery(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+    events = []
+    recovery_keys = []
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            events.append("withdraw")
+
+        def deiconify(self):
+            events.append("deiconify")
+
+        def iconphoto(self, default, image):
+            pass
+
+        def protocol(self, name, callback):
+            pass
+
+        def mainloop(self):
+            pass
+
+        def destroy(self):
+            events.append("destroy")
+
+    class FakeWindow:
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+        ):
+            events.append("window")
+
+        def pack(self, **kwargs):
+            pass
+
+        def close(self):
+            pass
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    def fake_prompt_setup(root):
+        events.append("setup")
+        return ("alice", "Garlic1!", "Garlic1!")
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_setup",
+        fake_prompt_setup,
+    )
+
+    def fake_show_recovery(recovery_key, *, master):
+        events.append("recovery")
+        recovery_keys.append(recovery_key)
+        assert isinstance(master, FakeRoot)
+        return recovery_key
+
+    monkeypatch.setattr(
+        gui_application,
+        "show_recovery_key",
+        fake_show_recovery,
+        raising=False,
+    )
+
+    def fake_build_view_model(*, paths, dek):
+        store = AccountCredentialStore(
+            path=paths.account_credentials_file,
+        )
+        assert dek == store.unlock_dek_with_password(
+            username="alice",
+            password="Garlic1!",
+        )
+        events.append("build")
+        return object()
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fake_build_view_model,
+    )
+
+    result = gui_application.run_gui(paths=paths)
+
+    assert result == 0
+    assert len(recovery_keys) == 1
+    assert len(recovery_keys[0]) == 64
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=recovery_keys[0],
+    ) == store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    assert events == [
+        "withdraw",
+        "setup",
+        "recovery",
+        "build",
+        "deiconify",
+        "window",
+    ]
+
+
+def test_show_recovery_key_uses_confirmation_dialog(monkeypatch):
+    events = []
+
+    class FakeRecoveryDialog:
+        def __init__(self, master, recovery_key):
+            events.append(("create", master, recovery_key))
+            self.result = True
+
+        def grab_set(self):
+            events.append("grab")
+
+        def wait_window(self):
+            events.append("wait")
+
+    root = object()
+
+    monkeypatch.setattr(
+        gui_application,
+        "RecoveryDialog",
+        FakeRecoveryDialog,
+        raising=False,
+    )
+
+    result = gui_application.show_recovery_key(
+        "test-recovery-key",
+        master=root,
+    )
+
+    assert result is True
+    assert events == [
+        ("create", root, "test-recovery-key"),
+        "grab",
+        "wait",
+    ]
+
+
+def test_gui_unlock_can_resume_unconfirmed_recovery(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-recovery-key",
+    )
+
+    original_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    displayed_keys = []
+
+    result = gui_application.unlock_application_dek(
+        paths=paths,
+        prompt=lambda: ("alice", "Garlic1!"),
+        show_recovery=lambda key: (
+            displayed_keys.append(key),
+            key,
+        )[1],
+    )
+
+    assert result == original_dek
+    assert len(displayed_keys) == 1
+    assert len(displayed_keys[0]) == 64
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_keys[0],
+    ) == original_dek
+
+    assert store._read_credentials()["recovery_confirmed"] is True
+
+
+def test_gui_resume_recovery_cancel_keeps_account_unconfirmed(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-recovery-key",
+    )
+
+    original_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    displayed_keys = []
+
+    def show_recovery(recovery_key):
+        displayed_keys.append(recovery_key)
+        return False
+
+    with pytest.raises(ValueError, match="recovery"):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: ("alice", "Garlic1!"),
+            show_recovery=show_recovery,
+        )
+
+    assert len(displayed_keys) == 1
+
+    assert store._read_credentials()["recovery_confirmed"] is False
+
+    assert store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    ) == original_dek
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_keys[0],
+    ) == original_dek
+
+
+def test_run_gui_passes_recovery_dialog_to_unlock(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    paths.account_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.account_credentials_file.touch()
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            pass
+
+    root = FakeRoot()
+    received = {}
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    def fake_show_recovery_key(recovery_key, *, master):
+        received["recovery_key"] = recovery_key
+        received["master"] = master
+        return True
+
+    monkeypatch.setattr(
+        gui_application,
+        "show_recovery_key",
+        fake_show_recovery_key,
+    )
+
+    def fake_unlock_application_dek(
+        *,
+        paths,
+        prompt,
+        invalid_credentials=None,
+        show_recovery=None,
+        on_forgot_password=None,
+    ):
+        received["paths"] = paths
+        received["show_recovery"] = show_recovery
+
+        if show_recovery is not None:
+            received["confirmed"] = show_recovery(
+                "test-recovery-key"
+            )
+
+        return None
+
+    monkeypatch.setattr(
+        gui_application,
+        "unlock_application_dek",
+        fake_unlock_application_dek,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: pytest.fail(
+            "build_view_model must not run"
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+    assert received["paths"] == paths
+    assert callable(received["show_recovery"])
+    assert received["recovery_key"] == "test-recovery-key"
+    assert received["master"] is root
+    assert received["confirmed"] is True
+
+
+def test_gui_resume_recovery_dialog_error_preserves_dek(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-recovery-key",
+    )
+
+    original_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    displayed_keys = []
+
+    def failing_show_recovery(recovery_key):
+        displayed_keys.append(recovery_key)
+        raise RuntimeError("Recovery dialog failed")
+
+    with pytest.raises(RuntimeError, match="Recovery dialog failed"):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: ("alice", "Garlic1!"),
+            show_recovery=failing_show_recovery,
+        )
+
+    assert len(displayed_keys) == 1
+    assert store._read_credentials()["recovery_confirmed"] is False
+
+    assert store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    ) == original_dek
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_keys[0],
+    ) == original_dek
+
+
+def test_gui_resume_recovery_confirmation_failure_preserves_dek(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-recovery-key",
+    )
+
+    original_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    displayed_keys = []
+
+    def show_recovery(recovery_key):
+        displayed_keys.append(recovery_key)
+        return recovery_key
+
+    original_replace = AccountCredentialStore._replace_credentials
+
+    def fail_confirmation(self, data, *, expected_original):
+        if data.get("recovery_confirmed") is True:
+            raise OSError("Simulated confirmation write failure")
+
+        return original_replace(
+            self,
+            data,
+            expected_original=expected_original,
+        )
+
+    monkeypatch.setattr(
+        AccountCredentialStore,
+        "_replace_credentials",
+        fail_confirmation,
+    )
+
+    with pytest.raises(
+        OSError,
+        match="Simulated confirmation write failure",
+    ):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: ("alice", "Garlic1!"),
+            show_recovery=show_recovery,
+        )
+
+    assert len(displayed_keys) == 1
+
+    credentials = store._read_credentials()
+    assert credentials["recovery_confirmed"] is False
+
+    assert store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    ) == original_dek
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_keys[0],
+    ) == original_dek
+
+
+def test_gui_resume_recovery_directory_fsync_failure_blocks_unlock(
+    tmp_path,
+    monkeypatch,
+):
+    import os
+    import stat
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-recovery-key",
+    )
+
+    original_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    displayed_keys = []
+    original_confirm = AccountCredentialStore.confirm_recovery
+
+    def fail_after_confirmation(self, *, username, recovery_key):
+        import garlicsmtp.security.auth.account_credentials as credentials_module
+
+        original_fsync = credentials_module.os.fsync
+
+        def fail_directory_fsync(descriptor):
+            if stat.S_ISDIR(os.fstat(descriptor).st_mode):
+                raise OSError("Simulated directory fsync failure")
+            return original_fsync(descriptor)
+
+        with monkeypatch.context() as patch:
+            patch.setattr(
+                credentials_module.os,
+                "fsync",
+                fail_directory_fsync,
+            )
+            return original_confirm(self, username=username, recovery_key=recovery_key)
+
+    monkeypatch.setattr(
+        AccountCredentialStore,
+        "confirm_recovery",
+        fail_after_confirmation,
+    )
+
+    with pytest.raises(
+        OSError,
+        match="Simulated directory fsync failure",
+    ):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: ("alice", "Garlic1!"),
+            show_recovery=lambda key: (
+                displayed_keys.append(key),
+                key,
+            )[1],
+        )
+
+    assert len(displayed_keys) == 1
+
+    assert store._read_credentials()["recovery_confirmed"] is True
+
+    assert store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    ) == original_dek
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_keys[0],
+    ) == original_dek
+
+
+def test_run_gui_destroys_root_when_dek_unlock_raises(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    paths.account_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.account_credentials_file.touch()
+
+    class FakeRoot:
+        def __init__(self):
+            self.destroy_calls = 0
+
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            self.destroy_calls += 1
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "configure_application_fonts",
+        lambda root: None,
+    )
+
+    def fail_unlock(**kwargs):
+        raise OSError("Simulated DEK unlock failure")
+
+    monkeypatch.setattr(
+        gui_application,
+        "unlock_application_dek",
+        fail_unlock,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: pytest.fail(
+            "build_view_model must not run"
+        ),
+    )
+
+    with pytest.raises(
+        OSError,
+        match="Simulated DEK unlock failure",
+    ):
+        gui_application.run_gui(
+            ["garlicsmtp-gui"],
+            paths=paths,
+        )
+
+    assert root.destroy_calls == 1
+
+
+def test_run_gui_destroys_root_when_first_setup_raises_oserror(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            events.append("withdraw")
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            events.append("destroy")
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "configure_application_fonts",
+        lambda root: None,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_setup",
+        lambda master: ("alice", "Garlic1!", "Garlic1!"),
+    )
+
+    def fail_setup(**kwargs):
+        raise OSError("Simulated setup persistence failure")
+
+    monkeypatch.setattr(
+        gui_application,
+        "setup_application_dek",
+        fail_setup,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: pytest.fail(
+            "build_view_model must not run"
+        ),
+    )
+
+    with pytest.raises(
+        OSError,
+        match="Simulated setup persistence failure",
+    ):
+        gui_application.run_gui(
+            ["garlicsmtp-gui"],
+            paths=paths,
+        )
+
+    assert events == ["withdraw", "destroy"]
+
+
+def test_run_gui_destroys_root_when_first_setup_raises_runtime_error(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            events.append("withdraw")
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            events.append("destroy")
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "configure_application_fonts",
+        lambda root: None,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_setup",
+        lambda master: ("alice", "Garlic1!", "Garlic1!"),
+    )
+
+    def fail_setup(**kwargs):
+        raise RuntimeError("Simulated recovery dialog failure")
+
+    monkeypatch.setattr(
+        gui_application,
+        "setup_application_dek",
+        fail_setup,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: pytest.fail(
+            "build_view_model must not run"
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulated recovery dialog failure",
+    ):
+        gui_application.run_gui(
+            ["garlicsmtp-gui"],
+            paths=paths,
+        )
+
+    assert events == ["withdraw", "destroy"]
+
+
+def test_run_gui_destroys_root_when_view_model_build_fails(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    events = []
+    dek = bytes(range(32))
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            events.append("withdraw")
+
+        def deiconify(self):
+            events.append("deiconify")
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            events.append("destroy")
+
+    root = FakeRoot()
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        lambda: root,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "configure_application_fonts",
+        lambda root: None,
+    )
+
+    def fail_build(*, paths, dek):
+        events.append("build")
+        raise RuntimeError("Simulated view model failure")
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fail_build,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        lambda *args, **kwargs: pytest.fail(
+            "MainWindow must not be created"
+        ),
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Simulated view model failure",
+    ):
+        gui_application.run_gui(
+            ["garlicsmtp-gui"],
+            paths=paths,
+            authenticate=lambda **kwargs: dek,
+        )
+
+    assert events == [
+        "withdraw",
+        "build",
+        "destroy",
+    ]
+
+
+def test_sent_database_wrong_dek_preserves_existing_message(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    paths.sent_mailbox_database.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    sender = "alice@test.onion"
+    body = "SENT-WRONG-DEK-PRESERVATION"
+
+    message = MailMessage(
+        envelope=Envelope(
+            sender=sender,
+            recipients=["bob@test.onion"],
+        ),
+        headers=MailHeaders(),
+        body=body,
+    )
+
+    backend = SQLiteMessageStoreBackend(
+        paths.sent_mailbox_database,
+        dek=dek,
+    )
+
+    try:
+        backend.save_entry(sender, message)
+    finally:
+        backend.close()
+
+    original_bytes = (
+        paths.sent_mailbox_database.read_bytes()
+    )
+
+    assert body.encode() not in original_bytes
+    assert not original_bytes.startswith(
+        b"SQLite format 3"
+    )
+
+    wrong_dek = bytes(
+        value ^ 0xFF for value in dek
+    )
+
+    with pytest.raises(sqlcipher.DatabaseError):
+        SQLiteMessageStoreBackend(
+            paths.sent_mailbox_database,
+            dek=wrong_dek,
+        )
+
+    assert (
+        paths.sent_mailbox_database.read_bytes()
+        == original_bytes
+    )
+
+    reopened = SQLiteMessageStoreBackend(
+        paths.sent_mailbox_database,
+        dek=dek,
+    )
+
+    try:
+        entries = reopened.list_entries(sender)
+
+        assert len(entries) == 1
+        assert entries[0].message.body == body
+    finally:
+        reopened.close()
+
+
+def test_fresh_install_creates_encrypted_databases_and_reopens(
+    tmp_path,
+    monkeypatch,
+):
+    import sqlite3
+
+    from garlicsmtp.security.encrypted_sqlite import (
+        connect_encrypted_sqlite,
+    )
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    # Il test non deve utilizzare la configurazione reale.
+    real_builder = ApplicationBuilder
+
+    def isolated_builder(*, paths, dek):
+        return real_builder(
+            paths=paths,
+            settings=ApplicationSettings(),
+            dek=dek,
+        )
+
+    monkeypatch.setattr(
+        gui_application,
+        "ApplicationBuilder",
+        isolated_builder,
+    )
+
+    recovery_keys = []
+
+    dek = gui_application.setup_application_dek(
+        paths=paths,
+        username="alice",
+        password="Garlic1!",
+        show_recovery=lambda key: (
+            recovery_keys.append(key),
+            key,
+        )[1],
+    )
+
+    assert len(recovery_keys) == 1
+
+    first_view_model = gui_application.build_view_model(
+        paths=paths,
+        dek=dek,
+    )
+
+    first_context = first_view_model.controller.context
+
+    first_context.store.backend.close()
+    first_context.queue.backend.close()
+
+    # Chiude anche il database dei messaggi inviati.
+    first_view_model.sent_message_list.explorer.store.backend.close()
+
+    reopened_store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    reopened_dek = reopened_store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    assert reopened_dek == dek
+
+    recovered_dek = reopened_store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=recovery_keys[0],
+    )
+
+    assert recovered_dek == dek
+
+    attachment_content = (
+        b"GarlicSMTP confidential attachment "
+        b"content for fresh install test"
+    )
+
+    first_context.store.attachment_store.save(
+        message_id="fresh-install-message",
+        filename="private.txt",
+        declared_mime="text/plain",
+        content=attachment_content,
+    )
+
+    encrypted_files = list(
+        (
+            paths.attachments_dir
+            / "fresh-install-message"
+        ).glob("*.gsat")
+    )
+
+    assert len(encrypted_files) == 1
+
+    encrypted_bytes = encrypted_files[0].read_bytes()
+
+    assert encrypted_bytes.startswith(b"GSAT\x01")
+    assert attachment_content not in encrypted_bytes
+    assert b"private.txt" not in encrypted_bytes
+
+    recovered_attachment_store = AttachmentStore(
+        paths.attachments_dir,
+        dek=recovered_dek,
+    )
+
+    recovered_attachments = (
+        recovered_attachment_store.list_for_message(
+            "fresh-install-message"
+        )
+    )
+
+    assert len(recovered_attachments) == 1
+    assert recovered_attachments[0].filename == "private.txt"
+    assert recovered_attachments[0].declared_mime == "text/plain"
+    assert recovered_attachments[0].content == attachment_content
+
+    for database in (
+        paths.mailbox_database,
+        paths.sent_mailbox_database,
+        paths.queue_database,
+    ):
+        connection = connect_encrypted_sqlite(
+            database,
+            dek=recovered_dek,
+        )
+        try:
+            assert connection.execute(
+                "PRAGMA integrity_check"
+            ).fetchone() == ("ok",)
+        finally:
+            connection.close()
+
+    for database in (
+        paths.mailbox_database,
+        paths.sent_mailbox_database,
+        paths.queue_database,
+    ):
+        assert database.is_file()
+
+        assert database.read_bytes()[:16] != (
+            b"SQLite format 3\x00"
+        )
+
+        with pytest.raises(sqlite3.DatabaseError):
+            with sqlite3.connect(database) as connection:
+                connection.execute(
+                    "SELECT name FROM sqlite_master"
+                ).fetchall()
+
+        connection = connect_encrypted_sqlite(
+            database,
+            dek=reopened_dek,
+        )
+        try:
+            assert connection.execute(
+                "PRAGMA integrity_check"
+            ).fetchone() == ("ok",)
+        finally:
+            connection.close()
+
+        second_view_model = gui_application.build_view_model(
+            paths=paths,
+            dek=reopened_dek,
+        )
+
+        second_context = second_view_model.controller.context
+
+        reopened_attachments = (
+            second_context.store.attachment_store.list_for_message(
+                "fresh-install-message"
+            )
+        )
+
+        assert len(reopened_attachments) == 1
+        assert reopened_attachments[0].filename == "private.txt"
+        assert reopened_attachments[0].declared_mime == "text/plain"
+        assert reopened_attachments[0].content == attachment_content
+
+        assert second_context.store is not None
+        assert second_context.queue is not None
+
+        second_context.store.backend.close()
+        second_context.queue.backend.close()
+
+        second_view_model.sent_message_list.explorer.store.backend.close()
+
+def test_gui_setup_rejects_wrong_reentered_recovery_key(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    with pytest.raises(ValueError):
+        gui_application.setup_application_dek(
+            paths=paths,
+            username="alice",
+            password="Garlic1!",
+            show_recovery=lambda recovery_key: "wrong-recovery-key",
+        )
+
+    credentials = json.loads(
+        paths.account_credentials_file.read_text(
+            encoding="utf-8",
+        )
+    )
+
+    assert credentials["recovery_confirmed"] is False
+
+
+def test_gui_setup_accepts_correct_reentered_recovery_key(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    displayed_recovery_keys = []
+
+    def show_recovery(recovery_key):
+        displayed_recovery_keys.append(recovery_key)
+        return recovery_key
+
+    dek = gui_application.setup_application_dek(
+        paths=paths,
+        username="alice",
+        password="Garlic1!",
+        show_recovery=show_recovery,
+    )
+
+    assert len(displayed_recovery_keys) == 1
+    assert isinstance(dek, bytes)
+    assert len(dek) == 32
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+
+    assert store._read_credentials()["recovery_confirmed"] is True
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_recovery_keys[0],
+    ) == dek
+
+
+def test_gui_unlock_accepts_correct_reentered_recovery_key(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-unconfirmed-recovery-key",
+    )
+
+    expected_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    displayed_keys = []
+
+    def show_recovery(recovery_key):
+        displayed_keys.append(recovery_key)
+        return recovery_key
+
+    actual_dek = gui_application.unlock_application_dek(
+        paths=paths,
+        prompt=lambda: ("alice", "Garlic1!"),
+        show_recovery=show_recovery,
+    )
+
+    assert actual_dek == expected_dek
+    assert len(displayed_keys) == 1
+
+    assert store._read_credentials()["recovery_confirmed"] is True
+
+    assert store.unlock_dek_with_recovery(
+        username="alice",
+        recovery_key=displayed_keys[0],
+    ) == expected_dek
+
+
+def test_gui_unlock_rejects_wrong_reentered_recovery_key(tmp_path):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    store = AccountCredentialStore(
+        path=paths.account_credentials_file,
+    )
+    store.create(
+        username="alice",
+        password="Garlic1!",
+    )
+    store.enable_recovery(
+        username="alice",
+        password="Garlic1!",
+        recovery_key="old-unconfirmed-recovery-key",
+    )
+
+    expected_dek = store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    )
+
+    with pytest.raises(ValueError, match="Invalid wrapped DEK"):
+        gui_application.unlock_application_dek(
+            paths=paths,
+            prompt=lambda: ("alice", "Garlic1!"),
+            show_recovery=lambda recovery_key: "wrong-recovery-key",
+        )
+
+    assert store._read_credentials()["recovery_confirmed"] is False
+
+    assert store.unlock_dek_with_password(
+        username="alice",
+        password="Garlic1!",
+    ) == expected_dek
+
+
+def test_gui_unlock_handles_forgot_password_request(
+    tmp_path,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from garlicsmtp.gui.application import unlock_application_dek
+
+    class FakeStore:
+        def __init__(self, path):
+            self.path = path
+
+        def authenticate(self, *, username, password):
+            raise AssertionError(
+                "Authentication must not run for a recovery request"
+            )
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AccountCredentialStore",
+        FakeStore,
+    )
+
+    responses = iter(["forgot_password", None])
+    recovery_requests = []
+
+    result = unlock_application_dek(
+        paths=SimpleNamespace(
+            account_credentials_file=tmp_path / "credentials.json",
+        ),
+        prompt=lambda: next(responses),
+        on_forgot_password=lambda: recovery_requests.append(True),
+    )
+
+    assert result is None
+    assert recovery_requests == [True]
+
+
+def test_password_recovery_does_not_reset_without_key_confirmation(
+    tmp_path,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from garlicsmtp.gui.application import recover_application_password
+
+    reset_calls = []
+
+    class FakeStore:
+        def __init__(self, path):
+            self.path = path
+
+        def reset_password_with_recovery(self, **kwargs):
+            reset_calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AccountCredentialStore",
+        FakeStore,
+    )
+
+    result = recover_application_password(
+        paths=SimpleNamespace(
+            account_credentials_file=tmp_path / "credentials.json",
+        ),
+        username="test-user",
+        recovery_key="existing-recovery-key",
+        new_password="NewPassword123!",
+        show_recovery=lambda generated_key: False,
+    )
+
+    assert result is False
+    assert reset_calls == []
+
+
+def test_password_recovery_resets_after_key_confirmation(
+    tmp_path,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from garlicsmtp.gui.application import recover_application_password
+
+    generated_key = "new-generated-recovery-key"
+    reset_calls = []
+
+    class FakeKeyManager:
+        def generate_recovery_key(self):
+            return generated_key
+
+    class FakeStore:
+        def __init__(self, path):
+            assert path == tmp_path / "credentials.json"
+
+        def reset_password_with_recovery(self, **kwargs):
+            reset_calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AtRestKeyManager",
+        FakeKeyManager,
+    )
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AccountCredentialStore",
+        FakeStore,
+    )
+
+    result = recover_application_password(
+        paths=SimpleNamespace(
+            account_credentials_file=tmp_path / "credentials.json",
+        ),
+        username="test-user",
+        recovery_key="old-recovery-key",
+        new_password="NewPassword123!",
+        show_recovery=lambda key: key,
+    )
+
+    assert result is True
+    assert reset_calls == [{
+        "username": "test-user",
+        "recovery_key": "old-recovery-key",
+        "new_password": "NewPassword123!",
+        "new_recovery_key": generated_key,
+    }]
+
+
+def test_password_recovery_rejects_mismatched_confirmation(
+    tmp_path,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    from garlicsmtp.gui.application import recover_application_password
+
+    reset_calls = []
+
+    class FakeKeyManager:
+        def generate_recovery_key(self):
+            return "correct-new-key"
+
+    class FakeStore:
+        def __init__(self, path):
+            pass
+
+        def reset_password_with_recovery(self, **kwargs):
+            reset_calls.append(kwargs)
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AtRestKeyManager",
+        FakeKeyManager,
+    )
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AccountCredentialStore",
+        FakeStore,
+    )
+
+    result = recover_application_password(
+        paths=SimpleNamespace(
+            account_credentials_file=tmp_path / "credentials.json",
+        ),
+        username="test-user",
+        recovery_key="old-key",
+        new_password="NewPassword123!",
+        show_recovery=lambda key: "incorrect-key",
+    )
+
+    assert result is False
+    assert reset_calls == []
+
+
+def test_password_recovery_propagates_credential_errors(
+    tmp_path,
+    monkeypatch,
+):
+    from types import SimpleNamespace
+
+    import pytest
+
+    from garlicsmtp.gui.application import recover_application_password
+
+    class FakeKeyManager:
+        def generate_recovery_key(self):
+            return "new-key"
+
+    class FakeStore:
+        def __init__(self, path):
+            pass
+
+        def reset_password_with_recovery(self, **kwargs):
+            raise ValueError("Invalid account credentials")
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AtRestKeyManager",
+        FakeKeyManager,
+    )
+    monkeypatch.setattr(
+        "garlicsmtp.gui.application.AccountCredentialStore",
+        FakeStore,
+    )
+
+    with pytest.raises(ValueError, match="Invalid account credentials"):
+        recover_application_password(
+            paths=SimpleNamespace(
+                account_credentials_file=tmp_path / "credentials.json",
+            ),
+            username="test-user",
+            recovery_key="wrong-old-key",
+            new_password="NewPassword123!",
+            show_recovery=lambda key: key,
+        )
+
+
+def test_run_gui_wires_forgot_password_to_recovery_flow(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    paths.account_credentials_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+    paths.account_credentials_file.touch()
+
+    events = []
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            events.append(("destroy",))
+
+    root = FakeRoot()
+
+    def fake_showinfo(title, message, *, parent):
+        events.append(("showinfo", title, message, parent))
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showinfo",
+        fake_showinfo,
+    )
+
+    monkeypatch.setattr(gui_application.tk, "Tk", lambda: root)
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    def fake_prompt_password_reset(master):
+        events.append(("reset_prompt", master))
+        return ("alice", "existing-key", "NewPassword123!")
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_password_reset",
+        fake_prompt_password_reset,
+        raising=False,
+    )
+
+    def fake_recover_application_password(**kwargs):
+        events.append(("recover", kwargs))
+        return True
+
+    monkeypatch.setattr(
+        gui_application,
+        "recover_application_password",
+        fake_recover_application_password,
+    )
+
+    def fake_unlock_application_dek(
+        *,
+        paths,
+        prompt,
+        invalid_credentials=None,
+        show_recovery=None,
+        on_forgot_password=None,
+    ):
+        assert callable(on_forgot_password)
+        on_forgot_password()
+        return None
+
+    monkeypatch.setattr(
+        gui_application,
+        "unlock_application_dek",
+        fake_unlock_application_dek,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: pytest.fail(
+            "Recovery must return to login, not open the application"
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+    )
+
+    assert result == 1
+    assert events[0] == ("reset_prompt", root)
+
+    recovery = events[1]
+    assert recovery[0] == "recover"
+    assert recovery[1]["paths"] == paths
+    assert recovery[1]["username"] == "alice"
+    assert recovery[1]["recovery_key"] == "existing-key"
+    assert recovery[1]["new_password"] == "NewPassword123!"
+    assert callable(recovery[1]["show_recovery"])
+    assert events[2][0] == "showinfo"
+    assert events[2][3] is root
+    assert "Sign in" in events[2][2]
+    assert events[-1] == ("destroy",)
+
+
+@pytest.mark.parametrize(
+    ("credentials", "recovery_result", "expected_message"),
+    [
+        (None, None, None),
+        (("alice", "old-key", "NewPassword123!"), False, None),
+        (("alice", "wrong-key", "NewPassword123!"), ValueError("Invalid recovery key"), "error"),
+        (("alice", "old-key", "NewPassword123!"), True, "success"),
+    ],
+)
+def test_handle_forgot_password_outcomes(
+    tmp_path,
+    monkeypatch,
+    credentials,
+    recovery_result,
+    expected_message,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    master = object()
+    events = []
+
+    monkeypatch.setattr(
+        gui_application,
+        "prompt_password_reset",
+        lambda received_master: (
+            events.append(("prompt", received_master)),
+            credentials,
+        )[1],
+    )
+
+    def fake_recover_application_password(**kwargs):
+        events.append(("recover", kwargs))
+        if isinstance(recovery_result, Exception):
+            raise recovery_result
+        return recovery_result
+
+    monkeypatch.setattr(
+        gui_application,
+        "recover_application_password",
+        fake_recover_application_password,
+    )
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showerror",
+        lambda title, message, *, parent: events.append(
+            ("error", title, message, parent)
+        ),
+    )
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showinfo",
+        lambda title, message, *, parent: events.append(
+            ("success", title, message, parent)
+        ),
+    )
+
+    gui_application.handle_forgot_password(
+        paths=paths,
+        master=master,
+    )
+
+    assert events[0] == ("prompt", master)
+
+    recovery_calls = [
+        event for event in events if event[0] == "recover"
+    ]
+    messages = [
+        event for event in events
+        if event[0] in ("error", "success")
+    ]
+
+    if credentials is None:
+        assert recovery_calls == []
+    else:
+        assert len(recovery_calls) == 1
+        kwargs = recovery_calls[0][1]
+        assert kwargs["paths"] == paths
+        assert kwargs["username"] == credentials[0]
+        assert kwargs["recovery_key"] == credentials[1]
+        assert kwargs["new_password"] == credentials[2]
+        assert callable(kwargs["show_recovery"])
+
+    if expected_message is None:
+        assert messages == []
+    else:
+        assert len(messages) == 1
+        assert messages[0][0] == expected_message
+        assert messages[0][3] is master
+
+        if expected_message == "error":
+            assert "Invalid recovery key" in messages[0][2]
+        else:
+            assert "Sign in" in messages[0][2]

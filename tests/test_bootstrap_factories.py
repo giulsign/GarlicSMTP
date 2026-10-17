@@ -1,25 +1,34 @@
+
 # Copyright (c) 2026 Giuliano Signorelli
 # SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
 #
 # See LICENSE for the full license terms.
 
-from garlicsmtp.core.engine import Bootstrap
+from garlicsmtp.core.engine import (
+    Bootstrap,
+    GarlicSMTPConfig,
+    Runtime,
+)
 from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.transport.manager import TransportManager
 from garlicsmtp.transport.onion.transport import OnionTransport
-from garlicsmtp.core.engine import Runtime
 from garlicsmtp.queue.worker import QueueWorker
 from garlicsmtp.smtp.server import SMTPServer
 from garlicsmtp.logger import Logger
-from garlicsmtp.core.pipeline import Pipeline
+from garlicsmtp.core.pipeline import Pipeline, PipelineContext
 from garlicsmtp.storage.store import MessageStore
-from garlicsmtp.core.pipeline import PipelineContext
-from garlicsmtp.core.engine import GarlicSMTPConfig
 
 
-def test_bootstrap_factories():
-
-    bootstrap = Bootstrap()
+def test_bootstrap_factories(
+    tmp_path,
+    dek,
+):
+    bootstrap = Bootstrap(
+        config=GarlicSMTPConfig(
+            mailbox_db=str(tmp_path / "mailboxes.db"),
+        ),
+        dek=dek,
+    )
 
     assert isinstance(
         bootstrap.build_queue(),
@@ -37,8 +46,8 @@ def test_bootstrap_factories():
     )
 
     assert isinstance(
-    bootstrap.build_worker(),
-    QueueWorker,
+        bootstrap.build_worker(),
+        QueueWorker,
     )
 
     assert isinstance(
@@ -66,10 +75,20 @@ def test_bootstrap_factories():
         MessageStore,
     )
 
+    bootstrap.build_queue().backend.close()
+    bootstrap.build_message_store().backend.close()
 
-def test_bootstrap_reuses_instances():
 
-    bootstrap = Bootstrap()
+def test_bootstrap_reuses_instances(
+    tmp_path,
+    dek,
+):
+    bootstrap = Bootstrap(
+        config=GarlicSMTPConfig(
+            mailbox_db=str(tmp_path / "mailboxes.db"),
+        ),
+        dek=dek,
+    )
 
     assert bootstrap.build_queue() is bootstrap.build_queue()
     assert bootstrap.build_transport() is bootstrap.build_transport()
@@ -78,42 +97,79 @@ def test_bootstrap_reuses_instances():
     assert bootstrap.build_server() is bootstrap.build_server()
     assert bootstrap.build_logger() is bootstrap.build_logger()
     assert bootstrap.build_pipeline() is bootstrap.build_pipeline()
-    assert (bootstrap.build_message_store() is bootstrap.build_message_store())
+    assert (
+        bootstrap.build_message_store()
+        is bootstrap.build_message_store()
+    )
 
-def test_bootstrap_runtime_services():
+    bootstrap.build_queue().backend.close()
+    bootstrap.build_message_store().backend.close()
 
-    bootstrap = Bootstrap()
+
+def test_bootstrap_runtime_services(
+    tmp_path,
+    dek,
+):
+    bootstrap = Bootstrap(
+        config=GarlicSMTPConfig(
+            mailbox_db=str(tmp_path / "mailboxes.db"),
+        ),
+        dek=dek,
+    )
 
     runtime = bootstrap.build_runtime()
 
     assert bootstrap.build_server() in runtime.services
     assert bootstrap.build_worker() in runtime.services
 
+    bootstrap.build_queue().backend.close()
+    bootstrap.build_message_store().backend.close()
 
-def test_bootstrap_runtime_tasks():
 
-    bootstrap = Bootstrap()
+def test_bootstrap_runtime_tasks(
+    tmp_path,
+    dek,
+):
+    bootstrap = Bootstrap(
+        config=GarlicSMTPConfig(
+            mailbox_db=str(tmp_path / "mailboxes.db"),
+        ),
+        dek=dek,
+    )
 
     runtime = bootstrap.build_runtime()
 
     assert bootstrap.build_server() in runtime.tasks
     assert bootstrap.build_worker() in runtime.tasks
 
+    bootstrap.build_queue().backend.close()
+    bootstrap.build_message_store().backend.close()
 
-def test_bootstrap_server_uses_shared_pipeline():
 
-    bootstrap = Bootstrap()
+def test_bootstrap_server_uses_shared_pipeline(
+    tmp_path,
+    dek,
+):
+    bootstrap = Bootstrap(
+        config=GarlicSMTPConfig(
+            mailbox_db=str(tmp_path / "mailboxes.db"),
+        ),
+        dek=dek,
+    )
 
     server = bootstrap.build_server()
 
     assert server.pipeline is bootstrap.build_pipeline()
 
+    bootstrap.build_queue().backend.close()
+    bootstrap.build_message_store().backend.close()
+
 
 def test_bootstrap_pipeline_stores_local_message(
     tmp_path,
     message,
+    dek,
 ):
-
     db_path = tmp_path / "mailboxes.db"
 
     config = GarlicSMTPConfig(
@@ -123,11 +179,10 @@ def test_bootstrap_pipeline_stores_local_message(
 
     bootstrap = Bootstrap(
         config=config,
+        dek=dek,
     )
 
-    recipient = (
-        f"bob@{bootstrap.config.hostname}"
-    )
+    recipient = f"bob@{bootstrap.config.hostname}"
 
     message.envelope.recipients = [
         recipient
@@ -159,14 +214,15 @@ def test_bootstrap_pipeline_stores_local_message(
         message.envelope.sender
     )
 
+    bootstrap.build_queue().backend.close()
     store.backend.close()
 
 
 def test_bootstrap_message_store_persists(
     tmp_path,
     message,
+    dek,
 ):
-
     db_path = tmp_path / "mailboxes.db"
 
     config = GarlicSMTPConfig(
@@ -176,6 +232,7 @@ def test_bootstrap_message_store_persists(
 
     bootstrap = Bootstrap(
         config=config,
+        dek=dek,
     )
 
     message.envelope.recipients = [
@@ -196,8 +253,12 @@ def test_bootstrap_message_store_persists(
 
     assert len(ids) == 1
 
+    bootstrap.build_queue().backend.close()
+    store.backend.close()
+
     second_bootstrap = Bootstrap(
         config=config,
+        dek=dek,
     )
 
     restored_store = (
@@ -220,3 +281,6 @@ def test_bootstrap_message_store_persists(
         restored.envelope.sender
         == message.envelope.sender
     )
+
+    second_bootstrap.build_queue().backend.close()
+    restored_store.backend.close()

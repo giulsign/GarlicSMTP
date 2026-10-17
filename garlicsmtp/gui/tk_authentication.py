@@ -14,6 +14,7 @@ class LoginForm(ttk.Frame):
         master,
         *,
         on_submit=None,
+        on_forgot_password=None,
     ) -> None:
         super().__init__(
             master,
@@ -32,6 +33,7 @@ class LoginForm(ttk.Frame):
         ) 
         
         self.on_submit = on_submit
+        self.on_forgot_password = on_forgot_password
 
         ttk.Label(
             self,
@@ -93,10 +95,28 @@ class LoginForm(ttk.Frame):
             pady=(8, 0),
         )
 
+
+        self.forgot_password_button = ttk.Button(
+            self,
+            text="Forgotten password?",
+            command=self.forgot_password,
+        )
+        self.forgot_password_button.grid(
+            row=3,
+            column=1,
+            sticky="e",
+            pady=(6, 0),
+        )
+
         self.columnconfigure(
             1,
             weight=1,
         )
+
+
+    def forgot_password(self) -> None:
+        if self.on_forgot_password is not None:
+            self.on_forgot_password()
 
     def credentials(
         self,
@@ -250,6 +270,7 @@ class LoginDialog(tk.Toplevel):
         self.form = LoginForm(
             self,
             on_submit=self.accept,
+            on_forgot_password=self.forgot_password,
         )
 
         self.form.grid(
@@ -278,6 +299,10 @@ class LoginDialog(tk.Toplevel):
         credentials,
     ) -> None:
         self.result = credentials
+        self.destroy()
+
+    def forgot_password(self) -> None:
+        self.result = "forgot_password"
         self.destroy()
 
     def cancel(
@@ -319,6 +344,237 @@ class SetupDialog(tk.Toplevel):
     def cancel(
         self,
     ) -> None:
+        self.destroy()
+
+class RecoveryDialog(tk.Toplevel):
+
+    def __init__(
+        self,
+        master,
+        recovery_key: str,
+    ) -> None:
+        super().__init__(master)
+
+        self.result = False
+        self.recovery_key = recovery_key
+
+        self.title("GarlicSMTP recovery key")
+
+        self.warning_label = ttk.Label(
+            self,
+            text=(
+                "Save your recovery key in a secure place.\n"
+                "If you lose your password and recovery key, "
+                "you may permanently lose access to your encrypted data."
+            ),
+            wraplength=500,
+            justify="left",
+        )
+
+        self.warning_label.grid(
+            row=0,
+            column=0,
+            padx=20,
+            pady=(20, 10),
+            sticky="w",
+        )
+
+        self.recovery_key_entry = ttk.Entry(
+            self,
+            width=68,
+        )
+        self.recovery_key_entry.insert(0, recovery_key)
+        self.recovery_key_entry.configure(state="readonly")
+
+        self.recovery_key_entry.grid(
+            row=1,
+            column=0,
+            padx=20,
+            pady=20,
+            sticky="ew",
+        )
+
+        self.copy_button = ttk.Button(
+            self,
+            text="Copy recovery key",
+            command=self.copy_recovery_key,
+        )
+
+        self.copy_button.grid(
+            row=2,
+            column=0,
+            padx=20,
+            pady=(0, 10),
+        )
+
+        self.reentry_label = ttk.Label(
+            self,
+            text="Re-enter your recovery key to confirm:",
+        )
+        self.reentry_label.grid(
+            row=3,
+            column=0,
+            padx=20,
+            pady=(10, 5),
+            sticky="w",
+        )
+
+        self.reentry_entry = ttk.Entry(
+            self,
+            width=68,
+        )
+        self.reentry_entry.grid(
+            row=4,
+            column=0,
+            padx=20,
+            pady=(0, 10),
+            sticky="ew",
+        )
+
+        self.confirm_button = ttk.Button(
+            self,
+            text="Verify recovery key",
+            command=self.accept,
+        )
+
+        self.confirm_button.grid(
+            row=5,
+            column=0,
+            padx=20,
+            pady=(0, 20),
+        )
+
+        self.protocol(
+            "WM_DELETE_WINDOW",
+            self.cancel,
+        )
+
+    def copy_recovery_key(self) -> None:
+        self.clipboard_clear()
+        self.clipboard_append(self.recovery_key)
+
+    def accept(self) -> None:
+        entered_key = self.reentry_entry.get()
+        if not entered_key:
+            return
+
+        self.result = entered_key
+        self.destroy()
+
+    def cancel(self) -> None:
+        self.result = False
+        self.destroy()
+
+class PasswordResetDialog(tk.Toplevel):
+    def __init__(self, master) -> None:
+        super().__init__(master)
+
+        self.result = None
+        self.title("GarlicSMTP password recovery")
+
+        fields = (
+            ("Username", "username_entry", False),
+            ("Existing recovery key", "recovery_key_entry", True),
+            ("New password", "new_password_entry", True),
+            ("Confirm new password", "password_confirmation_entry", True),
+        )
+
+        for row, (label, attribute, secret) in enumerate(fields):
+            ttk.Label(
+                self,
+                text=label,
+            ).grid(
+                row=row,
+                column=0,
+                padx=(20, 12),
+                pady=6,
+                sticky="w",
+            )
+
+            entry = ttk.Entry(
+                self,
+                width=42,
+                show="*" if secret else "",
+            )
+            entry.grid(
+                row=row,
+                column=1,
+                padx=(0, 20),
+                pady=6,
+                sticky="ew",
+            )
+            setattr(self, attribute, entry)
+
+        self.error_label = ttk.Label(
+            self,
+            text="",
+            foreground="red",
+        )
+        self.error_label.grid(
+            row=4,
+            column=0,
+            columnspan=2,
+            padx=20,
+            pady=6,
+            sticky="w",
+        )
+
+        self.reset_button = ttk.Button(
+            self,
+            text="Continue",
+            command=self.accept,
+        )
+        self.reset_button.grid(
+            row=5,
+            column=1,
+            padx=20,
+            pady=(8, 16),
+            sticky="e",
+        )
+
+        self.cancel_button = ttk.Button(
+            self,
+            text="Cancel",
+            command=self.cancel,
+        )
+        self.cancel_button.grid(
+            row=5,
+            column=0,
+            padx=20,
+            pady=(8, 16),
+            sticky="w",
+        )
+
+        self.columnconfigure(1, weight=1)
+        self.protocol("WM_DELETE_WINDOW", self.cancel)
+
+    def accept(self) -> None:
+        username = self.username_entry.get()
+        recovery_key = self.recovery_key_entry.get()
+        new_password = self.new_password_entry.get()
+        confirmation = self.password_confirmation_entry.get()
+
+        if not username or not recovery_key or not new_password:
+            self.error_label.configure(
+                text="All fields are required",
+            )
+            return
+
+        if new_password != confirmation:
+            self.error_label.configure(
+                text="Passwords do not match",
+            )
+            return
+
+        self.result = (
+            username,
+            recovery_key,
+            new_password,
+        )
+        self.destroy()
+
+    def cancel(self) -> None:
+        self.result = None
         self.destroy()
 
 

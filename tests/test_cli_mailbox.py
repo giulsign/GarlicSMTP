@@ -7,18 +7,20 @@ from garlicsmtp.cli.mailbox import (
     list_mailboxes,
     list_messages,
     show_message,
+    update_flags,
 )
-from garlicsmtp.storage.sqlite import (
-    SQLiteMessageStoreBackend,
-)
-from garlicsmtp.cli.mailbox import update_flags
+from garlicsmtp.storage.sqlite import SQLiteMessageStoreBackend
+
 
 def create_mailbox_database(
     path,
     message,
+    *,
+    dek: bytes,
 ):
     backend = SQLiteMessageStoreBackend(
-        path
+        path,
+        dek=dek,
     )
 
     message.headers.fields[
@@ -27,12 +29,13 @@ def create_mailbox_database(
 
     message.body = "Message body"
 
-    message_id = backend.save(
-        "bob@test.onion",
-        message,
-    )
-
-    backend.close()
+    try:
+        message_id = backend.save(
+            "bob@test.onion",
+            message,
+        )
+    finally:
+        backend.close()
 
     return message_id
 
@@ -41,16 +44,19 @@ def test_cli_lists_mailboxes(
     tmp_path,
     message,
     capsys,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     create_mailbox_database(
         database,
         message,
+        dek=dek,
     )
 
     result = list_mailboxes(
-        str(database)
+        str(database),
+        dek=dek,
     )
 
     output = capsys.readouterr().out
@@ -64,17 +70,20 @@ def test_cli_lists_messages(
     tmp_path,
     message,
     capsys,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     message_id = create_mailbox_database(
         database,
         message,
+        dek=dek,
     )
 
     result = list_messages(
         str(database),
         "bob@test.onion",
+        dek=dek,
     )
 
     output = capsys.readouterr().out
@@ -89,18 +98,21 @@ def test_cli_shows_message_by_position(
     tmp_path,
     message,
     capsys,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     create_mailbox_database(
         database,
         message,
+        dek=dek,
     )
 
     result = show_message(
         str(database),
         "bob@test.onion",
         "1",
+        dek=dek,
     )
 
     output = capsys.readouterr().out
@@ -115,6 +127,7 @@ def test_cli_shows_message_by_position(
 def test_cli_show_returns_error_for_missing_message(
     tmp_path,
     capsys,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
@@ -122,6 +135,7 @@ def test_cli_show_returns_error_for_missing_message(
         str(database),
         "bob@test.onion",
         "1",
+        dek=dek,
     )
 
     output = capsys.readouterr().out
@@ -134,12 +148,14 @@ def test_cli_updates_message_flags(
     tmp_path,
     message,
     capsys,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
     create_mailbox_database(
         database,
         message,
+        dek=dek,
     )
 
     result = update_flags(
@@ -150,6 +166,7 @@ def test_cli_updates_message_flags(
         flags={
             "\\Seen",
         },
+        dek=dek,
     )
 
     output = capsys.readouterr().out
@@ -158,7 +175,8 @@ def test_cli_updates_message_flags(
     assert "UID 1 flags: \\Seen" in output
 
     backend = SQLiteMessageStoreBackend(
-        database
+        database,
+        dek=dek,
     )
 
     try:

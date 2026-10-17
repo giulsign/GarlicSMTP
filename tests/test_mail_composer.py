@@ -620,11 +620,13 @@ def test_mail_composer_saves_attachment_message_as_plain_sent_message():
 
 def test_mail_composer_stores_sent_attachments(
     tmp_path,
+    dek,
 ):
     pipeline = FakePipeline()
 
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     sent_store = MessageStore(
@@ -680,6 +682,7 @@ def test_mail_composer_stores_sent_attachments(
 
 def test_mail_composer_rolls_back_sent_when_attachment_save_fails(
     tmp_path,
+    dek,
 ):
     class FailingAttachmentStore(
         AttachmentStore
@@ -688,8 +691,9 @@ def test_mail_composer_rolls_back_sent_when_attachment_save_fails(
         def __init__(
             self,
             path,
+            dek,
         ):
-            super().__init__(path)
+            super().__init__(path, dek=dek)
             self.save_calls = 0
 
         def save(
@@ -708,7 +712,8 @@ def test_mail_composer_rolls_back_sent_when_attachment_save_fails(
             )
 
     attachment_store = FailingAttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     sent_store = MessageStore(
@@ -763,10 +768,12 @@ def test_mail_composer_rolls_back_sent_when_attachment_save_fails(
 
 def test_mail_composer_with_attachment_store_accepts_no_attachments(
     tmp_path,
+    dek,
 ):
     sent_store = MessageStore(
         attachment_store=AttachmentStore(
-            tmp_path / "attachments"
+            tmp_path / "attachments",
+                             dek=dek,
         ),
     )
 

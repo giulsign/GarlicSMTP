@@ -92,6 +92,7 @@ def receive_line(client):
 
 def test_smtp_delivery_is_visible_through_imap(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp",
@@ -110,6 +111,7 @@ def test_smtp_delivery_is_visible_through_imap(
                 "alice": "secret",
             }
         ),
+        dek=dek,
     ).build()
 
     context.smtp_server.start()

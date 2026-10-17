@@ -8,7 +8,7 @@ from garlicsmtp.queue.manager import QueueManager
 from garlicsmtp.queue.sqlite import SQLiteQueueBackend
 
 
-def test_queue_survives_restart(tmp_path, message):
+def test_queue_survives_restart(tmp_path, message, dek):
 
     db = tmp_path / "queue.db"
 
@@ -17,7 +17,7 @@ def test_queue_survives_restart(tmp_path, message):
     #
 
     queue = QueueManager(
-        backend=SQLiteQueueBackend(db),
+        backend=SQLiteQueueBackend(db, dek=dek),
     )
 
     item = QueueFactory.create(message)
@@ -31,7 +31,7 @@ def test_queue_survives_restart(tmp_path, message):
     #
 
     queue = QueueManager(
-        backend=SQLiteQueueBackend(db),
+        backend=SQLiteQueueBackend(db, dek=dek),
     )
 
     assert queue.size() == 1

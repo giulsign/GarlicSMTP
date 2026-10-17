@@ -14,6 +14,7 @@ from garlicsmtp.configuration import (
 
 def test_application_context_holds_dependencies(
     tmp_path,
+    dek,
 ):
     paths = ApplicationPaths(
         root_dir=tmp_path / "garlicsmtp"
@@ -24,6 +25,7 @@ def test_application_context_holds_dependencies(
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
+        dek=dek,
     ).build()
 
     assert context.paths is paths

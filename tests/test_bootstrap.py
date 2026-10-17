@@ -3,30 +3,29 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+
 from garlicsmtp.core.engine import Bootstrap, GarlicSMTP
 from garlicsmtp.core.engine import GarlicSMTPConfig
 
 
 
 
-def test_bootstrap_builds_application():
+def test_bootstrap_builds_application(
+    tmp_path,
+    dek,
+):
+    config = GarlicSMTPConfig(
+        mailbox_db=str(tmp_path / "mailboxes.db"),
+    )
 
-    app = Bootstrap().build()
+    app = Bootstrap(
+        config=config,
+        dek=dek,
+    ).build()
 
     assert isinstance(app, GarlicSMTP)
     assert app.runtime is not None
-
-def test_bootstrap_uses_configuration():
-
-    config = GarlicSMTPConfig(
-        hostname="mail.example.onion",
-        listen_host="0.0.0.0",
-        listen_port=10025,
-    )
-
-    bootstrap = Bootstrap(config)
-
-    server = bootstrap.build_server()
 
 
 def test_bootstrap_uses_socks_configuration():
@@ -42,3 +41,11 @@ def test_bootstrap_uses_socks_configuration():
 
     assert onion.socks_client.connection.proxy_host == "127.0.0.2"
     assert onion.socks_client.connection.proxy_port == 9150
+
+
+def test_bootstrap_rejects_missing_dek():
+    with pytest.raises(
+        ValueError,
+        match="DEK",
+    ):
+        Bootstrap().build_context()

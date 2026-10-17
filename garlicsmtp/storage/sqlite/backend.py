@@ -3,7 +3,9 @@
 #
 # See LICENSE for the full license terms.
 
-import sqlite3
+from garlicsmtp.security.encrypted_sqlite import (
+    connect_encrypted_sqlite,
+)
 import threading
 from datetime import UTC, datetime
 from uuid import uuid4
@@ -24,13 +26,13 @@ class SQLiteMessageStoreBackend(
     MessageStoreBackend
 ):
 
-    def __init__(self, path):
+    def __init__(self, path, *, dek: bytes):
         self.path = path
         self._lock = threading.RLock()
 
-        self.connection = sqlite3.connect(
+        self.connection = connect_encrypted_sqlite(
             path,
-            check_same_thread=False,
+            dek=dek,
         )
 
         self._create_schema()

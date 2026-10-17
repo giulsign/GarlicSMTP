@@ -216,9 +216,11 @@ def test_mailbox_view_updates_flags(
 def test_mailbox_view_works_with_sqlite(
     tmp_path,
     message,
+    dek,
 ):
     backend = SQLiteMessageStoreBackend(
-        tmp_path / "mailboxes.db"
+        tmp_path / "mailboxes.db",
+        dek=dek,
     )
 
     store = MessageStore(

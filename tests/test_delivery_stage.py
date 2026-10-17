@@ -141,13 +141,15 @@ def test_delivery_stage_preserves_verification_status(
 def test_delivery_stage_stores_local_attachments(
     tmp_path,
     message,
+    dek,
 ):
     message.envelope.recipients = [
         "bob@example.onion"
     ]
 
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     store = MessageStore(
@@ -207,13 +209,15 @@ def test_delivery_stage_stores_local_attachments(
 def test_delivery_stage_rolls_back_local_message_when_attachment_save_fails(
     tmp_path,
     message,
+    dek,
 ):
     message.envelope.recipients = [
         "bob@example.onion"
     ]
 
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     attachment_store.save = Mock(
@@ -261,13 +265,15 @@ def test_delivery_stage_rolls_back_local_message_when_attachment_save_fails(
 def test_delivery_stage_removes_written_attachments_when_later_save_fails(
     tmp_path,
     message,
+    dek,
 ):
     message.envelope.recipients = [
         "bob@example.onion"
     ]
 
     attachment_store = AttachmentStore(
-        tmp_path / "attachments"
+        tmp_path / "attachments",
+                           dek=dek,
     )
 
     real_save = attachment_store.save
@@ -343,6 +349,7 @@ def test_delivery_stage_removes_written_attachments_when_later_save_fails(
 def test_delivery_stage_accepts_local_message_without_attachments(
     tmp_path,
     message,
+    dek,
 ):
     message.envelope.recipients = [
         "bob@example.onion"
@@ -350,7 +357,8 @@ def test_delivery_stage_accepts_local_message_without_attachments(
 
     store = MessageStore(
         attachment_store=AttachmentStore(
-            tmp_path / "attachments"
+            tmp_path / "attachments",
+                             dek=dek,
         ),
     )
 

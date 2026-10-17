@@ -15,6 +15,7 @@ from garlicsmtp.core.pipeline import (
 def test_receiver_pipeline_stores_local_mail(
     tmp_path,
     message,
+    dek,
 ):
     database = tmp_path / "mailboxes.db"
 
@@ -25,6 +26,7 @@ def test_receiver_pipeline_stores_local_mail(
 
     bootstrap = Bootstrap(
         config=config,
+        dek=dek,
     )
 
     message.envelope.recipients = [
