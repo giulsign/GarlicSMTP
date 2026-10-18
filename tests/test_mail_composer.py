@@ -42,6 +42,9 @@ from garlicsmtp.storage.store import MessageStore
 from garlicsmtp.storage.attachment_store import (
     AttachmentStore,
 )
+from garlicsmtp.storage.sqlite.backend import (
+    SQLiteMessageStoreBackend,
+)
 
 
 class FakePipeline:
@@ -796,3 +799,485 @@ def test_mail_composer_with_attachment_store_accepts_no_attachments(
     )
 
     assert len(entries) == 1
+
+
+def test_mail_composer_persists_sent_message_in_encrypted_sqlite(
+    tmp_path,
+):
+    class AcceptingPipeline:
+
+        def execute(self, context):
+            context.accepted = True
+            return context
+
+    database = tmp_path / "sent.db"
+    dek = bytes(range(32))
+
+    backend = SQLiteMessageStoreBackend(
+        database,
+        dek=dek,
+    )
+
+    sent_store = MessageStore(
+        backend=backend,
+    )
+
+    composer = MailComposerService(
+        AcceptingPipeline(),
+        sent_store=sent_store,
+    )
+
+    try:
+        result = composer.send(
+            sender="alice@sender.onion",
+            recipient="bob@receiver.onion",
+            subject="Encrypted sent regression",
+            body="Sent message persistence test",
+        )
+
+        assert result is True
+
+        entries = sent_store.list_entries(
+            "alice@sender.onion"
+        )
+
+        assert len(entries) == 1
+        assert entries[0].message.body == (
+            "Sent message persistence test"
+        )
+        assert entries[0].message.headers.get(
+            "Subject"
+        ) == "Encrypted sent regression"
+
+    finally:
+        backend.close()
+
+    reopened = SQLiteMessageStoreBackend(
+        database,
+        dek=dek,
+    )
+
+    try:
+        entries = reopened.list_entries(
+            "alice@sender.onion"
+        )
+
+        assert len(entries) == 1
+        assert entries[0].message.body == (
+            "Sent message persistence test"
+        )
+
+    finally:
+        reopened.close()
+
+
+def test_mail_composer_remote_e2ee_queue_and_sent_encrypted_sqlite(
+    tmp_path,
+):
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+    )
+
+    from garlicsmtp.core.pipeline import Pipeline
+    from garlicsmtp.queue.manager import QueueManager
+    from garlicsmtp.queue.sqlite import SQLiteQueueBackend
+    from garlicsmtp.queue.stage import QueueStage
+    from garlicsmtp.security.encryption_key_store import (
+        MemoryEncryptionKeyStore,
+    )
+    from garlicsmtp.security.encryptor import (
+        ENCRYPTION_HEADER,
+        MessageEncryptor,
+    )
+    from garlicsmtp.storage.delivery_stage import DeliveryStage
+    from garlicsmtp.storage.sqlite.backend import (
+        SQLiteMessageStoreBackend,
+    )
+    from garlicsmtp.storage.store import MessageStore
+
+    dek = bytes(range(32))
+    remote_host = "a" * 56 + ".onion"
+    sender = "alice@local.onion"
+    recipient = f"bob@{remote_host}"
+    subject = "Remote E2EE integration"
+    body = "REMOTE-E2EE-PLAINTEXT-SENTINEL"
+
+    recipient_private_key = X25519PrivateKey.generate()
+    key_store = MemoryEncryptionKeyStore()
+    key_store.remember(
+        remote_host,
+        recipient_private_key.public_key().public_bytes_raw(),
+    )
+
+    queue_path = tmp_path / "queue.db"
+    sent_path = tmp_path / "sent.db"
+
+    queue_backend = SQLiteQueueBackend(
+        queue_path,
+        dek=dek,
+    )
+    sent_backend = SQLiteMessageStoreBackend(
+        sent_path,
+        dek=dek,
+    )
+
+    try:
+        queue = QueueManager(queue_backend)
+        sent_store = MessageStore(backend=sent_backend)
+
+        pipeline = Pipeline()
+        pipeline.add(
+            DeliveryStage(
+                store=MessageStore(),
+                queue_stage=QueueStage(queue),
+                local_domains={"local.onion"},
+                encryptor=MessageEncryptor(),
+                encryption_key_store=key_store,
+            )
+        )
+
+        composer = MailComposerService(
+            pipeline,
+            sent_store=sent_store,
+        )
+
+        assert composer.send(
+            sender=sender,
+            recipient=recipient,
+            subject=subject,
+            body=body,
+        ) is True
+
+        assert queue.size() == 1
+
+        queued_message = queue.peek().message
+
+        assert queued_message.headers.get(
+            ENCRYPTION_HEADER
+        ) is not None
+        assert body not in queued_message.body
+        assert queued_message.headers.get("Subject") is None
+
+        sent_entries = sent_store.list_entries(sender)
+
+        assert len(sent_entries) == 1
+        assert sent_entries[0].message.body == body
+        assert (
+            sent_entries[0].message.headers.get("Subject")
+            == subject
+        )
+
+    finally:
+        queue_backend.connection.close()
+        sent_backend.close()
+
+    reopened_queue = SQLiteQueueBackend(
+        queue_path,
+        dek=dek,
+    )
+    reopened_sent = SQLiteMessageStoreBackend(
+        sent_path,
+        dek=dek,
+    )
+
+    try:
+        assert reopened_queue.size() == 1
+
+        queued_message = reopened_queue.peek().message
+        assert queued_message.headers.get(
+            ENCRYPTION_HEADER
+        ) is not None
+        assert body not in queued_message.body
+
+        sent_entries = reopened_sent.list_entries(sender)
+
+        assert len(sent_entries) == 1
+        assert sent_entries[0].message.body == body
+        assert (
+            sent_entries[0].message.headers.get("Subject")
+            == subject
+        )
+
+    finally:
+        reopened_queue.connection.close()
+        reopened_sent.close()
+
+
+def test_mail_composer_first_contact_e2ee_queue_and_sent_encrypted_sqlite(
+    tmp_path,
+):
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+    )
+
+    from garlicsmtp.core.pipeline import Pipeline
+    from garlicsmtp.queue.manager import QueueManager
+    from garlicsmtp.queue.sqlite import SQLiteQueueBackend
+    from garlicsmtp.queue.stage import QueueStage
+    from garlicsmtp.security.encryption_key_store import (
+        MemoryEncryptionKeyStore,
+    )
+    from garlicsmtp.security.encryptor import (
+        ENCRYPTION_HEADER,
+        MessageEncryptor,
+    )
+    from garlicsmtp.storage.delivery_stage import DeliveryStage
+    from garlicsmtp.storage.sqlite.backend import (
+        SQLiteMessageStoreBackend,
+    )
+    from garlicsmtp.storage.store import MessageStore
+
+    dek = bytes(range(32))
+    remote_host = "b" * 56 + ".onion"
+    sender = "alice@local.onion"
+    recipient = f"bob@{remote_host}"
+    subject = "First contact E2EE integration"
+    body = "FIRST-CONTACT-E2EE-PLAINTEXT-SENTINEL"
+
+    recipient_private_key = X25519PrivateKey.generate()
+    key_store = MemoryEncryptionKeyStore()
+    discovered = []
+
+    def discover_encryption_key(hostname):
+        discovered.append(hostname)
+        key_store.remember(
+            hostname,
+            recipient_private_key.public_key().public_bytes_raw(),
+        )
+
+    queue_path = tmp_path / "queue.db"
+    sent_path = tmp_path / "sent.db"
+
+    queue_backend = SQLiteQueueBackend(
+        queue_path,
+        dek=dek,
+    )
+    sent_backend = SQLiteMessageStoreBackend(
+        sent_path,
+        dek=dek,
+    )
+
+    try:
+        queue = QueueManager(queue_backend)
+        sent_store = MessageStore(backend=sent_backend)
+
+        pipeline = Pipeline()
+        pipeline.add(
+            DeliveryStage(
+                store=MessageStore(),
+                queue_stage=QueueStage(queue),
+                local_domains={"local.onion"},
+                encryptor=MessageEncryptor(),
+                encryption_key_store=key_store,
+                discover_encryption_key=discover_encryption_key,
+            )
+        )
+
+        composer = MailComposerService(
+            pipeline,
+            sent_store=sent_store,
+        )
+
+        assert composer.send(
+            sender=sender,
+            recipient=recipient,
+            subject=subject,
+            body=body,
+        ) is True
+
+        assert discovered == [remote_host]
+        assert queue.size() == 1
+
+        queued_message = queue.peek().message
+        assert queued_message.headers.get(
+            ENCRYPTION_HEADER
+        ) is not None
+        assert body not in queued_message.body
+        assert queued_message.headers.get("Subject") is None
+
+        sent_entries = sent_store.list_entries(sender)
+        assert len(sent_entries) == 1
+        assert sent_entries[0].message.body == body
+        assert (
+            sent_entries[0].message.headers.get("Subject")
+            == subject
+        )
+
+    finally:
+        queue_backend.connection.close()
+        sent_backend.close()
+
+    reopened_queue = SQLiteQueueBackend(
+        queue_path,
+        dek=dek,
+    )
+    reopened_sent = SQLiteMessageStoreBackend(
+        sent_path,
+        dek=dek,
+    )
+
+    try:
+        assert reopened_queue.size() == 1
+
+        queued_message = reopened_queue.peek().message
+        assert queued_message.headers.get(
+            ENCRYPTION_HEADER
+        ) is not None
+        assert body not in queued_message.body
+
+        sent_entries = reopened_sent.list_entries(sender)
+        assert len(sent_entries) == 1
+        assert sent_entries[0].message.body == body
+        assert (
+            sent_entries[0].message.headers.get("Subject")
+            == subject
+        )
+
+    finally:
+        reopened_queue.connection.close()
+        reopened_sent.close()
+
+
+def test_mail_composer_first_contact_without_e2ee_key_rejects_without_persisting(
+    tmp_path,
+):
+    from garlicsmtp.core.pipeline import Pipeline
+    from garlicsmtp.queue.manager import QueueManager
+    from garlicsmtp.queue.sqlite import SQLiteQueueBackend
+    from garlicsmtp.queue.stage import QueueStage
+    from garlicsmtp.security.encryption_key_store import (
+        MemoryEncryptionKeyStore,
+    )
+    from garlicsmtp.security.encryptor import MessageEncryptor
+    from garlicsmtp.storage.delivery_stage import DeliveryStage
+
+    dek = bytes(range(32))
+    remote_host = "c" * 56 + ".onion"
+    sender = "alice@local.onion"
+
+    discovered = []
+
+    def discover_encryption_key(hostname):
+        discovered.append(hostname)
+        # La scoperta termina senza trovare una chiave.
+
+    queue_backend = SQLiteQueueBackend(
+        tmp_path / "queue.db",
+        dek=dek,
+    )
+    sent_backend = SQLiteMessageStoreBackend(
+        tmp_path / "sent.db",
+        dek=dek,
+    )
+
+    try:
+        queue = QueueManager(queue_backend)
+        sent_store = MessageStore(backend=sent_backend)
+
+        pipeline = Pipeline()
+        pipeline.add(
+            DeliveryStage(
+                store=MessageStore(),
+                queue_stage=QueueStage(queue),
+                local_domains={"local.onion"},
+                encryptor=MessageEncryptor(),
+                encryption_key_store=MemoryEncryptionKeyStore(),
+                discover_encryption_key=discover_encryption_key,
+            )
+        )
+
+        composer = MailComposerService(
+            pipeline,
+            sent_store=sent_store,
+        )
+
+        result = composer.send(
+            sender=sender,
+            recipient=f"bob@{remote_host}",
+            subject="Missing E2EE key",
+            body="MUST-NOT-BE-QUEUED",
+        )
+
+        assert discovered == [remote_host]
+        assert result is False
+        assert queue.size() == 0
+        assert sent_store.list_entries(sender) == []
+
+    finally:
+        queue_backend.connection.close()
+        sent_backend.close()
+
+
+def test_mail_composer_first_contact_discovery_error_does_not_persist(
+    tmp_path,
+):
+    from garlicsmtp.core.pipeline import Pipeline
+    from garlicsmtp.exceptions import TemporaryDeliveryError
+    from garlicsmtp.queue.manager import QueueManager
+    from garlicsmtp.queue.sqlite import SQLiteQueueBackend
+    from garlicsmtp.queue.stage import QueueStage
+    from garlicsmtp.security.encryption_key_store import (
+        MemoryEncryptionKeyStore,
+    )
+    from garlicsmtp.security.encryptor import MessageEncryptor
+    from garlicsmtp.storage.delivery_stage import DeliveryStage
+
+    dek = bytes(range(32))
+    remote_host = "d" * 56 + ".onion"
+    sender = "alice@local.onion"
+    discovered = []
+
+    def discover_encryption_key(hostname):
+        discovered.append(hostname)
+        raise TemporaryDeliveryError(
+            "Onion discovery failed: simulated timeout"
+        )
+
+    queue_backend = SQLiteQueueBackend(
+        tmp_path / "queue.db",
+        dek=dek,
+    )
+    sent_backend = SQLiteMessageStoreBackend(
+        tmp_path / "sent.db",
+        dek=dek,
+    )
+
+    try:
+        queue = QueueManager(queue_backend)
+        sent_store = MessageStore(backend=sent_backend)
+
+        pipeline = Pipeline()
+        pipeline.add(
+            DeliveryStage(
+                store=MessageStore(),
+                queue_stage=QueueStage(queue),
+                local_domains={"local.onion"},
+                encryptor=MessageEncryptor(),
+                encryption_key_store=MemoryEncryptionKeyStore(),
+                discover_encryption_key=discover_encryption_key,
+            )
+        )
+
+        composer = MailComposerService(
+            pipeline,
+            sent_store=sent_store,
+        )
+
+        with pytest.raises(
+            TemporaryDeliveryError,
+            match="Onion discovery failed: simulated timeout",
+        ):
+            composer.send(
+                sender=sender,
+                recipient=f"bob@{remote_host}",
+                subject="Discovery timeout",
+                body="MUST-NOT-BE-PERSISTED",
+            )
+
+        assert discovered == [remote_host]
+        assert queue.size() == 0
+        assert sent_store.list_entries(sender) == []
+
+    finally:
+        queue_backend.connection.close()
+        sent_backend.close()

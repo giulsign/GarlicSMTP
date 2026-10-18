@@ -11,4 +11,4 @@ class LoggerStage(PipelineStage):
     def process(self, context):
         del context
 
-        print("PIPELINE message accepted")
+        print("PIPELINE message processing started")

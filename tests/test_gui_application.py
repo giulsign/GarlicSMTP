@@ -1297,6 +1297,111 @@ def test_run_gui_uses_user_application_paths(
     )
 
 
+def test_run_gui_does_not_destroy_root_when_close_is_refused(
+    tmp_path,
+    monkeypatch,
+    dek,
+):
+    paths = ApplicationPaths.for_development(
+        project_root=tmp_path,
+        home=tmp_path,
+    )
+
+    received = {
+        "destroy_calls": 0,
+        "close_calls": 0,
+        "warnings": [],
+    }
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def deiconify(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def protocol(self, name, callback):
+            received["protocol_name"] = name
+            received["close_callback"] = callback
+
+        def mainloop(self):
+            received["close_callback"]()
+
+        def destroy(self):
+            received["destroy_calls"] += 1
+
+    class FakeWindow:
+        def __init__(self, master, view_model, **kwargs):
+            pass
+
+        def pack(self, **kwargs):
+            pass
+
+        def close(self):
+            received["close_calls"] += 1
+            return False
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showwarning",
+        lambda title, message, **kwargs: (
+            received["warnings"].append(
+                (title, message)
+            )
+        ),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=lambda **kwargs: dek,
+    )
+
+    assert result == 0
+    assert received["protocol_name"] == "WM_DELETE_WINDOW"
+    assert received["close_calls"] == 1
+    assert received["destroy_calls"] == 0
+
+    assert len(received["warnings"]) == 1
+    assert received["warnings"][0][0] == "GarlicSMTP"
+    assert "message is being sent" in (
+        received["warnings"][0][1].lower()
+    )
+
+
 def test_run_gui_uses_provided_application_paths(
     tmp_path,
     monkeypatch,
@@ -1567,6 +1672,7 @@ def test_run_gui_closes_window_before_destroying_root(
             self,
         ):
             events.append("close")
+            return True
 
     monkeypatch.setattr(
         gui_application.tk,

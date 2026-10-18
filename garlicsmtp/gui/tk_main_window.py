@@ -839,7 +839,12 @@ class MainWindow(ttk.Frame):
 
     def close(
         self,
-    ) -> None:
+    ) -> bool:
+        if (
+            self.compose_section is not None
+            and self.compose_section._send_in_progress
+        ):
+            return False
         if self._refresh_poll_after_id is not None:
             self.after_cancel(
                 self._refresh_poll_after_id
@@ -855,3 +860,4 @@ class MainWindow(ttk.Frame):
             self.view_model.stop()
 
         self.view_model.close()
+        return True

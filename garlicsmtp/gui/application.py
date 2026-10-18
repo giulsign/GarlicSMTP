@@ -584,7 +584,18 @@ def run_gui(
     )
 
     def close_window() -> None:
-        window.close()
+        if not window.close():
+            messagebox.showwarning(
+                "GarlicSMTP",
+                (
+                    "A message is being sent. "
+                    "Please wait for it to finish "
+                    "before closing GarlicSMTP."
+                ),
+                parent=root,
+            )
+            return
+
         root.destroy()
 
     root.protocol(

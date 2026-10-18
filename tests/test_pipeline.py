@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+
 from garlicsmtp.core.pipeline import Pipeline
 from garlicsmtp.core.pipeline import PipelineContext
 from garlicsmtp.core.pipeline import LoggerStage
@@ -66,8 +68,19 @@ def test_pipeline_logger_is_privacy_safe(
     )
 
     assert (
+        "PIPELINE message processing started"
+        in output
+    )
+
+    assert (
         "PIPELINE message accepted"
         in output
+    )
+
+    assert output.index(
+        "PIPELINE message processing started"
+    ) < output.index(
+        "PIPELINE message accepted"
     )
 
     assert (
@@ -94,3 +107,64 @@ def test_pipeline_context_has_empty_attachments_by_default(
     )
 
     assert context.attachments == []
+
+
+def test_pipeline_logs_accepted_outcome(message, capsys):
+    pipeline = Pipeline()
+    context = PipelineContext(message)
+
+    result = pipeline.execute(context)
+
+    output = capsys.readouterr().out
+
+    assert result is context
+    assert context.accepted is True
+    assert "PIPELINE message accepted" in output
+
+
+def test_pipeline_logs_rejected_outcome(message, capsys):
+    class RejectingStage:
+        def process(self, context):
+            context.accepted = False
+            context.reject_reason = "private rejection detail"
+
+    pipeline = Pipeline()
+    pipeline.add(RejectingStage())
+
+    context = PipelineContext(message)
+
+    result = pipeline.execute(context)
+
+    output = capsys.readouterr().out
+
+    assert result is context
+    assert context.accepted is False
+    assert "PIPELINE message rejected" in output
+    assert "private rejection detail" not in output
+    assert "PIPELINE message accepted" not in output
+
+
+def test_pipeline_logs_failure_and_propagates_exception(
+    message,
+    capsys,
+):
+    class FailingStage:
+        def process(self, context):
+            raise RuntimeError("private failure detail")
+
+    pipeline = Pipeline()
+    pipeline.add(FailingStage())
+
+    context = PipelineContext(message)
+
+    with pytest.raises(
+        RuntimeError,
+        match="private failure detail",
+    ):
+        pipeline.execute(context)
+
+    output = capsys.readouterr().out
+
+    assert "PIPELINE message processing failed" in output
+    assert "private failure detail" not in output
+    assert "PIPELINE message accepted" not in output

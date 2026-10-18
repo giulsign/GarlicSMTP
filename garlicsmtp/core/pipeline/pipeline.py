@@ -15,13 +15,20 @@ class Pipeline:
         self.stages.append(stage)
 
     def execute(self, context):
+        try:
+            for stage in self.stages:
+                stage.process(context)
 
-        for stage in self.stages:
+                if not context.accepted:
+                    break
 
-            stage.process(context)
+        except Exception:
+            print("PIPELINE message processing failed")
+            raise
 
-            if not context.accepted:
-
-                break
+        if context.accepted:
+            print("PIPELINE message accepted")
+        else:
+            print("PIPELINE message rejected")
 
         return context

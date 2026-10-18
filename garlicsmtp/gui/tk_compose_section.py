@@ -4,8 +4,10 @@
 # See LICENSE for the full license terms.
 
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, messagebox, ttk
 from pathlib import Path
+import queue
+import threading
 
 from garlicsmtp.smtp.mime import (
     MimeAttachment,
@@ -32,6 +34,9 @@ class ComposeSection(DashboardCard):
         )
 
         self.view_model = view_model
+        self._send_results = queue.Queue()
+        self._send_in_progress = False
+        self._send_poll_id = None
 
         form = ttk.Frame(
             self.content,
@@ -206,35 +211,84 @@ class ComposeSection(DashboardCard):
             self.view_model.sender,
         )
 
-    def _send_message(
-        self,
-    ) -> None:
-        self.view_model.sender = (
-            self.sender_input.get()
-        )
-
-        self.view_model.recipient = (
-            self.recipient_input.get()
-        )
-
-        self.view_model.subject = (
-            self.subject_input.get()
-        )
-
-        self.view_model.body = (
-            self.body_input.get(
-                "1.0",
-                "end-1c",
+    def destroy(self) -> None:
+        if self._send_poll_id is not None:
+            self.after_cancel(
+                self._send_poll_id
             )
-        )
+            self._send_poll_id = None
 
-        try:
-            sent = self.view_model.send()
-        except Exception:
+        super().destroy()
+
+    def _send_message(self) -> None:
+        if self._send_in_progress:
             return
 
-        if sent:
+        self.view_model.sender = self.sender_input.get()
+        self.view_model.recipient = self.recipient_input.get()
+        self.view_model.subject = self.subject_input.get()
+        self.view_model.body = self.body_input.get(
+            "1.0",
+            "end-1c",
+        )
+
+        self._send_in_progress = True
+        self.send_button.configure(state="disabled")
+        self.clear_button.configure(state="disabled")
+        self.attach_button.configure(state="disabled")
+
+        worker = threading.Thread(
+            target=self._send_in_background,
+            daemon=True,
+        )
+        worker.start()
+
+        self._schedule_send_poll()
+
+    def _send_in_background(self) -> None:
+        try:
+            sent = self.view_model.send()
+        except Exception as exc:
+            self._send_results.put(("error", str(exc)))
+        else:
+            self._send_results.put(("result", sent))
+
+    def _schedule_send_poll(self) -> None:
+        self._send_poll_id = self.after(
+            50,
+            self._poll_send_result,
+        )
+
+    def _poll_send_result(self) -> None:
+        self._send_poll_id = None
+
+        try:
+            outcome, value = self._send_results.get_nowait()
+        except queue.Empty:
+            if self._send_in_progress:
+                self._schedule_send_poll()
+            return
+
+        self._send_in_progress = False
+
+        self.send_button.configure(state="normal")
+        self.clear_button.configure(state="normal")
+        self.attach_button.configure(state="normal")
+
+        if outcome == "error":
+            messagebox.showerror(
+                "GarlicSMTP error",
+                f"Failed to send message: {value}",
+                parent=self.winfo_toplevel(),
+            )
+        elif value:
             self._clear_fields()
+        else:
+            messagebox.showerror(
+                "GarlicSMTP error",
+                "Message not sent. Delivery was not accepted.",
+                parent=self.winfo_toplevel(),
+            )
 
     def _clear_fields(
         self,

@@ -5,6 +5,7 @@
 
 import tkinter as tk
 from pathlib import Path
+import time
 
 from garlicsmtp.application.compose_view_model import (
     ComposeViewModel,
@@ -13,6 +14,22 @@ from garlicsmtp.gui.tk_compose_section import (
     ComposeSection,
 )
 import garlicsmtp.gui.tk_compose_section as compose_module
+
+
+def wait_for_send_completion(root, section, timeout=3):
+    deadline = time.monotonic() + timeout
+
+    while time.monotonic() < deadline:
+        root.update()
+
+        if not section._send_in_progress:
+            return
+
+        time.sleep(0.01)
+
+    raise AssertionError(
+        "Asynchronous send did not complete"
+    )
 
 
 class FakeComposer:
@@ -266,6 +283,7 @@ def test_compose_section_successful_send_clears_fields():
         fill_compose_fields(section)
 
         section.send_button.invoke()
+        wait_for_send_completion(root, section)
 
         assert_compose_fields_empty(
             section
@@ -275,9 +293,19 @@ def test_compose_section_successful_send_clears_fields():
         root.destroy()
 
 
-def test_compose_section_failed_send_preserves_fields():
+def test_compose_section_failed_send_preserves_fields(monkeypatch):
     root = tk.Tk()
     root.withdraw()
+
+    errors = []
+
+    monkeypatch.setattr(
+        compose_module.messagebox,
+        "showerror",
+        lambda title, message, **kwargs: errors.append(
+            (title, message)
+        ),
+    )
 
     try:
         class FailingComposer:
@@ -309,6 +337,7 @@ def test_compose_section_failed_send_preserves_fields():
         fill_compose_fields(section)
 
         section.send_button.invoke()
+        wait_for_send_completion(root, section)
 
         assert (
             section.sender_input.get()
@@ -329,6 +358,9 @@ def test_compose_section_failed_send_preserves_fields():
             )
             == "Body"
         )
+        assert len(errors) == 1
+        assert errors[0][0] == "GarlicSMTP error"
+        assert "not sent" in errors[0][1].lower()
 
     finally:
         root.destroy()
@@ -375,6 +407,71 @@ def test_compose_section_send_exception_is_handled():
             section.recipient_input.get()
             == "bob@receiver.onion"
         )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_send_exception_shows_error_and_preserves_fields(
+    monkeypatch,
+):
+    root = tk.Tk()
+    root.withdraw()
+
+    errors = []
+
+    class RaisingComposer:
+
+        def send(
+            self,
+            *,
+            sender,
+            recipient,
+            subject,
+            body,
+            attachments=None,
+        ):
+            raise RuntimeError("delivery failed")
+
+    try:
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                RaisingComposer()
+            ),
+        )
+
+        fill_compose_fields(section)
+
+        monkeypatch.setattr(
+            compose_module.messagebox,
+            "showerror",
+            lambda title, message, **kwargs: errors.append(
+                (title, message)
+            ),
+        )
+
+        section.send_button.invoke()
+        wait_for_send_completion(root, section)
+
+        assert errors == [
+            (
+                "GarlicSMTP error",
+                "Failed to send message: delivery failed",
+            )
+        ]
+
+        assert section.sender_input.get() == (
+            "alice@sender.onion"
+        )
+        assert section.recipient_input.get() == (
+            "bob@receiver.onion"
+        )
+        assert section.subject_input.get() == "Hello"
+        assert section.body_input.get(
+            "1.0",
+            "end-1c",
+        ) == "Body"
 
     finally:
         root.destroy()
@@ -683,6 +780,7 @@ def test_compose_section_successful_send_clears_attachment(
         )
 
         section.send_button.invoke()
+        wait_for_send_completion(root, section)
 
         assert view_model.attachments == []
         assert (
@@ -693,4 +791,180 @@ def test_compose_section_successful_send_clears_attachment(
         )
 
     finally:
+        root.destroy()
+
+
+def test_compose_section_send_does_not_block_gui():
+    import threading
+
+    root = tk.Tk()
+    root.withdraw()
+
+    send_started = threading.Event()
+    allow_send_to_finish = threading.Event()
+
+    class SlowComposer:
+
+        def send(
+            self,
+            *,
+            sender,
+            recipient,
+            subject,
+            body,
+            attachments=None,
+        ):
+            send_started.set()
+
+            if not allow_send_to_finish.wait(timeout=3):
+                raise TimeoutError("Simulated slow send timed out")
+
+            return True
+
+    try:
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                SlowComposer()
+            ),
+        )
+
+        fill_compose_fields(section)
+
+        start = __import__("time").monotonic()
+        section.send_button.invoke()
+        elapsed = __import__("time").monotonic() - start
+
+        assert elapsed < 0.5
+        assert send_started.wait(timeout=1)
+        assert str(section.send_button.cget("state")) == "disabled"
+
+    finally:
+        allow_send_to_finish.set()
+        root.destroy()
+
+
+def test_compose_section_async_send_clears_only_after_completion():
+    import threading
+    import time
+
+    root = tk.Tk()
+    root.withdraw()
+
+    send_started = threading.Event()
+    allow_completion = threading.Event()
+
+    class ControlledComposer:
+
+        def send(
+            self,
+            *,
+            sender,
+            recipient,
+            subject,
+            body,
+            attachments=None,
+        ):
+            send_started.set()
+
+            if not allow_completion.wait(timeout=5):
+                raise TimeoutError("Test send timed out")
+
+            return True
+
+    try:
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                ControlledComposer()
+            ),
+        )
+
+        fill_compose_fields(section)
+        section.send_button.invoke()
+
+        assert send_started.wait(timeout=1)
+
+        # L'invio è ancora in corso: il messaggio deve restare visibile.
+        assert section.subject_input.get() == "Hello"
+        assert str(section.send_button.cget("state")) == "disabled"
+
+        allow_completion.set()
+
+        # Il polling Tkinter deve elaborare il risultato.
+        deadline = time.monotonic() + 3
+
+        while time.monotonic() < deadline:
+            root.update()
+
+            if str(section.send_button.cget("state")) == "normal":
+                break
+
+            time.sleep(0.01)
+
+        assert str(section.send_button.cget("state")) == "normal"
+        assert str(section.clear_button.cget("state")) == "normal"
+        assert str(section.attach_button.cget("state")) == "normal"
+
+        assert section.sender_input.get() == ""
+        assert section.recipient_input.get() == ""
+        assert section.subject_input.get() == ""
+        assert section.body_input.get("1.0", "end-1c") == ""
+
+    finally:
+        allow_completion.set()
+        root.destroy()
+
+
+def test_compose_section_destroy_cancels_pending_send_poll():
+    import threading
+
+    root = tk.Tk()
+    root.withdraw()
+
+    send_started = threading.Event()
+    allow_completion = threading.Event()
+
+    class ControlledComposer:
+
+        def send(
+            self,
+            *,
+            sender,
+            recipient,
+            subject,
+            body,
+            attachments=None,
+        ):
+            send_started.set()
+            allow_completion.wait(timeout=5)
+            return True
+
+    try:
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                ControlledComposer()
+            ),
+        )
+
+        fill_compose_fields(section)
+        section.send_button.invoke()
+
+        assert send_started.wait(timeout=1)
+
+        poll_id = section._send_poll_id
+
+        assert poll_id is not None
+
+        section.destroy()
+
+        assert section._send_poll_id is None
+        assert poll_id not in root.tk.call(
+            "after",
+            "info",
+        )
+
+    finally:
+        allow_completion.set()
         root.destroy()

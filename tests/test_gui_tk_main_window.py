@@ -1683,6 +1683,47 @@ def test_tk_main_window_close_stops_polling_and_running_application():
         root.destroy()
 
 
+def test_tk_main_window_refuses_close_during_send():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        controller = FakeController(
+            runtime_state=RuntimeState.RUNNING,
+        )
+
+        view_model = ApplicationViewModel(
+            controller
+        )
+
+        window = MainWindow(
+            root,
+            view_model,
+            folder_opener=FakeFolderOpener(),
+            attachment_directory_factory=(
+                attachment_directory_factory
+            ),
+        )
+
+        class SendingSection:
+            _send_in_progress = True
+
+        window.compose_section = SendingSection()
+
+        listener = window._queue_refresh
+        poll_id = window._refresh_poll_after_id
+
+        result = window.close()
+
+        assert result is False
+        assert "stop" not in controller.actions
+        assert listener in view_model._listeners
+        assert window._refresh_poll_after_id == poll_id
+
+    finally:
+        root.destroy()
+
+
 def test_tk_main_window_content_has_vertical_scrollbar():
     root = tk.Tk()
     root.withdraw()
