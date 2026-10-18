@@ -68,6 +68,20 @@ Dependencies with copyleft, source-disclosure, noncommercial,
 commercial, or otherwise restrictive licensing requirements must
 be reviewed before they are accepted.
 
+## Development baseline and validation
+
+The designated frozen Alpha is `v0.1.0-alpha.1`, source commit `9bfc2f7`.
+New work should be proposed on a separate branch, without silently
+changing that baseline. Do not claim a release tag has been published
+until it has actually been created.
+
+Before changes, inspect the actual source and related tests. Use focused
+TDD (RED, minimal GREEN, related regression tests, full suite) and
+validate on Ubuntu 24.04 when crossing an operating-system or runtime
+boundary. Do not include real user databases, Onion identities, passwords,
+DEKs, recovery material, logs with secrets or editor swap files in commits.
+Stage only intended files rather than using `git add .`.
+
 ## Pull Requests
 
 Contributions should normally be developed in a separate branch or

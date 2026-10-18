@@ -28,6 +28,36 @@ https://www.dnspython.org/
 Official source repository:
 https://github.com/rthalley/dnspython
 
+### cryptography
+
+GarlicSMTP uses the Python `cryptography` package for cryptographic
+primitives and key handling. Its applicable upstream license and notices
+must be verified against the exact version included in a distribution.
+
+Official project: https://cryptography.io/
+
+### SQLCipher and Python SQLCipher bindings
+
+GarlicSMTP uses SQLCipher-backed SQLite through the `sqlcipher3` Python
+binding for encrypted persistent databases. SQLCipher and its binding are
+distinct third-party components; their actual versions, linkage and
+license obligations must be checked in the release environment.
+
+SQLCipher upstream: https://www.zetetic.net/sqlcipher/
+
+### Tkinter / Tcl / Tk
+
+The desktop GUI uses Tkinter and the underlying Tcl/Tk components.
+Licensing and redistribution obligations for the actual Python and Tcl/Tk
+packages supplied with the distribution must be checked.
+
+### Tor
+
+GarlicSMTP uses the Tor daemon and Onion Services for transport.
+Tor is an external system component with its own licensing and notices.
+
+Official project: https://www.torproject.org/
+
 ## Python Standard Library
 
 GarlicSMTP uses numerous modules from the Python Standard Library.
@@ -45,6 +75,17 @@ are not licensed under the GarlicSMTP license merely because they
 are used to develop or test GarlicSMTP.
 
 Their respective upstream licenses continue to apply.
+
+## Release compliance gate for v0.1.0-alpha.1
+
+This document is a dependency notice, **not a completed software bill of
+materials or legal compliance certification**. Before publishing binaries,
+check `pyproject.toml`, requirements and lock/install manifests for all
+actual runtime, installer and bundled dependencies; record their exact
+versions, authoritative license identifiers, bundled license texts and
+any attribution or source-availability requirements. Historical PySide6
+references do not by themselves establish that it is part of the current
+Tkinter runtime distribution.
 
 ## Other Components
 

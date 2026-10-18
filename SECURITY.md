@@ -7,7 +7,9 @@ Security and privacy reports are taken seriously.
 
 ## Project Status
 
-GarlicSMTP is currently alpha software.
+GarlicSMTP `v0.1.0-alpha.1` is the designated first official Alpha
+baseline, associated with validated source commit `9bfc2f7`.
+The Git tag and public release have not yet been confirmed.
 
 It has not undergone an independent professional security audit and
 must not be considered a guarantee of anonymity, confidentiality,
@@ -15,6 +17,23 @@ integrity, or resistance to endpoint compromise.
 
 Users should evaluate the risks of their environment and threat
 model before relying on GarlicSMTP for sensitive communications.
+
+## Security properties and boundaries of the Alpha
+
+The validated baseline uses a password-unlocked 32-byte DEK and SQLCipher
+for Received, Sent and Queue databases. Local attachment content and
+metadata are protected in authenticated GSAT v1 files. GUI and mailbox
+CLI paths unlock the DEK before database access; SMTP reception uses
+the DEK-equipped application builder. Read-only checks on developer and
+Ubuntu VM found no plaintext SQLite headers and confirmed GSAT v1 file
+format. These observations are not a comprehensive cryptographic audit,
+forensic examination or guarantee of protection for all local files,
+backups, temporary files or private keys.
+
+The CLI `start` bootstrap currently fails closed without a DEK; this is
+a known functional limitation and not a confirmed confidentiality flaw.
+No migration of existing plaintext data is certified. Protect recovery
+material, private keys, local backups and the host operating system.
 
 ## Reporting a Vulnerability
 
@@ -114,8 +133,10 @@ in public bug reports.
 
 ## Supported Versions
 
-Until GarlicSMTP reaches a stable release, security fixes are
-provided primarily for the current development version.
+The designated current Alpha baseline is `v0.1.0-alpha.1` (`9bfc2f7`).
+Security maintenance for that version has not been assigned a guaranteed
+support period. Subsequent fixes may require a new prerelease version;
+older snapshots should not be assumed supported.
 
 Older commits and development snapshots may contain known or
 unknown vulnerabilities.

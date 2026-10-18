@@ -1,0 +1,559 @@
+GARLICSMTP — ALBERO DEI FILE DEL PROGETTO
+Versione documentata: v0.1.0-alpha.1 | aggiornamento: 19/10/2026
+Fonte: tree -J reale fornito dall’utente (bozza aggiornata, ottobre 2026).
+Formato e criterio di pulizia ereditati da project-tree.txt dell’08/10/2026.
+Esclusi cache, .venv, .git, build, database, log, spool, artefatti e backup.
+I cinque documenti aggiornati sono inseriti come destinazione prevista, non come prova di presenza nel checkout.
+La struttura fotografa il tree caricato, NON un nuovo tree eseguito sul commit 9bfc2f7.
+
+GarlicSMTP/
+├── CHANGELOG.md
+├── CLA.md
+├── COMMERCIAL-LICENSE.md
+├── CONTRIBUTING.md
+├── LICENSE
+├── NOTICE
+├── README.md
+├── SECURITY.md
+├── THIRD_PARTY_LICENSES.md
+├── bin/
+│   └── garlicsmtp
+├── check_onion_smtp.py
+├── config/
+│   └── default.toml
+├── docs/
+│   ├── develop_snapshots/
+│   │   ├── GarlicSMTP - Ripresa 5 - Validazione Alpha.docx
+│   │   ├── GarlicSMTP%20-%20ripresa%208%20-%20snapshot.txt
+│   │   ├── GarlicSMTP_Architettura_e_Funzionamento 03 09 26.docx
+│   │   ├── GarlicSMTP_Architettura_e_Funzionamento_versione2_06%2009%2026.docx
+│   │   ├── GarlicSMTP_Handoff_Tecnico_Completo_2026-09-27_RIGENERATO.docx
+│   │   ├── GarlicSMTP_Metodologia_Ingegneristica 03 09 26.docx
+│   │   ├── GarlicSMTP_Metodologia_Ingegneristica_versione2_06%2009%2026.docx
+│   │   ├── GarlicSMTP_Punto_di_Aggiornamento_Sviluppo_09_09_26.docx
+│   │   ├── GarlicSMTP_Riepilogo_Tecnico 03 09 26.docx
+│   │   ├── GarlicSMTP_Riepilogo_Tecnico_versione2_06%2009%2026.docx
+│   │   ├── GarlicSMTP_Ripresa_7_Snapshot_Tecnico_Ripresa_Completa_02_10_26.txt
+│   │   ├── GarlicSMTP_Snapshot_Ripresa_Completa_09_09_26.docx
+│   │   ├── GarlicSMTP_Snapshot_Ripresa_Completa_15_09_26.docx
+│   │   ├── GarlicSMTP_Snapshot_Tecnico_Ripresa_Completa_27_09_26.docx
+│   │   └── GarlicSMTP_handoff_2026-09-15.docx
+│   ├── GarlicSMTP-development-book-10.txt
+│   ├── GarlicSMTP-development-book-8.txt
+│   ├── GarlicSMTP-development-book-9.txt
+│   ├── GarlicSMTP-Handbook.txt
+│   ├── GarlicSMTP-Handbook_aggiornato_13_10_26.txt
+│   ├── GarlicSMTP_Ripresa_8_Snapshot_Tecnico_Ripresa_Completa_13_10_26.docx
+│   ├── installation-architecture.md
+│   ├── installation-architecture_aggiornato_13_10_26.md
+│   ├── project-tree.txt
+│   ├── project-tree_annotato_13_10_26.txt
+│   ├── quicklaunch.md
+│   └── quicklaunch_aggiornato_13_10_26.md
+├── garlicsmtp/
+│   ├── __init__.py
+│   ├── api/
+│   │   └── __init__.py
+│   ├── application/
+│   │   ├── __init__.py
+│   │   ├── activity.py
+│   │   ├── attachment_limit.py
+│   │   ├── attachment_limit_admin.py
+│   │   ├── attachment_policy.py
+│   │   ├── attachment_policy_stage.py
+│   │   ├── builder.py
+│   │   ├── compose_view_model.py
+│   │   ├── context.py
+│   │   ├── controller.py
+│   │   ├── event.py
+│   │   ├── event_hub.py
+│   │   ├── event_log.py
+│   │   ├── event_service.py
+│   │   ├── mail_composer.py
+│   │   ├── mailbox_summary.py
+│   │   ├── mailbox_view_model.py
+│   │   ├── message_explorer.py
+│   │   ├── message_formatter.py
+│   │   ├── message_list_view_model.py
+│   │   ├── message_preview_view_model.py
+│   │   ├── message_summary.py
+│   │   ├── status.py
+│   │   ├── status_provider.py
+│   │   ├── tor_monitor_service.py
+│   │   ├── tor_status.py
+│   │   ├── tor_status_provider.py
+│   │   └── view_model.py
+│   ├── cli/
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   └── mailbox.py
+│   ├── config.py
+│   ├── configuration/
+│   │   ├── __init__.py
+│   │   ├── loader.py
+│   │   ├── paths.py
+│   │   └── settings.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── engine/
+│   │   │   ├── __init__.py
+│   │   │   ├── app.py
+│   │   │   ├── bootstrap.py
+│   │   │   ├── config.py
+│   │   │   ├── runtime.py
+│   │   │   └── state.py
+│   │   ├── events/
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py
+│   │   │   ├── bus.py
+│   │   │   ├── handler.py
+│   │   │   ├── mailaccepted.py
+│   │   │   └── registry.py
+│   │   ├── pipeline/
+│   │   │   ├── __init__.py
+│   │   │   ├── context.py
+│   │   │   ├── logger.py
+│   │   │   ├── pipeline.py
+│   │   │   └── stage.py
+│   │   ├── service.py
+│   │   └── tickable.py
+│   ├── crypto/
+│   │   └── __init__.py
+│   ├── exceptions.py
+│   ├── first_run.py
+│   ├── gui/
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── application.py
+│   │   ├── folder_opener.py
+│   │   ├── tk_activity_section.py
+│   │   ├── tk_application_section.py
+│   │   ├── tk_authentication.py
+│   │   ├── tk_compose_section.py
+│   │   ├── tk_dashboard_widgets.py
+│   │   ├── tk_mail_metrics_section.py
+│   │   ├── tk_mailbox_list_section.py
+│   │   ├── tk_main_window.py
+│   │   ├── tk_message_list_section.py
+│   │   ├── tk_message_preview_section.py
+│   │   ├── tk_message_received_list_section.py
+│   │   ├── tk_message_received_preview_section.py
+│   │   ├── tk_message_sent_list_section.py
+│   │   ├── tk_message_sent_preview_section.py
+│   │   ├── tk_services_section.py
+│   │   ├── tk_theme.py
+│   │   └── tk_tor_section.py
+│   ├── imap/
+│   │   ├── __init__.py
+│   │   ├── append.py
+│   │   ├── command_result.py
+│   │   ├── fetch.py
+│   │   ├── idle.py
+│   │   ├── literal.py
+│   │   ├── message_parser.py
+│   │   ├── notification_factory.py
+│   │   ├── notification_sink.py
+│   │   ├── null_notification_sink.py
+│   │   ├── parser.py
+│   │   ├── protocol.py
+│   │   ├── reply.py
+│   │   ├── response.py
+│   │   ├── search.py
+│   │   ├── server.py
+│   │   ├── session.py
+│   │   └── store_event_adapter.py
+│   ├── install_first_run.py
+│   ├── install_runtime_config.py
+│   ├── logger.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── envelope.py
+│   │   ├── header.py
+│   │   ├── message.py
+│   │   ├── onion.py
+│   │   └── smtp.py
+│   ├── network/
+│   │   ├── __init__.py
+│   │   ├── client/
+│   │   │   └── __init__.py
+│   │   ├── server/
+│   │   │   ├── __init__.py
+│   │   │   └── tcp.py
+│   │   ├── socket/
+│   │   │   └── __init__.py
+│   │   ├── socks5/
+│   │   │   ├── __init__.py
+│   │   │   ├── client.py
+│   │   │   ├── connection.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── reply.py
+│   │   │   └── request.py
+│   │   └── text/
+│   │       ├── __init__.py
+│   │       └── connection.py
+│   ├── plugins/
+│   │   └── __init__.py
+│   ├── protocol/
+│   │   └── __init__.py
+│   ├── queue/
+│   │   ├── __init__.py
+│   │   ├── backend.py
+│   │   ├── factory.py
+│   │   ├── item.py
+│   │   ├── manager.py
+│   │   ├── memory.py
+│   │   ├── retry.py
+│   │   ├── serializer.py
+│   │   ├── spool.py
+│   │   ├── sqlite.py
+│   │   ├── stage.py
+│   │   ├── storage.py
+│   │   └── worker.py
+│   ├── runtime_config.py
+│   ├── security/
+│   │   ├── __init__.py
+│   │   ├── at_rest_cipher.py
+│   │   ├── at_rest_key_manager.py
+│   │   ├── auth/
+│   │   │   ├── __init__.py
+│   │   │   ├── account_credentials.py
+│   │   │   ├── authenticator.py
+│   │   │   ├── imap_credentials.py
+│   │   │   ├── memory.py
+│   │   │   ├── password_hasher.py
+│   │   │   ├── persistent_imap_authenticator.py
+│   │   │   └── rejecting.py
+│   │   ├── canonicalizer.py
+│   │   ├── decryptor.py
+│   │   ├── dkim/
+│   │   │   └── __init__.py
+│   │   ├── encrypted_sqlite.py
+│   │   ├── encryption_capability.py
+│   │   ├── encryption_identity.py
+│   │   ├── encryption_key_store.py
+│   │   ├── encryptor.py
+│   │   ├── policy/
+│   │   │   └── __init__.py
+│   │   ├── signature_header.py
+│   │   ├── signer.py
+│   │   ├── signing_identity.py
+│   │   ├── spf/
+│   │   │   └── __init__.py
+│   │   ├── trust_store.py
+│   │   └── verifier.py
+│   ├── smtp/
+│   │   ├── __init__.py
+│   │   ├── connection.py
+│   │   ├── datareceiver.py
+│   │   ├── dispatcher.py
+│   │   ├── engine.py
+│   │   ├── fsm.py
+│   │   ├── handlers/
+│   │   │   ├── __init__.py
+│   │   │   ├── base.py
+│   │   │   ├── data.py
+│   │   │   ├── ehlo.py
+│   │   │   ├── mail.py
+│   │   │   ├── rcpt.py
+│   │   │   └── register.py
+│   │   ├── headerparser.py
+│   │   ├── mime.py
+│   │   ├── parser.py
+│   │   ├── protocol.py
+│   │   ├── replies.py
+│   │   ├── rfc5322.py
+│   │   ├── server.py
+│   │   ├── session.py
+│   │   └── state.py
+│   ├── storage/
+│   │   ├── __init__.py
+│   │   ├── attachment_store.py
+│   │   ├── backend.py
+│   │   ├── composite_event_sink.py
+│   │   ├── delivery_stage.py
+│   │   ├── entry.py
+│   │   ├── entry_serializer.py
+│   │   ├── event_sink.py
+│   │   ├── filesystem/
+│   │   │   └── __init__.py
+│   │   ├── mailbox.py
+│   │   ├── memory/
+│   │   │   ├── __init__.py
+│   │   │   └── backend.py
+│   │   ├── null_event_sink.py
+│   │   ├── serializer.py
+│   │   ├── sqlite/
+│   │   │   ├── __init__.py
+│   │   │   └── backend.py
+│   │   └── store.py
+│   ├── tor/
+│   │   ├── __init__.py
+│   │   ├── control/
+│   │   │   ├── __init__.py
+│   │   │   ├── auth_challenge.py
+│   │   │   ├── authenticator.py
+│   │   │   ├── client.py
+│   │   │   ├── connection.py
+│   │   │   ├── cookie_reader.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── parser.py
+│   │   │   ├── protocol_info.py
+│   │   │   ├── reply.py
+│   │   │   └── safecookie.py
+│   │   ├── onion_service_factory.py
+│   │   └── onion_service_manager.py
+│   ├── transport/
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── dns/
+│   │   │   ├── __init__.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── records.py
+│   │   │   └── resolver.py
+│   │   ├── dummy.py
+│   │   ├── lmtp/
+│   │   │   └── __init__.py
+│   │   ├── local/
+│   │   │   ├── __init__.py
+│   │   │   └── transport.py
+│   │   ├── manager.py
+│   │   ├── onion/
+│   │   │   ├── __init__.py
+│   │   │   ├── dummy.py
+│   │   │   ├── transport.py
+│   │   │   └── validator.py
+│   │   ├── smtp/
+│   │   │   ├── __init__.py
+│   │   │   ├── client.py
+│   │   │   ├── connection.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── protocol.py
+│   │   │   ├── reply.py
+│   │   │   └── transport.py
+│   │   ├── socks5/
+│   │   │   └── __init__.py
+│   │   └── tls/
+│   │       └── __init__.py
+│   ├── utils/
+│   │   └── __init__.py
+│   └── version.py
+├── install/
+│   ├── assets/
+│   │   └── garlicsmtp.png
+│   ├── desktop.py
+│   ├── environment.py
+│   ├── generator.py
+│   ├── installer.py
+│   ├── manifest.toml
+│   ├── platform.py
+│   ├── prerequisites.py
+│   ├── runtime_config.py
+│   ├── system.py
+│   ├── tor_config.py
+│   ├── tor_runtime.py
+│   ├── uninstaller.py
+│   └── validator.py
+├── install.sh
+├── mypy.ini
+├── pyproject.toml
+├── pytest.ini
+├── requirements.txt
+├── tests/
+│   ├── __init__.py
+│   ├── conftest.py
+│   ├── support/
+│   │   ├── __init__.py
+│   │   └── application.py
+│   ├── test_account_credentials.py
+│   ├── test_application_activity.py
+│   ├── test_application_builder.py
+│   ├── test_application_context.py
+│   ├── test_application_controller.py
+│   ├── test_application_event_hub.py
+│   ├── test_application_event_log.py
+│   ├── test_application_paths.py
+│   ├── test_application_settings.py
+│   ├── test_application_status.py
+│   ├── test_application_view_model.py
+│   ├── test_at_rest_cipher.py
+│   ├── test_at_rest_key_manager.py
+│   ├── test_attachment_limit.py
+│   ├── test_attachment_limit_admin.py
+│   ├── test_attachment_policy.py
+│   ├── test_attachment_policy_stage.py
+│   ├── test_attachment_store.py
+│   ├── test_authenticator.py
+│   ├── test_bootstrap.py
+│   ├── test_bootstrap_factories.py
+│   ├── test_cli.py
+│   ├── test_cli_mailbox.py
+│   ├── test_compose_view_model.py
+│   ├── test_configuration_loader.py
+│   ├── test_connection.py
+│   ├── test_datareceiver.py
+│   ├── test_delivery_exceptions.py
+│   ├── test_delivery_stage.py
+│   ├── test_delivery_stage_integration.py
+│   ├── test_dispatcher.py
+│   ├── test_dns_lookup.py
+│   ├── test_dns_resolver.py
+│   ├── test_ehlo_handler.py
+│   ├── test_encrypted_sqlite_backends.py
+│   ├── test_encrypted_sqlite_connection.py
+│   ├── test_encryption_capability.py
+│   ├── test_encryption_identity.py
+│   ├── test_encryption_key_store.py
+│   ├── test_end_to_end.py
+│   ├── test_engine.py
+│   ├── test_engine_config.py
+│   ├── test_events.py
+│   ├── test_file_trust_store.py
+│   ├── test_first_run.py
+│   ├── test_fsm.py
+│   ├── test_gui_application.py
+│   ├── test_gui_folder_opener.py
+│   ├── test_gui_main.py
+│   ├── test_gui_tk_activity_section.py
+│   ├── test_gui_tk_application_section.py
+│   ├── test_gui_tk_authentication.py
+│   ├── test_gui_tk_compose_section.py
+│   ├── test_gui_tk_dashboard_widgets.py
+│   ├── test_gui_tk_mail_metrics_section.py
+│   ├── test_gui_tk_mailbox_list_section.py
+│   ├── test_gui_tk_main_window.py
+│   ├── test_gui_tk_message_list_section.py
+│   ├── test_gui_tk_message_preview_section.py
+│   ├── test_gui_tk_services_section.py
+│   ├── test_gui_tk_theme.py
+│   ├── test_gui_tk_tor_section.py
+│   ├── test_headerparser.py
+│   ├── test_imap_append.py
+│   ├── test_imap_command_result.py
+│   ├── test_imap_credentials.py
+│   ├── test_imap_fetch.py
+│   ├── test_imap_idle.py
+│   ├── test_imap_message_parser.py
+│   ├── test_imap_notification_factory.py
+│   ├── test_imap_notification_sink.py
+│   ├── test_imap_parser.py
+│   ├── test_imap_protocol.py
+│   ├── test_imap_reply.py
+│   ├── test_imap_response.py
+│   ├── test_imap_search.py
+│   ├── test_imap_server.py
+│   ├── test_imap_server_connection.py
+│   ├── test_imap_session.py
+│   ├── test_imap_store_event_adapter.py
+│   ├── test_install_desktop.py
+│   ├── test_install_environment.py
+│   ├── test_install_first_run.py
+│   ├── test_install_first_run_entrypoint.py
+│   ├── test_install_generator.py
+│   ├── test_install_installer.py
+│   ├── test_install_manifest.py
+│   ├── test_install_platform.py
+│   ├── test_install_prerequisites.py
+│   ├── test_install_runtime_config.py
+│   ├── test_install_runtime_config_entrypoint.py
+│   ├── test_install_system.py
+│   ├── test_install_tor_config.py
+│   ├── test_install_tor_runtime.py
+│   ├── test_install_uninstaller.py
+│   ├── test_local_transport.py
+│   ├── test_logger.py
+│   ├── test_mail_composer.py
+│   ├── test_mail_flow.py
+│   ├── test_mail_headers.py
+│   ├── test_mailbox_view.py
+│   ├── test_message_canonicalizer.py
+│   ├── test_message_encryptor.py
+│   ├── test_message_entry.py
+│   ├── test_message_entry_serializer.py
+│   ├── test_message_explorer.py
+│   ├── test_message_formatter.py
+│   ├── test_message_list_view_model.py
+│   ├── test_message_preview_view_model.py
+│   ├── test_message_serializer.py
+│   ├── test_message_signer.py
+│   ├── test_message_store.py
+│   ├── test_message_store_memory.py
+│   ├── test_message_store_sqlite.py
+│   ├── test_message_summary.py
+│   ├── test_message_verifier.py
+│   ├── test_mime_decoder.py
+│   ├── test_onion_address.py
+│   ├── test_onion_end_to_end_local.py
+│   ├── test_onion_service_manager.py
+│   ├── test_onion_transport.py
+│   ├── test_onion_validator.py
+│   ├── test_packaging.py
+│   ├── test_parser.py
+│   ├── test_password_hasher.py
+│   ├── test_persistent_imap_authenticator.py
+│   ├── test_pipeline.py
+│   ├── test_protocol.py
+│   ├── test_queue.py
+│   ├── test_queue_backend.py
+│   ├── test_queue_factory.py
+│   ├── test_queue_item.py
+│   ├── test_queue_manager_sqlite.py
+│   ├── test_queue_persistence.py
+│   ├── test_queue_serializer.py
+│   ├── test_queue_sqlite_backend.py
+│   ├── test_queue_stage.py
+│   ├── test_queue_storage.py
+│   ├── test_queue_worker.py
+│   ├── test_receiver_mailbox_pipeline.py
+│   ├── test_reply.py
+│   ├── test_retry_policy.py
+│   ├── test_rfc5322.py
+│   ├── test_runtime.py
+│   ├── test_runtime_config.py
+│   ├── test_runtime_state.py
+│   ├── test_service.py
+│   ├── test_session.py
+│   ├── test_signature_header.py
+│   ├── test_signature_roundtrip.py
+│   ├── test_signing_identity.py
+│   ├── test_smtp_client_connection.py
+│   ├── test_smtp_real_client.py
+│   ├── test_smtp_server.py
+│   ├── test_smtp_server_connection.py
+│   ├── test_socks5_client.py
+│   ├── test_socks5_connection.py
+│   ├── test_socks5_reply.py
+│   ├── test_socks5_request.py
+│   ├── test_store_event_sink.py
+│   ├── test_tcp_server.py
+│   ├── test_text_connection.py
+│   ├── test_tickable.py
+│   ├── test_tor_control_auth_challenge.py
+│   ├── test_tor_control_authenticator.py
+│   ├── test_tor_control_client.py
+│   ├── test_tor_control_connection.py
+│   ├── test_tor_control_cookie_reader.py
+│   ├── test_tor_control_protocol_info.py
+│   ├── test_tor_control_reply_parser.py
+│   ├── test_tor_control_safecookie.py
+│   ├── test_tor_monitor_service.py
+│   ├── test_tor_onion_service_factory.py
+│   ├── test_tor_status.py
+│   ├── test_tor_status_provider_authenticated.py
+│   ├── test_transport_manager.py
+│   ├── test_transport_manager_onion_real.py
+│   ├── test_transport_selection.py
+│   ├── test_transport_smtp_client.py
+│   ├── test_transport_smtp_protocol.py
+│   ├── test_transport_smtp_transport.py
+│   └── test_trust_store.py
+└── tools/
+    ├── __init__.py
+    ├── check_onion_smtp.py
+    ├── inspect_receiver_queue.py
+    ├── run_onion_receiver.py
+    ├── send_onion_mail.py
+    └── verify_tor_delivery.py
+
+BASELINE DOCUMENTALE: v0.1.0-alpha.1 — commit 9bfc2f7 (main/origin/main, push riferito).
+Il tag Git e la release non sono attestati come creati.
+Gli elementi del tree sono tratti dalla bozza caricata; verificare prima di usarlo come inventario release.
