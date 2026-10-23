@@ -26,6 +26,17 @@ class OnionPagePreferences:
                 "HTML path is required when the custom Onion page is enabled"
             )
 
+        if enabled:
+            html_file = Path(html_path).expanduser()
+
+            if not html_file.is_absolute():
+                html_file = self.settings_path.absolute().parent / html_file
+
+            if html_file.is_dir():
+                raise ValueError(
+                    "HTML file path must point to a file, not a directory"
+                )
+
         save_onion_page_settings(
             self.settings_path,
             enabled=enabled,

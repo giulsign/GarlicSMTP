@@ -286,7 +286,7 @@ def test_onion_page_section_formats_load_error_message():
     message = section._load_error_message()
 
     assert "Invalid Onion configuration" in message
-    assert "salvataggio" in message.lower()
+    assert "saving disabled" in message.lower()
 
 
 def test_onion_page_section_has_no_message_after_successful_load():
@@ -397,3 +397,23 @@ def test_onion_page_section_save_callback_uses_selected_checkbox(
     section._on_save()
 
     assert calls == [(True, "/tmp/personal.html")]
+
+
+def test_onion_page_section_uses_english_interface_text():
+    import inspect
+
+    source = inspect.getsource(OnionPageSection)
+
+    expected_texts = (
+        "Personal Onion Page",
+        "Enable custom HTML page",
+        "HTML file path:",
+        "Save preferences",
+        "Onion configuration error",
+        "Preferences saved",
+        "Unable to load Onion configuration:",
+        "Saving disabled.",
+    )
+
+    for text in expected_texts:
+        assert text in source

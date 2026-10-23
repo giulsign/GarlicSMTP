@@ -177,3 +177,66 @@ def test_onion_page_preferences_rejects_invalid_path_type(
         match="onion_custom_page_path",
     ):
         preferences.load()
+
+
+def test_onion_page_preferences_rejects_directory_as_html_file(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "settings.toml"
+    html_directory = tmp_path / "personalized_html"
+    html_directory.mkdir()
+
+    calls = []
+
+    def fake_save(path, *, enabled, html_path):
+        calls.append((path, enabled, html_path))
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.onion_page_preferences.save_onion_page_settings",
+        fake_save,
+    )
+
+    preferences = OnionPagePreferences(settings_path)
+
+    with pytest.raises(
+        ValueError,
+        match="HTML file",
+    ):
+        preferences.save(
+            enabled=True,
+            html_path=str(html_directory),
+        )
+
+    assert calls == []
+
+
+def test_onion_page_preferences_rejects_relative_directory(
+    tmp_path,
+    monkeypatch,
+):
+    settings_path = tmp_path / "settings.toml"
+    (tmp_path / "personalized_html").mkdir()
+
+    calls = []
+
+    def fake_save(path, *, enabled, html_path):
+        calls.append((path, enabled, html_path))
+
+    monkeypatch.setattr(
+        "garlicsmtp.gui.onion_page_preferences.save_onion_page_settings",
+        fake_save,
+    )
+
+    preferences = OnionPagePreferences(settings_path)
+
+    with pytest.raises(
+        ValueError,
+        match="HTML file",
+    ):
+        preferences.save(
+            enabled=True,
+            html_path="personalized_html",
+        )
+
+    assert calls == []

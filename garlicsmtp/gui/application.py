@@ -554,6 +554,19 @@ def run_gui(
             paths=application_paths,
             dek=dek,
         )
+    except IsADirectoryError as exc:
+        messagebox.showerror(
+            "Onion HTML configuration error",
+            (
+                "The configured Onion HTML path points to a directory "
+                "instead of a file.\n\n"
+                f"{exc}\n\n"
+                "Select a valid HTML file in the Onion page settings."
+            ),
+            parent=root,
+        )
+        root.destroy()
+        return 1
     except Exception:
         root.destroy()
         raise

@@ -20,7 +20,7 @@ class OnionPageSection(ttk.LabelFrame):
     ) -> None:
         super().__init__(
             parent,
-            text="Pagina personale Onion",
+            text="Personal Onion Page",
             padding=12,
         )
 
@@ -44,7 +44,7 @@ class OnionPageSection(ttk.LabelFrame):
 
         ttk.Checkbutton(
             self,
-            text="Abilita pagina HTML personalizzata",
+            text="Enable custom HTML page",
             variable=self.enabled_var,
         ).grid(
             row=0,
@@ -56,7 +56,7 @@ class OnionPageSection(ttk.LabelFrame):
 
         ttk.Label(
             self,
-            text="Percorso file HTML:",
+            text="HTML file path:",
         ).grid(
             row=1,
             column=0,
@@ -76,7 +76,7 @@ class OnionPageSection(ttk.LabelFrame):
 
         self.save_button = ttk.Button(
             self,
-            text="Salva preferenze",
+            text="Save preferences",
             command=self._on_save,
         )
 
@@ -123,16 +123,16 @@ class OnionPageSection(ttk.LabelFrame):
             )
         except (OSError, ValueError, TypeError) as exc:
             messagebox.showerror(
-                "Errore configurazione Onion",
+                "Onion configuration error",
                 str(exc),
                 parent=self,
             )
             return
 
         messagebox.showinfo(
-            "Preferenze salvate",
-            "Le preferenze della pagina Onion sono state salvate.\n"
-            "Saranno applicate al prossimo avvio del servizio.",
+            "Preferences saved",
+            "Onion page preferences have been saved.\n"
+            "Changes will take effect when the service restarts.",
             parent=self,
         )
 
@@ -172,9 +172,9 @@ class OnionPageSection(ttk.LabelFrame):
             return ""
 
         return (
-            "Impossibile caricare la configurazione Onion: "
+            "Unable to load Onion configuration: "
             f"{self._preferences_load_error}. "
-            "Salvataggio disabilitato."
+            "Saving disabled."
         )
 
     def _create_load_error_label(self) -> None:

@@ -5220,3 +5220,75 @@ def test_handle_forgot_password_outcomes(
             assert "Invalid recovery key" in messages[0][2]
         else:
             assert "Sign in" in messages[0][2]
+
+
+def test_run_gui_reports_invalid_onion_html_path(
+    tmp_path,
+    monkeypatch,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+    dek = bytes(range(32))
+    events = []
+
+    class FakeRoot:
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def destroy(self):
+            events.append("destroy")
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    def fake_build_view_model(*, paths, dek):
+        raise IsADirectoryError(
+            "HTML path points to a directory"
+        )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        fake_build_view_model,
+    )
+
+    def fake_showerror(title, message, *, parent):
+        events.append(("error", title, message))
+        assert isinstance(parent, FakeRoot)
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showerror",
+        fake_showerror,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=lambda **kwargs: dek,
+    )
+
+    assert result == 1
+    assert len(events) == 2
+    assert events[0][0] == "error"
+    assert "Onion" in events[0][1]
+    assert "HTML" in events[0][2]
+    assert events[1] == "destroy"
