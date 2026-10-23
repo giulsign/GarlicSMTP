@@ -175,7 +175,7 @@ def attachment_directory_factory(
         / message_id
     )
 
-def test_tk_main_window_builds_dashboard_sections():
+def test_tk_main_window_builds_dashboard_sections(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -189,6 +189,7 @@ def test_tk_main_window_builds_dashboard_sections():
                 attachment_directory_factory=(
                     attachment_directory_factory
                 ),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         assert (
@@ -236,7 +237,7 @@ def test_tk_main_window_builds_dashboard_sections():
         root.destroy()
 
 
-def test_tk_main_window_binds_received_and_sent_sections():
+def test_tk_main_window_binds_received_and_sent_sections(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -250,6 +251,7 @@ def test_tk_main_window_binds_received_and_sent_sections():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         assert (
@@ -273,7 +275,7 @@ def test_tk_main_window_binds_received_and_sent_sections():
         root.destroy()
 
 
-def test_tk_main_window_selects_mailbox_for_received_and_sent():
+def test_tk_main_window_selects_mailbox_for_received_and_sent(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -289,6 +291,7 @@ def test_tk_main_window_selects_mailbox_for_received_and_sent():
             attachment_directory_factory=(
                 attachment_directory_factory
             ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -311,7 +314,7 @@ def test_tk_main_window_selects_mailbox_for_received_and_sent():
         root.destroy()
 
 
-def test_tk_main_window_has_no_compose_without_view_model():
+def test_tk_main_window_has_no_compose_without_view_model(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -324,7 +327,8 @@ def test_tk_main_window_has_no_compose_without_view_model():
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(
                 attachment_directory_factory
-            ),  
+            ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -336,7 +340,7 @@ def test_tk_main_window_has_no_compose_without_view_model():
         root.destroy()
 
 
-def test_tk_main_window_builds_compose_section():
+def test_tk_main_window_builds_compose_section(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -371,6 +375,7 @@ def test_tk_main_window_builds_compose_section():
             attachment_directory_factory=(
                 attachment_directory_factory
             ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -387,7 +392,7 @@ def test_tk_main_window_builds_compose_section():
         root.destroy()
 
 
-def test_tk_main_window_loads_selected_mailbox_messages():
+def test_tk_main_window_loads_selected_mailbox_messages(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -408,6 +413,7 @@ def test_tk_main_window_loads_selected_mailbox_messages():
             attachment_directory_factory=(
                 attachment_directory_factory
             ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -481,6 +487,7 @@ def test_tk_main_window_displays_selected_message_preview(
                     / "materialized"
                 )
             ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -549,7 +556,7 @@ def test_tk_main_window_displays_selected_message_preview(
         root.destroy()
 
 
-def test_tk_main_window_clears_preview_for_deleted_message():
+def test_tk_main_window_clears_preview_for_deleted_message(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -575,6 +582,7 @@ def test_tk_main_window_clears_preview_for_deleted_message():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         assert (
@@ -616,7 +624,7 @@ def test_tk_main_window_clears_preview_for_deleted_message():
         root.destroy()
 
 
-def test_tk_main_window_clears_sent_preview_for_deleted_message():
+def test_tk_main_window_clears_sent_preview_for_deleted_message(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -641,6 +649,7 @@ def test_tk_main_window_clears_sent_preview_for_deleted_message():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         assert (
@@ -679,7 +688,7 @@ def test_tk_main_window_clears_sent_preview_for_deleted_message():
         root.destroy()
 
 
-def test_tk_main_window_keeps_preview_for_other_deleted_message():
+def test_tk_main_window_keeps_preview_for_other_deleted_message(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -705,6 +714,7 @@ def test_tk_main_window_keeps_preview_for_other_deleted_message():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         assert (
@@ -746,7 +756,7 @@ def test_tk_main_window_keeps_preview_for_other_deleted_message():
         root.destroy()
 
 
-def test_tk_main_window_refreshes_all_sections():
+def test_tk_main_window_refreshes_all_sections(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -758,6 +768,7 @@ def test_tk_main_window_refreshes_all_sections():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         refreshed = []
@@ -789,7 +800,7 @@ def test_tk_main_window_refreshes_all_sections():
         root.destroy()
 
 
-def test_tk_main_window_refreshes_compose_when_present():
+def test_tk_main_window_refreshes_compose_when_present(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -824,6 +835,7 @@ def test_tk_main_window_refreshes_compose_when_present():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         refreshed = []
@@ -844,7 +856,7 @@ def test_tk_main_window_refreshes_compose_when_present():
         root.destroy()
 
 
-def test_tk_main_window_has_refresh_button():
+def test_tk_main_window_has_refresh_button(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -856,6 +868,7 @@ def test_tk_main_window_has_refresh_button():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
             )
 
         assert (
@@ -867,7 +880,7 @@ def test_tk_main_window_has_refresh_button():
         root.destroy()
 
 
-def test_tk_main_window_refresh_button_refreshes_view():
+def test_tk_main_window_refresh_button_refreshes_view(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -879,6 +892,7 @@ def test_tk_main_window_refresh_button_refreshes_view():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         refreshed = []
@@ -895,7 +909,7 @@ def test_tk_main_window_refresh_button_refreshes_view():
         root.destroy()
 
 
-def test_tk_main_window_has_start_button():
+def test_tk_main_window_has_start_button(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -906,7 +920,8 @@ def test_tk_main_window_has_start_button():
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
-            attachment_directory_factory=(attachment_directory_factory),        
+            attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -918,7 +933,7 @@ def test_tk_main_window_has_start_button():
         root.destroy()
 
 
-def test_tk_main_window_start_button_starts_and_refreshes():
+def test_tk_main_window_start_button_starts_and_refreshes(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -932,6 +947,7 @@ def test_tk_main_window_start_button_starts_and_refreshes():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         started = []
@@ -954,7 +970,7 @@ def test_tk_main_window_start_button_starts_and_refreshes():
         root.destroy()
 
 
-def test_tk_main_window_action_buttons_follow_stopped_state():
+def test_tk_main_window_action_buttons_follow_stopped_state(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -968,6 +984,7 @@ def test_tk_main_window_action_buttons_follow_stopped_state():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -990,7 +1007,7 @@ def test_tk_main_window_action_buttons_follow_stopped_state():
         root.destroy()
 
 
-def test_tk_main_window_stop_and_restart_buttons_execute_actions():
+def test_tk_main_window_stop_and_restart_buttons_execute_actions(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1006,6 +1023,7 @@ def test_tk_main_window_stop_and_restart_buttons_execute_actions():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -1058,7 +1076,7 @@ def test_tk_main_window_stop_and_restart_buttons_execute_actions():
 
 
 def test_tk_main_window_action_error_is_generic_and_refreshes(
-    monkeypatch,
+    monkeypatch, tmp_path
 ):
     root = tk.Tk()
     root.withdraw()
@@ -1070,7 +1088,8 @@ def test_tk_main_window_action_error_is_generic_and_refreshes(
                 FakeController()
             ),
             folder_opener=FakeFolderOpener(),
-            attachment_directory_factory=(attachment_directory_factory),    
+            attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         dialogs = []
@@ -1128,7 +1147,7 @@ def test_tk_main_window_action_error_is_generic_and_refreshes(
         root.destroy()
 
 
-def test_tk_main_window_refresh_button_refreshes_view_model():
+def test_tk_main_window_refresh_button_refreshes_view_model(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1140,6 +1159,7 @@ def test_tk_main_window_refresh_button_refreshes_view_model():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         actions = []
@@ -1162,7 +1182,7 @@ def test_tk_main_window_refresh_button_refreshes_view_model():
         root.destroy()
 
 
-def test_tk_main_window_places_top_dashboard_in_three_columns():
+def test_tk_main_window_places_top_dashboard_in_three_columns(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1174,6 +1194,7 @@ def test_tk_main_window_places_top_dashboard_in_three_columns():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -1246,7 +1267,7 @@ def test_tk_main_window_places_top_dashboard_in_three_columns():
         root.destroy()
 
 
-def test_tk_main_window_places_compose_and_messages_layout():
+def test_tk_main_window_places_compose_and_messages_layout(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1279,13 +1300,14 @@ def test_tk_main_window_places_compose_and_messages_layout():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         compose_info = (
             window.compose_section.grid_info()
         )
 
-        assert compose_info["row"] == 2
+        assert compose_info["row"] == 3
         assert compose_info["column"] == 0
         assert compose_info["columnspan"] == 3
 
@@ -1298,7 +1320,7 @@ def test_tk_main_window_places_compose_and_messages_layout():
             window.messages_pane.grid_info()
         )
 
-        assert pane_info["row"] == 3
+        assert pane_info["row"] == 4
         assert pane_info["column"] == 0
         assert pane_info["columnspan"] == 3
 
@@ -1348,7 +1370,7 @@ def test_tk_main_window_places_compose_and_messages_layout():
         root.destroy()
 
 
-def test_tk_main_window_moves_messages_up_without_compose():
+def test_tk_main_window_moves_messages_up_without_compose(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1360,6 +1382,7 @@ def test_tk_main_window_moves_messages_up_without_compose():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert window.compose_section is None
@@ -1368,7 +1391,7 @@ def test_tk_main_window_moves_messages_up_without_compose():
             window.messages_pane.grid_info()
         )
 
-        assert pane_info["row"] == 2
+        assert pane_info["row"] == 3
         assert pane_info["column"] == 0
         assert pane_info["columnspan"] == 3
 
@@ -1376,7 +1399,7 @@ def test_tk_main_window_moves_messages_up_without_compose():
         root.destroy()
 
 
-def test_tk_main_window_dashboard_columns_and_messages_row_expand():
+def test_tk_main_window_dashboard_columns_and_messages_row_expand(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1388,6 +1411,7 @@ def test_tk_main_window_dashboard_columns_and_messages_row_expand():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         for column in range(3):
@@ -1433,7 +1457,7 @@ def test_tk_main_window_dashboard_columns_and_messages_row_expand():
         root.destroy()
 
 
-def test_tk_main_window_dashboard_sections_belong_to_content_frame():
+def test_tk_main_window_dashboard_sections_belong_to_content_frame(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1445,6 +1469,7 @@ def test_tk_main_window_dashboard_sections_belong_to_content_frame():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert isinstance(
@@ -1481,7 +1506,7 @@ def test_tk_main_window_dashboard_sections_belong_to_content_frame():
         root.destroy()
 
 
-def test_tk_main_window_builds_header_and_action_bar():
+def test_tk_main_window_builds_header_and_action_bar(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1493,6 +1518,7 @@ def test_tk_main_window_builds_header_and_action_bar():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -1557,7 +1583,7 @@ def test_tk_main_window_builds_header_and_action_bar():
         root.destroy()
 
 
-def test_tk_main_window_queues_view_model_event_from_worker_thread():
+def test_tk_main_window_queues_view_model_event_from_worker_thread(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1571,6 +1597,7 @@ def test_tk_main_window_queues_view_model_event_from_worker_thread():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         refresh_calls = []
@@ -1601,7 +1628,7 @@ def test_tk_main_window_queues_view_model_event_from_worker_thread():
         root.destroy()
 
 
-def test_tk_main_window_schedules_refresh_queue_poll():
+def test_tk_main_window_schedules_refresh_queue_poll(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1613,6 +1640,7 @@ def test_tk_main_window_schedules_refresh_queue_poll():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -1634,7 +1662,7 @@ def test_tk_main_window_schedules_refresh_queue_poll():
         root.destroy()
 
 
-def test_tk_main_window_close_stops_polling_and_running_application():
+def test_tk_main_window_close_stops_polling_and_running_application(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1652,6 +1680,7 @@ def test_tk_main_window_close_stops_polling_and_running_application():
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         listener = window._queue_refresh
@@ -1683,7 +1712,7 @@ def test_tk_main_window_close_stops_polling_and_running_application():
         root.destroy()
 
 
-def test_tk_main_window_refuses_close_during_send():
+def test_tk_main_window_refuses_close_during_send(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1703,6 +1732,7 @@ def test_tk_main_window_refuses_close_during_send():
             attachment_directory_factory=(
                 attachment_directory_factory
             ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         class SendingSection:
@@ -1724,7 +1754,7 @@ def test_tk_main_window_refuses_close_during_send():
         root.destroy()
 
 
-def test_tk_main_window_content_has_vertical_scrollbar():
+def test_tk_main_window_content_has_vertical_scrollbar(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1736,6 +1766,7 @@ def test_tk_main_window_content_has_vertical_scrollbar():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert window.content_canvas is not None
@@ -1763,7 +1794,7 @@ def test_tk_main_window_content_has_vertical_scrollbar():
         root.destroy()
 
 
-def test_tk_main_window_messages_are_visible_at_bottom_of_scroll():
+def test_tk_main_window_messages_are_visible_at_bottom_of_scroll(tmp_path):
     root = tk.Tk()
     root.geometry("980x720")
 
@@ -1775,6 +1806,7 @@ def test_tk_main_window_messages_are_visible_at_bottom_of_scroll():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
         window.pack(
             fill="both",
@@ -1809,7 +1841,7 @@ def test_tk_main_window_messages_are_visible_at_bottom_of_scroll():
         root.destroy()
 
 
-def test_tk_main_window_messages_container_uses_grid_layout():
+def test_tk_main_window_messages_container_uses_grid_layout(tmp_path):
     root = tk.Tk()
     root.withdraw()
 
@@ -1821,6 +1853,7 @@ def test_tk_main_window_messages_container_uses_grid_layout():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (
@@ -1837,7 +1870,7 @@ def test_tk_main_window_messages_container_uses_grid_layout():
         root.destroy()
 
 
-def test_tk_main_window_mouse_wheel_scrolls_content_on_linux():
+def test_tk_main_window_mouse_wheel_scrolls_content_on_linux(tmp_path):
     root = tk.Tk()
     root.geometry("980x720")
 
@@ -1849,6 +1882,7 @@ def test_tk_main_window_mouse_wheel_scrolls_content_on_linux():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
         window.pack(
             fill="both",
@@ -1873,7 +1907,7 @@ def test_tk_main_window_mouse_wheel_scrolls_content_on_linux():
         root.destroy()
 
 
-def test_tk_main_window_mouse_wheel_scrolls_over_content_widget():
+def test_tk_main_window_mouse_wheel_scrolls_over_content_widget(tmp_path):
     root = tk.Tk()
     root.geometry("980x720")
 
@@ -1885,6 +1919,7 @@ def test_tk_main_window_mouse_wheel_scrolls_over_content_widget():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
         window.pack(
             fill="both",
@@ -1911,7 +1946,7 @@ def test_tk_main_window_mouse_wheel_scrolls_over_content_widget():
         root.destroy()
 
 
-def test_tk_main_window_keeps_message_preview_visible_before_selection():
+def test_tk_main_window_keeps_message_preview_visible_before_selection(tmp_path):
     root = tk.Tk()
     root.geometry("980x720")
 
@@ -1923,6 +1958,7 @@ def test_tk_main_window_keeps_message_preview_visible_before_selection():
             ),
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
+            onion_settings_path=tmp_path / "settings.toml",
         )
         window.pack(
             fill="both",
@@ -2005,6 +2041,7 @@ def test_tk_main_window_displays_selected_sent_message_preview(tmp_path):
                     / "materialized"
                 )
             ),
+            onion_settings_path=tmp_path / "settings.toml",
         )
 
         assert (

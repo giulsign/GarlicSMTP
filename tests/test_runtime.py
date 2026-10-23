@@ -3,8 +3,13 @@
 #
 # See LICENSE for the full license terms.
 
+import socket
+
 from garlicsmtp.core.engine import Runtime
 from garlicsmtp.core.engine import RuntimeState
+from garlicsmtp.application.onion_presence_http_service import (
+    OnionPresenceHttpService,
+)
 
 
 class FakeService:
@@ -177,3 +182,109 @@ def test_runtime_runs_multiple_tasks_once(monkeypatch):
 
     assert first.count == 1
     assert second.count == 1
+
+
+def test_runtime_starts_http_before_onion_and_stops_in_reverse():
+    events = []
+
+    class RecordingService:
+
+        def __init__(self, name):
+            self.name = name
+
+        def start(self):
+            events.append(
+                f"start:{self.name}"
+            )
+
+        def stop(self):
+            events.append(
+                f"stop:{self.name}"
+            )
+
+    http_service = RecordingService("http")
+    onion_service = RecordingService("onion")
+
+    runtime = Runtime(
+        services=[
+            http_service,
+            onion_service,
+        ],
+    )
+
+    runtime.start()
+    runtime.stop()
+
+    assert events == [
+        "start:http",
+        "start:onion",
+        "stop:onion",
+        "stop:http",
+    ]
+
+    assert runtime.state is RuntimeState.STOPPED
+
+
+def test_runtime_stop_releases_http_presence_port():
+    http_service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+    )
+
+    runtime = Runtime(
+        services=[http_service],
+    )
+
+    runtime.start()
+
+    port = http_service.port
+
+    try:
+        assert http_service.running is True
+        assert port > 0
+    finally:
+        runtime.stop()
+
+    assert http_service.running is False
+    assert runtime.state is RuntimeState.STOPPED
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", port))
+
+
+def test_runtime_releases_http_port_when_onion_start_fails():
+    import pytest
+
+    class FailingOnionService:
+
+        def start(self):
+            raise RuntimeError("Onion publication failed")
+
+        def stop(self):
+            pass
+
+    http_service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+    )
+
+    runtime = Runtime(
+        services=[
+            http_service,
+            FailingOnionService(),
+        ],
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="Onion publication failed",
+    ):
+        runtime.start()
+
+    port = http_service.port
+
+    assert http_service.running is False
+    assert runtime.state is RuntimeState.STOPPED
+
+    with socket.socket() as probe:
+        probe.bind(("127.0.0.1", port))

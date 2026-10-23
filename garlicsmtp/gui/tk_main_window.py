@@ -6,6 +6,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from queue import Empty, Queue
+from pathlib import Path
+
 
 from garlicsmtp.application import (
     ApplicationViewModel,
@@ -46,6 +48,12 @@ from garlicsmtp.gui.tk_compose_section import (
 from garlicsmtp.gui.tk_dashboard_widgets import (
     StatusBadge,
 )
+from garlicsmtp.gui.onion_page_gui_factory import (
+    create_onion_page_preferences,
+)
+from garlicsmtp.gui.tk_onion_page_section import (
+    OnionPageSection,
+)
 
 
 class MainWindow(ttk.Frame):
@@ -57,6 +65,7 @@ class MainWindow(ttk.Frame):
         *,
         folder_opener,
         attachment_directory_factory,
+        onion_settings_path: Path,
     ) -> None:
         super().__init__(
             master,
@@ -68,6 +77,8 @@ class MainWindow(ttk.Frame):
         self.attachment_directory_factory = (
             attachment_directory_factory
         )
+
+        self.onion_settings_path = Path(onion_settings_path)
 
         self.view_model = view_model
 
@@ -183,6 +194,10 @@ class MainWindow(ttk.Frame):
         self.tor_section = TorSection(
             self.content_frame,
             view_model=self.view_model,
+        )
+        self.onion_page_section = self._create_onion_page_section(
+            self.content_frame,
+            self.onion_settings_path,
         )
 
         self.mailbox_section = MailboxListSection(
@@ -319,6 +334,12 @@ class MainWindow(ttk.Frame):
             column=2,
             sticky="nsew",
         )
+        self.onion_page_section.grid(
+            row=2,
+            column=0,
+            columnspan=3,
+            sticky="ew",
+        )
 
         self.mailbox_section.grid(
             row=1,
@@ -344,16 +365,16 @@ class MainWindow(ttk.Frame):
                 weight=1,
             )
 
-        messages_row = 2
+        messages_row = 3
 
         if self.compose_section is not None:
             self.compose_section.grid(
-                row=2,
+                row=3,
                 column=0,
                 columnspan=3,
                 sticky="nsew",
             )
-            messages_row = 3
+            messages_row = 4
 
         self.received_message_list_section.grid(
             row=0,
@@ -861,3 +882,17 @@ class MainWindow(ttk.Frame):
 
         self.view_model.close()
         return True
+
+    def _create_onion_page_section(
+        self,
+        parent,
+        settings_path: Path,
+    ) -> OnionPageSection:
+        preferences = create_onion_page_preferences(
+            settings_path,
+        )
+
+        return OnionPageSection(
+            parent,
+            preferences=preferences,
+        )

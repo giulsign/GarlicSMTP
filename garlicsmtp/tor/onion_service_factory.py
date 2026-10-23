@@ -41,5 +41,12 @@ def build_onion_service_manager(
         virtual_port=settings.tor.onion_smtp_port,
         target_host=settings.smtp.host,
         target_port=settings.smtp.port,
+        additional_ports=[
+            (
+                settings.tor.onion_http_port,
+                "127.0.0.1",
+                settings.tor.onion_http_target_port,
+            ),
+        ],
         hostname_callback=hostname_callback,
     )

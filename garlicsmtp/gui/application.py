@@ -576,6 +576,7 @@ def run_gui(
                 / message_id
             )
         ),
+        onion_settings_path=application_paths.settings_file,
     )
 
     window.pack(

@@ -4,7 +4,7 @@
 # See LICENSE for the full license terms.
 
 from __future__ import annotations
-
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -132,6 +132,9 @@ from garlicsmtp.storage.attachment_store import (
 from garlicsmtp.application.attachment_limit_admin import (
     AttachmentLimitAdminStore,
 )
+from garlicsmtp.application.onion_presence_http_service import (
+    OnionPresenceHttpService,
+)
 
 
 class ApplicationBuilder:
@@ -193,6 +196,37 @@ class ApplicationBuilder:
                 self.paths.settings_file
             )
         )
+
+        onion_presence_http_service = None
+
+        if settings.tor.enabled:
+            custom_page_enabled = settings.tor.onion_custom_page_enabled
+            custom_html = None
+
+            if custom_page_enabled:
+                custom_page_path = settings.tor.onion_custom_page_path
+
+                if not custom_page_path:
+                    raise ValueError(
+                        "Custom Onion page is enabled but no HTML path is configured"
+                    )
+
+                with Path(custom_page_path).open("rb") as html_file:
+                    html_bytes = html_file.read(256 * 1024 + 1)
+
+                if len(html_bytes) > 256 * 1024:
+                    raise ValueError(
+                        "Custom Onion HTML exceeds the maximum size of 256 KiB"
+                    )
+
+                custom_html = html_bytes.decode("utf-8")
+
+            onion_presence_http_service = OnionPresenceHttpService(
+                host="127.0.0.1",
+                port=settings.tor.onion_http_target_port,
+                custom_html=custom_html,
+                custom_page_enabled=custom_page_enabled,
+            )
 
         local_domains = {
             settings.local_domain,
@@ -311,11 +345,9 @@ class ApplicationBuilder:
         onion_service = None
 
         if settings.tor.enabled:
-            onion_service = (
-                self._build_onion_service(
-                    settings,
-                    hostname_callback=register_local_hostname,
-                )
+            onion_service = self._build_onion_service(
+                settings,
+                hostname_callback=register_local_hostname,
             )
 
         tor_status_provider = (
@@ -336,6 +368,7 @@ class ApplicationBuilder:
             imap_server=imap_server,
             queue_worker=queue_worker,
             onion_service=onion_service,
+            onion_presence_http_service=onion_presence_http_service,
             tor_monitor=tor_monitor,
             logger=logger,
         )
@@ -570,27 +603,25 @@ class ApplicationBuilder:
         onion_service,
         tor_monitor: TorMonitorService,
         logger: Logger,
+        onion_presence_http_service: OnionPresenceHttpService | None,
     ) -> Runtime:
         from garlicsmtp.core.engine.runtime import (
             Runtime,
         )
 
-        services = [
-            smtp_server,
-        ]
+        services = [smtp_server]
+
+        if onion_presence_http_service is not None:
+            services.append(onion_presence_http_service)
 
         if onion_service is not None:
-            services.append(
-                onion_service
-            )
+            services.append(onion_service)
 
-        services.extend(
-            [
-                imap_server,
-                queue_worker,
-                tor_monitor,
-            ]
-        )
+        services.extend([
+            imap_server,
+            queue_worker,
+            tor_monitor,
+        ])
 
         return Runtime(
             services=services,

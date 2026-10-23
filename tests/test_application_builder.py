@@ -4,6 +4,7 @@
 # See LICENSE for the full license terms.
 
 import pytest
+from pathlib import Path
 
 from garlicsmtp.application import (
     ApplicationBuilder,
@@ -97,6 +98,9 @@ from garlicsmtp.application.attachment_limit_admin import (
 )
 from garlicsmtp.security.encrypted_sqlite import (
     connect_encrypted_sqlite,
+)
+from garlicsmtp.application.onion_presence_http_service import (
+    OnionPresenceHttpService,
 )
 
 
@@ -236,13 +240,19 @@ def test_application_builder_connects_runtime_services(
         dek=dek,
     ).build()
 
-    assert context.runtime.services == [
-        context.smtp_server,
-        context.onion_service,
-        context.imap_server,
-        context.queue_worker,
-        context.tor_monitor,
-    ]
+    services = context.runtime.services
+
+    assert len(services) == 6
+
+    assert services[0] is context.smtp_server
+    assert isinstance(
+        services[1],
+        OnionPresenceHttpService,
+    )
+    assert services[2] is context.onion_service
+    assert services[3] is context.imap_server
+    assert services[4] is context.queue_worker
+    assert services[5] is context.tor_monitor
 
     assert context.runtime.tasks == [   
         context.smtp_server,
@@ -338,6 +348,7 @@ def test_application_builder_puts_onion_service_after_smtp():
         queue_worker=queue_worker,
         onion_service=onion_service,
         tor_monitor=tor_monitor,
+        onion_presence_http_service=None,
         logger=None,
     )
 
@@ -2118,3 +2129,326 @@ def test_application_builder_rejects_missing_dek(
 
     assert not paths.mailbox_database.exists()
     assert not paths.queue_database.exists()
+
+
+def test_application_builder_registers_http_presence_before_onion(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.onion_http_target_port = 18080
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        services = context.runtime.services
+
+        http_services = [
+            service
+            for service in services
+            if isinstance(
+                service,
+                OnionPresenceHttpService,
+            )
+        ]
+
+        assert len(http_services) == 1
+
+        http_service = http_services[0]
+
+        assert http_service.host == "127.0.0.1"
+        assert http_service.port == 18080
+
+        assert (
+            services.index(http_service) + 1
+            == services.index(context.onion_service)
+        )
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_omits_http_presence_when_tor_disabled(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp"
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.enabled = False
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        assert context.onion_service is None
+
+        assert not any(
+            isinstance(service, OnionPresenceHttpService)
+            for service in context.runtime.services
+        )
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_ignores_custom_page_file_when_disabled(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = False
+    settings.tor.onion_custom_page_path = str(
+        tmp_path / "missing.html"
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        http_service = next(
+            service
+            for service in context.runtime.services
+            if isinstance(service, OnionPresenceHttpService)
+        )
+
+        assert http_service.custom_page_enabled is False
+        assert http_service.custom_html is None
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_loads_enabled_custom_page(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    html_path = tmp_path / "personal.html"
+    custom_html = (
+        "<html><head><title>Pagina personale</title></head>"
+        "<body><h1>Benvenuti</h1></body></html>"
+    )
+    html_path.write_text(custom_html, encoding="utf-8")
+
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = True
+    settings.tor.onion_custom_page_path = str(html_path)
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        http_service = next(
+            service
+            for service in context.runtime.services
+            if isinstance(service, OnionPresenceHttpService)
+        )
+
+        assert http_service.custom_page_enabled is True
+        assert http_service.custom_html == custom_html
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+def test_application_builder_rejects_missing_enabled_custom_page(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = True
+    settings.tor.onion_custom_page_path = str(
+        tmp_path / "missing.html"
+    )
+
+    with pytest.raises(FileNotFoundError):
+        ApplicationBuilder(
+            paths=paths,
+            settings=settings,
+            dek=dek,
+        ).build()
+
+
+def test_application_builder_rejects_oversized_custom_page(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    html_path = tmp_path / "oversized.html"
+
+    html_path.write_bytes(b"A" * (256 * 1024 + 1))
+
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = True
+    settings.tor.onion_custom_page_path = str(html_path)
+
+    with pytest.raises(ValueError, match="256 KiB"):
+        ApplicationBuilder(
+            paths=paths,
+            settings=settings,
+            dek=dek,
+        ).build()
+
+
+def test_application_builder_does_not_read_oversized_custom_page(
+    tmp_path,
+    dek,
+    monkeypatch,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    html_path = tmp_path / "oversized.html"
+    html_path.write_bytes(b"A" * (256 * 1024 + 1))
+
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = True
+    settings.tor.onion_custom_page_path = str(html_path)
+
+    original_read_text = Path.read_text
+
+    def guarded_read_text(self, *args, **kwargs):
+        if self == html_path:
+            pytest.fail(
+                "Oversized custom HTML must not use Path.read_text()"
+            )
+        return original_read_text(self, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", guarded_read_text)
+
+    with pytest.raises(ValueError, match="256 KiB"):
+        ApplicationBuilder(
+            paths=paths,
+            settings=settings,
+            dek=dek,
+        ).build()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["missing-file", "invalid-html"],
+)
+def test_application_builder_validates_custom_page_before_backends(
+    tmp_path,
+    dek,
+    monkeypatch,
+    failure,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    html_path = tmp_path / "personal.html"
+
+    if failure == "invalid-html":
+        html_path.write_text(
+            "<html><body><script>alert(1)</script></body></html>",
+            encoding="utf-8",
+        )
+
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = True
+    settings.tor.onion_custom_page_path = str(html_path)
+
+    def unexpected_backend_creation(*args, **kwargs):
+        pytest.fail(
+            "Backend creation must not precede custom page validation"
+        )
+
+    monkeypatch.setattr(
+        ApplicationBuilder,
+        "_build_store",
+        unexpected_backend_creation,
+    )
+    monkeypatch.setattr(
+        ApplicationBuilder,
+        "_build_queue",
+        unexpected_backend_creation,
+    )
+
+    expected_exception = (
+        FileNotFoundError
+        if failure == "missing-file"
+        else ValueError
+    )
+
+    with pytest.raises(expected_exception):
+        ApplicationBuilder(
+            paths=paths,
+            settings=settings,
+            dek=dek,
+        ).build()
+
+
+@pytest.mark.parametrize(
+    "failure",
+    ["missing-path", "invalid-utf8", "oversized-html"],
+)
+def test_application_builder_rejects_invalid_custom_page_before_backends(
+    tmp_path,
+    dek,
+    monkeypatch,
+    failure,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+    html_path = tmp_path / "personal.html"
+
+    settings = ApplicationSettings()
+    settings.tor.onion_custom_page_enabled = True
+
+    if failure == "missing-path":
+        settings.tor.onion_custom_page_path = None
+    else:
+        settings.tor.onion_custom_page_path = str(html_path)
+
+        if failure == "invalid-utf8":
+            html_path.write_bytes(b"\xff\xfe")
+        else:
+            html_path.write_bytes(b"A" * (256 * 1024 + 1))
+
+    def unexpected_backend_creation(*args, **kwargs):
+        pytest.fail(
+            "Backend creation must not precede custom page validation"
+        )
+
+    monkeypatch.setattr(
+        ApplicationBuilder,
+        "_build_store",
+        unexpected_backend_creation,
+    )
+    monkeypatch.setattr(
+        ApplicationBuilder,
+        "_build_queue",
+        unexpected_backend_creation,
+    )
+
+    expected_exception = {
+        "missing-path": ValueError,
+        "invalid-utf8": UnicodeDecodeError,
+        "oversized-html": ValueError,
+    }[failure]
+
+    with pytest.raises(expected_exception):
+        ApplicationBuilder(
+            paths=paths,
+            settings=settings,
+            dek=dek,
+        ).build()

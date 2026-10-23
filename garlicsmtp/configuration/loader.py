@@ -47,6 +47,24 @@ class ConfigurationLoader:
             {},
         )
 
+        custom_page_enabled = tor_data.get(
+            "onion_custom_page_enabled",
+            False,
+        )
+
+        custom_page_path = tor_data.get(
+            "onion_custom_page_path",
+            None,
+        )
+
+        if custom_page_enabled and custom_page_path is not None:
+            html_path = Path(custom_page_path).expanduser()
+
+            if not html_path.is_absolute():
+                html_path = path.absolute().parent / html_path
+
+            custom_page_path = str(html_path)
+
         cookie_file_value = tor_data.get(
             "cookie_file"
         )
@@ -109,6 +127,16 @@ class ConfigurationLoader:
                     "onion_smtp_port",
                     25,
                 ),
+                onion_http_port=tor_data.get(
+                    "onion_http_port",
+                    80,
+                ),
+                onion_http_target_port=tor_data.get(
+                    "onion_http_target_port",
+                    8080,
+                ),
+                onion_custom_page_enabled=custom_page_enabled,
+                onion_custom_page_path=custom_page_path,
                 control_enabled=tor_data.get(
                     "control_enabled",
                     False,

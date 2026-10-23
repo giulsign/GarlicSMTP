@@ -20,6 +20,7 @@ class OnionServiceManager:
         target_host: str,
         target_port: int,
         hostname_callback=None,
+        additional_ports: (list[tuple[int, str, int]] | None) = None,
     ) -> None:
         self.client = client
         self.authenticator = authenticator
@@ -27,6 +28,7 @@ class OnionServiceManager:
         self.virtual_port = virtual_port
         self.target_host = target_host
         self.target_port = target_port
+        self.additional_ports = additional_ports
         self.hostname_callback = (
             hostname_callback
         )
@@ -79,11 +81,20 @@ class OnionServiceManager:
         else:
             key = "NEW:ED25519-V3"
 
+        onion_arguments = {
+            "key": key,
+            "virtual_port": self.virtual_port,
+            "target_host": self.target_host,
+            "target_port": self.target_port,
+        }
+
+        if self.additional_ports is not None:
+            onion_arguments["additional_ports"] = (
+                self.additional_ports
+            )
+
         service = self.client.add_onion(
-            key=key,
-            virtual_port=self.virtual_port,
-            target_host=self.target_host,
-            target_port=self.target_port,
+            **onion_arguments
         )
 
         if key == "NEW:ED25519-V3":

@@ -34,15 +34,19 @@ class FakeClient:
         virtual_port,
         target_host,
         target_port,
+        additional_ports=None,
     ):
-        self.calls.append(
-            {
-                "key": key,
-                "virtual_port": virtual_port,
-                "target_host": target_host,
-                "target_port": target_port,
-            }
-        )
+        call = {
+            "key": key,
+            "virtual_port": virtual_port,
+            "target_host": target_host,
+            "target_port": target_port,
+        }
+
+        if additional_ports is not None:
+            call["additional_ports"] = additional_ports
+
+        self.calls.append(call)
 
         return type(
             "OnionService",
@@ -517,3 +521,48 @@ def test_onion_service_manager_cleans_temporary_file_if_replace_fails(
             ".onion-service.key.*"
         )
     ) == []
+
+
+def test_onion_service_manager_publishes_additional_http_port(
+    tmp_path,
+):
+    identity_file = (
+        tmp_path / "onion-service.key"
+    )
+
+    client = FakeClient()
+
+    manager = OnionServiceManager(
+        client=client,
+        identity_file=identity_file,
+        virtual_port=25,
+        target_host="127.0.0.1",
+        target_port=2525,
+        additional_ports=[
+            (80, "127.0.0.1", 8080),
+        ],
+    )
+
+    hostname = manager.ensure_service()
+
+    assert hostname == (
+        ("a" * 56) + ".onion"
+    )
+
+    assert client.calls == [
+        {
+            "key": "NEW:ED25519-V3",
+            "virtual_port": 25,
+            "target_host": "127.0.0.1",
+            "target_port": 2525,
+            "additional_ports": [
+                (80, "127.0.0.1", 8080),
+            ],
+        }
+    ]
+
+    assert identity_file.read_text(
+        encoding="utf-8"
+    ) == (
+        "ED25519-V3:test-private-key"
+    )

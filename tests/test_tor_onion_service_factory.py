@@ -61,3 +61,37 @@ def test_build_onion_service_manager_uses_application_configuration(
         onion_service.hostname_callback
         is callback
     )
+
+
+def test_build_onion_service_manager_includes_http_mapping(
+    tmp_path,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path,
+    )
+
+    settings = ApplicationSettings()
+
+    settings.tor.onion_smtp_port = 2526
+    settings.smtp.host = "127.0.0.3"
+    settings.smtp.port = 2527
+
+    settings.tor.onion_http_port = 8081
+    settings.tor.onion_http_target_port = 18080
+
+    manager = build_onion_service_manager(
+        paths=paths,
+        settings=settings,
+    )
+
+    assert manager.virtual_port == 2526
+    assert manager.target_host == "127.0.0.3"
+    assert manager.target_port == 2527
+
+    assert manager.additional_ports == [
+        (8081, "127.0.0.1", 18080),
+    ]
+
+    assert manager.identity_file == (
+        paths.onion_identity_file
+    )

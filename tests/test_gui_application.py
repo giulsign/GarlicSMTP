@@ -914,6 +914,7 @@ def test_run_gui_sets_application_icon(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path,
         ):
             pass
 
@@ -968,6 +969,7 @@ def test_run_gui_sets_application_icon(
         application_icon = Path(
             "/application/garlicsmtp.png"
         )
+        settings_file = Path("/application/config/settings.toml")
 
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
@@ -999,6 +1001,7 @@ def test_run_gui_hides_root_until_authentication_succeeds(
         application_icon = Path(
             "/application/garlicsmtp.png"
         )
+        settings_file = Path("/application/config/settings.toml")
 
     class FakeRoot:
 
@@ -1052,6 +1055,7 @@ def test_run_gui_hides_root_until_authentication_succeeds(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path
         ):
             events.append("window")
 
@@ -1192,7 +1196,9 @@ def test_run_gui_uses_user_application_paths(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path,
         ):
+            received["onion_settings_path"] = onion_settings_path
             received["window"] = self
             received["master"] = master
             received["view_model"] = (
@@ -1295,6 +1301,7 @@ def test_run_gui_uses_user_application_paths(
         received["protocol"][0]
         == "WM_DELETE_WINDOW"
     )
+    assert received["onion_settings_path"] == expected_paths.settings_file
 
 
 def test_run_gui_does_not_destroy_root_when_close_is_refused(
@@ -1469,6 +1476,7 @@ def test_run_gui_uses_provided_application_paths(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path,
         ):
             pass
 
@@ -1601,6 +1609,7 @@ def test_run_gui_closes_window_before_destroying_root(
         application_icon = Path(
             "/application/garlicsmtp.png"
         )
+        settings_file = Path("/application/config/settings.toml")
 
     class FakeRoot:
 
@@ -1659,6 +1668,7 @@ def test_run_gui_closes_window_before_destroying_root(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path
         ):
             pass
 
@@ -2068,6 +2078,7 @@ def test_run_gui_builds_view_model_after_successful_authentication(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path,
         ):
             pass
 
@@ -3422,6 +3433,7 @@ def test_run_gui_default_login_unlocks_dek_before_build(
             *,
             folder_opener,
             attachment_directory_factory,
+            onion_settings_path,
         ):
             events.append("window")
 
@@ -3523,6 +3535,7 @@ def test_run_gui_first_setup_creates_dek_and_confirms_recovery(
             master,
             view_model,
             *,
+            onion_settings_path,
             folder_opener,
             attachment_directory_factory,
         ):

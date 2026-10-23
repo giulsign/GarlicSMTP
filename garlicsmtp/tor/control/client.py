@@ -370,15 +370,36 @@ class TorControlClient:
         virtual_port: int,
         target_host: str,
         target_port: int,
+        additional_ports: (
+            list[tuple[int, str, int]] | None
+        ) = None,
     ) -> OnionService:
         self._require_authenticated()
 
-        reply = self._execute_command(
+        port_mappings = [
             (
-                f"ADD_ONION {key} "
-                f"Port={virtual_port},"
-                f"{target_host}:{target_port}"
+                virtual_port,
+                target_host,
+                target_port,
+            ),
+        ]
+
+        if additional_ports:
+            port_mappings.extend(
+                additional_ports
             )
+
+        port_arguments = " ".join(
+            (
+                f"Port={port},"
+                f"{host}:{target}"
+            )
+            for port, host, target
+            in port_mappings
+        )
+
+        reply = self._execute_command(
+            f"ADD_ONION {key} {port_arguments}"
         )
 
         if not reply.successful:

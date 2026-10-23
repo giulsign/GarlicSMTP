@@ -33,6 +33,9 @@ class TorSettings:
 
     onion_smtp_port: int = 25
 
+    onion_http_port: int = 80
+    onion_http_target_port: int = 8080
+
     control_enabled: bool = False
     control_host: str = "127.0.0.1"
     control_port: int = 9051
@@ -41,6 +44,9 @@ class TorSettings:
 
     require_safecookie: bool = True
     allow_new_circuits: bool = False
+
+    onion_custom_page_enabled: bool = False
+    onion_custom_page_path: str | None = None
 
 
 @dataclass(slots=True)

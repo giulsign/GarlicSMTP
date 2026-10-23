@@ -672,3 +672,43 @@ def test_tor_control_client_adds_onion_with_existing_key():
     assert result.private_key == (
         existing_key
     )
+
+
+def test_tor_control_client_adds_onion_with_multiple_ports():
+    service_id = "a" * 56
+
+    connection = FakeConnection(
+        lines=[
+            f"250-ServiceID={service_id}",
+            (
+                "250-PrivateKey="
+                "ED25519-V3:test-private-key"
+            ),
+            "250 OK",
+        ]
+    )
+
+    client = TorControlClient(
+        connection=connection
+    )
+
+    client.connect()
+    client._authenticated = True
+
+    result = client.add_onion(
+        key="NEW:ED25519-V3",
+        virtual_port=25,
+        target_host="127.0.0.1",
+        target_port=2525,
+        additional_ports=[
+            (80, "127.0.0.1", 8080),
+        ],
+    )
+
+    assert result.service_id == service_id
+
+    assert connection.sent[-1] == (
+        "ADD_ONION NEW:ED25519-V3 "
+        "Port=25,127.0.0.1:2525 "
+        "Port=80,127.0.0.1:8080"
+    )

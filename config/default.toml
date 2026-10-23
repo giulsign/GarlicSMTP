@@ -22,3 +22,5 @@ control_port = 9051
 require_safecookie = true
 cookie_file = "/run/tor/control.authcookie"
 allow_new_circuits = false
+onion_custom_page_enabled = false
+onion_custom_page_path = ""
