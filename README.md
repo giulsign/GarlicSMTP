@@ -11,7 +11,9 @@ GarlicSMTP is a privacy-oriented SMTP messaging application that communicates th
 
 ## Features
 
-- Bidirectional SMTP messaging between Tor Onion Service peers; developer-to-Ubuntu-VM messaging has been exercised in earlier integration testing.
+- Bidirectional SMTP messaging between Tor Onion Service peers; developer-to-Ubuntu-Virtual Machine and REAL Machine messaging has been exercised in earlier integration testing.
+- Bidirectional SMTP messaging between Tor Onion Service peers; developer-to-KALI REAL Machine messaging has been exercised in earlier integration testing.
+- Bidirectional SMTP messaging between Tor Onion Service peers; Ubuntu REAL Machine and KALI Real Machine messaging has been exercised in earlier integration testing.
 - Message encryption using X25519 key discovery and pinning, HKDF, and ChaCha20-Poly1305, with Ed25519 signatures and verification.
 - Received and Sent mailboxes and a persistent delivery queue using SQLCipher with a password-unlocked 32-byte data-encryption key (DEK).
 - Encrypted local attachment content and metadata in authenticated GSAT v1 files.
