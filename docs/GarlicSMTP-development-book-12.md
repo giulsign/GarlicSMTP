@@ -1,3 +1,456 @@
+# GARLICSMTP — DEVELOPMENT BOOK 12
+## Development history, architecture, working protocol and reproducible handoff
+
+**Edition:** 12 · 25 October 2026
+**Working target:** `v0.1.1-alpha` candidate · Python distribution `0.1.1a0`
+**Latest reported development checkpoint:** `8faf1c6` on `main`, pushed to `origin/main`
+**Last reported complete development suite:** `1,974 passed` (`python -m pytest -q`, approximately 135.21 s)
+**Status:** continuity and third-party onboarding document; **not** a release announcement, fresh code audit or security certification.
+
+> **Authority and evidence hierarchy.** The checkout actually selected, its source code, dependency manifest, tests and reproducible runtime observations take priority over this book. Historical test results are dated evidence, not newly executed tests. Before modifying code, inspect the existing implementation and the relevant tests. Any discrepancies must be recorded, not silently reconciled.
+
+## 0. How to use this book
+
+Read Sections 1–4 to understand scope and verified status; Sections 5–9 before changing any code; Sections 10–13 to resume or fork development. **Section 14 is the complete opening declaration to paste into a new chat, together with this document and relevant source files.** Appendix A contains the original complete Book 11 in English, itself retaining earlier historical material. The appendix is archival: newer dated evidence supersedes older status claims without changing their historical meaning.
+
+**Evidence labels:** `IMPLEMENTED` = reported in inspected source or historical documentation; `TESTED` = accompanied by a named test checkpoint; `MANUALLY VERIFIED` = user-reported runtime exercise; `DECIDED` = required behavior not necessarily verified in all paths; `OPEN` = unclosed question; `NOT VERIFIED` = do not infer support. These labels are not interchangeable.
+
+## 1. Mission, boundaries and product identity
+
+GarlicSMTP is a Python-based privacy-oriented messaging application with SMTP and IMAP components, persistent mailbox and delivery queue, Tor Onion transport and its own Onion Service identity. It is not merely a GUI for public mail providers. The current GUI is **Tkinter**, not PySide6. The software is source-available under **PolyForm Noncommercial License 1.0.0**, not an OSI-approved open-source license. Separate commercial licensing is possible; the repository's authoritative `LICENSE` governs. Copyright © 2026 Giuliano Signorelli. Licensing contact: `giulisign@gmail.com`. Third-party licenses remain separately applicable.
+
+The design distinguishes: (a) Tor transport and Onion reachability; (b) end-to-end content encryption and sender signatures; (c) encrypted local application stores; and (d) operating-system, endpoint and human operational security. None alone guarantees anonymity, trust, availability, complete disk encryption or delivery.
+
+## 2. Provenance and chronological checkpoints
+
+| Checkpoint | Evidence and meaning |
+|---|---|
+| 08 Oct · Book 8 | Narrative architectural and method baseline; its then-open at-rest work is historical. |
+| 13 Oct · Book 9 | SQLCipher/DEK/recovery implementation progress; `1,797 passed` reported. |
+| 18 Oct · Book 10 history | `1,830 passed`; development recovery exercise reported. |
+| 19 Oct · Book 10 | `1,844 passed`; application baseline `9bfc2f7`; real developer ↔ Ubuntu VM message/attachment exchange; encrypted-store observations. |
+| 19 Oct · Book 11 closure | Public `v0.1.0-alpha.1` pre-release reported, release commit `212b9dd`, package `0.1.0a1`. Earlier Book 11 paragraphs saying publication was pending are superseded by its closure update. |
+| Later `v0.1.1-alpha` work | Reported `main` checkpoint `8faf1c6`, package `0.1.1a0`, optional configurable Onion HTML presence page, and full suite `1,974 passed`. **Candidate only**; no new tag or GitHub release confirmed. |
+
+Do not add checkpoint test totals together: they are distinct runs, and focused test groups may overlap. The Book 11 release and the Book 12 candidate are separate milestones. No independent security audit, certified clean installation, upgrade path or data migration is established for `v0.1.1-alpha`.
+
+## 3. Repository, environments and branch hygiene
+
+**Canonical remote:** `https://github.com/giulsign/GarlicSMTP.git`; historical working directory: `/mnt/c/garlicsmtp` inside Ubuntu on WSL, branch `main`. The user may have a different checkout: never assume paths or HEAD without checking. Ubuntu 24.04 is the documented installer target and historical VM validation environment; Ubuntu 22.04 GUI VM testing is also reported for subsequent work. Neither means native Windows/macOS or every Linux distribution is supported. Python requirement was historically `>=3.12`; inspect the current `pyproject.toml` before relying on it.
+
+Reported `0.1.1a0` dependency constraints: `dnspython>=2.8,<3`, `cryptography>=46,<47`, `sqlcipher3==0.6.3`, build `setuptools>=77`. Inspect exact lock/build resolution in the selected checkout. `sqlcipher3` has its own third-party licensing; it is not automatically relicensed by GarlicSMTP's PolyForm license.
+
+**Read-only starting checks** (run from the correct checkout, not from a live production data directory):
+
+```bash
+pwd
+git status --short
+git branch --show-current
+git log -1 --oneline
+git remote -v
+git diff --check
+python --version
+python -m pytest -q
+```
+
+The full test command is a proposed new verification, not a claim it has just been run. Capture exit status, exact count and duration. Never use `git add .`, `git reset --hard`, `git clean`, destructive checkout or automated cleanup. Historical working trees contained unrelated edits, deleted docs, untracked documents and backups; preserve them. Do not stage or commit without explicit approval. Never manipulate real databases, keys, recovery credentials, Onion identities or VM snapshots merely to test a hypothesis.
+
+**For an independent development branch:** first record the upstream URL, current HEAD, `git status`, package metadata and baseline test result; work from an explicitly chosen immutable commit or tag in a separate clone/worktree **only after ensuring that local changes and private data will not be affected**. Choose a new branch name, record its base SHA and document divergences. Do not copy private state or secrets into the fork. The right to use or distribute a fork is subject to `LICENSE`, third-party notices and any separate authorization; a public GitHub repository does not by itself confer unrestricted commercial rights.
+
+## 4. Architectural map and responsibilities
+
+```text
+Tkinter GUI / supported CLI entrypoints
+    → authentication / setup / password or recovery unlock
+    → 32-byte DEK available for protected stores
+    → ApplicationViewModel / ApplicationController
+    → ApplicationBuilder (composition root)
+       ├─ SMTP server → message pipeline → local Received store / remote delivery
+       ├─ IMAP server → mailbox access according to configured auth
+       ├─ MailComposerService → signature / routing / E2EE preparation
+       ├─ QueueWorker → TransportManager → OnionTransport → Tor SOCKS5
+       ├─ SQLCipher Received, Sent and Queue backends
+       └─ GSAT v1 encrypted AttachmentStore
+```
+
+This is a conceptual map, not a guaranteed exact call graph. Check constructors, call sites and tests in the current checkout. Historical paths to inspect **only when relevant**: `garlicsmtp/application/builder.py`, `garlicsmtp/gui/application.py`, `garlicsmtp/gui/tk_main_window.py`, `garlicsmtp/gui/tk_compose_section.py`, `garlicsmtp/core/pipeline/`, `garlicsmtp/security/auth/account_credentials.py`, `garlicsmtp/security/encrypted_sqlite.py`, `garlicsmtp/storage/sqlite/backend.py`, `garlicsmtp/queue/sqlite.py`, `garlicsmtp/storage/attachment_store.py`, `garlicsmtp/cli/mailbox.py`, Tor/Onion transport modules and corresponding `tests/`. Names and paths are historical pointers, not substitutes for listing the tree.
+
+**Outbound path:** compose → Ed25519 signature → determine local/remote destination → remote capability/key discovery and X25519 TOFU pin verification → HKDF/ChaCha20-Poly1305 encryption **before** persistent enqueue → QueueWorker and Onion transport over Tor → recipient SMTP. **Inbound path:** SMTP acceptance → E2EE decryption where applicable → signature validation → classification/store → GUI/IMAP. Transport retries and errors must preserve message integrity. A message in **Sent** means accepted/saved by the local application, **not** proof of remote delivery. `Retry pending` advances retry eligibility; it is not a delivery receipt or direct send.
+
+**Identities are separate:** Onion Service identity, Ed25519 signing identity, X25519 encryption identity. Cryptographically valid signatures do not automatically establish social trust. Unexpected pinned-peer key changes must not silently replace a trusted key. A first-contact TOFU decision has inherent trust limitations.
+
+## 5. At-rest storage, authentication and recovery invariants
+
+`IMPLEMENTED/TESTED` within documented paths: Received `data/mailboxes.db`, Sent `data/sent.db` and Queue `state/queue.db` use SQLCipher with a mandatory **32-byte DEK**; standard observed paths fail closed rather than falling back to plaintext SQLite. `garlicsmtp/security/encrypted_sqlite.py` historically centralizes SQLCipher connection and keying. `AttachmentStore` uses GSAT v1 (`GSAT` + version byte), a 12-byte nonce and ChaCha20-Poly1305; HKDF-SHA256 derives an attachment subkey from the DEK, and AEAD binds identifying context. File content and metadata are protected in the application blob. Legacy plaintext attachment formats are rejected in the documented reader.
+
+The password is verified via salted Scrypt and a separate password-derived KEK wraps the DEK; an offline recovery secret independently permits recovery of the **same** DEK. A password reset or recovery-key replacement must not regenerate DEK, Onion identity or Ed25519/X25519 identities. Recovery confirmation and fail-closed GUI behavior are important invariants. Account credentials were historically stored at `state/account-credentials.json` with restrictive permissions and atomic-update protections; inspect actual current code and filesystem semantics before relying on that detail.
+
+`NOT VERIFIED` as universally encrypted: private identity files, logs, backups, exported attachments, SQLite journal/WAL/temp remnants, caches, all CLI paths, third-party integrations and arbitrary host files. A non-plaintext database header is supporting evidence only. Exported attachments are readable at the selected destination. No certified backup/restore or legacy plaintext migration procedure is established. **Never delete a database or reinstall to solve forgotten credentials; use the supported recovery flow when available and preserve the original data.**
+
+The Book 11 targeted standard-path DEK propagation audit found no bypass in inspected GUI, builder, Bootstrap and mailbox CLI paths; it did **not** audit arbitrary injected backends. Book 11 also recorded a **possible functional anomaly**: the no-subcommand CLI server route may construct Bootstrap without a DEK. This was not reproduced with a dedicated test, may be legacy/intentional and is **not** evidence of an encryption bypass. Inspect and reproduce before treating it as a defect.
+
+## 6. GUI, runtime lifecycle and Tor
+
+The GUI must remain hidden until account setup/login and DEK unlock succeed. Build failures should destroy the Tk root; receiving must not start before authentication. Closing the GUI should stop the application's receiving services, while system Tor may remain running. The asynchronous compose/send flow uses a worker thread and Tk-safe result polling; it should report errors and clear compose fields only after application acceptance. Changes to thread handling require focused race/lifecycle tests.
+
+Tor is a system prerequisite in the validated profile; historical local Tor Control endpoint: `127.0.0.1:9051` with SAFECOOKIE. The application dynamically manages its persistent Onion Service. Local Tor readiness does **not** guarantee reachability of a remote `.onion` endpoint. Never make Tor cookies world-readable, run the application as root, or regenerate Onion identity to address a transient timeout. The GUI may require logout/login after `debian-tor` group membership changes.
+
+## 7. New `v0.1.1-alpha` capability: optional Onion HTML presence page
+
+The latest reported checkpoint adds a configurable **custom Onion HTML presence page** with GUI preferences. When enabled, the preference must specify a nonempty path; the validated configuration requires a meaningful HTML file path. Changes require a restart of the relevant services; do not imply hot reload. The presence page is not a replacement for SMTP/IMAP or the Onion cryptographic identity. Inspect the implementation and tests for path validation, enabled/disabled behavior, file access, error reporting and lifecycle before changing it. Never publish secret keys, personal identifiers or externally fetched resources unintentionally. No independent review of arbitrary HTML content is documented.
+
+This capability is associated with development commit `8faf1c6` and the reported `1,974 passed` suite. Neither constitutes certification of a clean Ubuntu 24.04 installation, upgrade or release publication. The repository document `docs/personalized_html/personalized_html.html` was explicitly excluded from this documentation production; do not copy it into the deliverable or treat it as reviewed evidence.
+
+## 8. Validation matrix and what is still unknown
+
+| Area | Evidence | Boundary |
+|---|---|---|
+| SMTP/IMAP, local and Onion delivery | historical unit/integration tests and real developer/VM send/receive | not a guarantee of every peer/network |
+| E2EE/signatures and key pinning | implemented and tested paths reported | no independent security audit |
+| Received/Sent/Queue SQLCipher | tests plus read-only header observations on developer and VM | not proof of entire disk coverage |
+| GSAT v1 attachments | synthetic format tests and real attachment exchange | exports/backups outside encrypted store |
+| Offline recovery | automated tests and historical manual developer/VM/physical tests | no certified disaster restore |
+| Tkinter GUI | historical login, lifecycle, send and recovery tests | GUI variations and new packaging not all recertified |
+| Optional Onion HTML | later implementation and full-suite report | no new clean-install/upgrade certification |
+| Full development suite | 1,974 passed at latest reported checkpoint | do not assert rerun during Book 12 writing |
+| Native Windows/macOS | not established | unsupported claim prohibited |
+
+**Release gates still OPEN unless new evidence is supplied:** actual `v0.1.1-alpha` tag/release publication, clean Ubuntu 24.04 installation with current manifest, upgrade/migration behavior, recovery/backup restoration end-to-end, third-party dependency packaging on all target hosts, independent security review, and a fresh runtime test of the new HTML setting where needed. Do not relabel historical validation as a current release gate.
+
+## 9. Strict development and review method
+
+1. **Define one observable micro-goal** and whether it is a bug, requested feature, characterization or documentation task; record acceptance criteria and what is out of scope.
+2. **Inspect existing source, tests and fixtures first**. Request only the relevant files or command outputs. Do not invent API names or propose patches based solely on this book.
+3. **Establish baseline:** branch/HEAD/status, environment, relevant targeted tests. If behavior already exists, write a GREEN characterization test instead of manufacturing a RED.
+4. **RED when justified:** introduce one focused test reproducing the missing behavior; confirm the expected failure and exclude unrelated environment failures.
+5. **GREEN:** minimal localized fix; preserve security, persistence and delivery invariants. No opportunistic core rewrites or cosmetic refactoring.
+6. **Verify:** focused tests → related regressions → full `python -m pytest -q` at a relevant gate → real Ubuntu VM test only if the changed boundary requires it. Stop and investigate unexpected failures.
+7. **Review diff and evidence:** `git diff --check`, list changed files, describe before/after behavior, update documentation and risks; propose commit only with user approval.
+8. **Handoff:** record SHA, test commands and results, remaining questions, next single action and a new-chat opening declaration.
+
+**Collaboration rule from the historical books:** the user manually applies source/test changes and explicitly approves Git operations. Provide inspectable, small diffs and copyable commands; do not execute scripts that rewrite repository code. Documentation artifacts may be produced separately without touching the repository. A third-party maintainer may adopt a different workflow on their own authorized branch, but must state that deviation explicitly and respect licenses, safety invariants and evidence standards.
+
+## 10. Work items and decision log for the next branch
+
+**Confirmed development status:** package version `0.1.1a0`, reported code checkpoint `8faf1c6`, optional HTML presence page, reported `1,974 passed`. **Not confirmed:** a new published `v0.1.1-alpha` release or complete release certification. Do not automatically re-open completed historical work or declare an old issue still present without current inspection.
+
+**Recommended first work package:** read-only checkout inventory; compare `pyproject.toml`, `garlicsmtp/__init__.py`, installer manifest, GUI HTML preferences, runtime serving path and relevant tests; capture a focused test baseline; decide whether the next task is a release gate, an actual bug or a separate feature. If a new branch is desired, agree on base commit, branch name, license permissions, review owner and test target first.
+
+**Known decision points:** (a) is `v0.1.1-alpha` to be tagged and published, and on which exact SHA? (b) which Ubuntu release(s) are explicitly supported after current installer testing? (c) is the no-subcommand CLI server entrypoint supported or legacy? (d) what backup/restore and migration policy is acceptable? (e) which threat model and security review are required before broader claims? (f) which HTML exposure and validation behaviors are part of the public contract? These are questions, not implied approvals.
+
+## 11. Source map for a third-party contributor
+
+Start with `README`, `CONTRIBUTING`, `SECURITY`, `LICENSE`, `NOTICE`, `THIRD_PARTY_LICENSES`, `CHANGELOG`, installation documentation and the current `pyproject.toml`; read the current files, not just the translated review copies. Then inspect only the subsystem being changed. Typical clusters: GUI (`garlicsmtp/gui/`, `tests/test_gui_*`), account/DEK (`garlicsmtp/security/auth/`, `garlicsmtp/security/encrypted_sqlite.py`), mail stores (`garlicsmtp/storage/`, `garlicsmtp/queue/`), delivery (`garlicsmtp/core/pipeline/`, `garlicsmtp/application/`, transport/Tor code), installer (`install.sh`, manifest tests). Verify names with `git ls-files` rather than assuming every historical path still exists.
+
+Keep fixtures and test data synthetic. Do not upload secrets, actual messages, real `.onion` identities or SQLCipher databases to an issue, pull request or AI chat. Separate external dependencies' copyright notices from project licensing. Document architecture changes and backward compatibility impacts explicitly.
+
+## 12. Continuity packet to attach to a new chat
+
+**Minimum:** this Book 12, the exact Git HEAD and branch, `git status --short`, package version from actual files, latest full and focused test output, a concise description of the next micro-goal, and the relevant existing source/test files. **If needed:** the last diff, installer/environment logs with secrets removed, failing traceback and reproducible steps. Do not attach the entire repository, private data or credentials indiscriminately. State whether the new session may only advise or may modify files.
+
+**First assistant response expected:** acknowledge the evidence hierarchy; summarize the currently known baseline and uncertainties; ask for missing *targeted* source/tests before proposing edits; select one small next action. Do not assume the assistant has access to the previous chat, the local checkout or the runtime.
+
+## 13. Handoff checklist
+
+- [ ] Confirm checkout path, branch, HEAD, remote and dirty/untracked files.
+- [ ] Confirm package and installer versions against the chosen commit.
+- [ ] Separate published `v0.1.0-alpha.1` from candidate `v0.1.1-alpha`.
+- [ ] Record exactly when/where `1,974 passed` was obtained; rerun only if appropriate.
+- [ ] Identify the single task, acceptance criteria and tests to inspect.
+- [ ] Preserve credentials, DEK, recovery key, Onion and signing/encryption identities.
+- [ ] Review applicable source and third-party licensing before a fork/distribution.
+- [ ] Obtain explicit permission before edits, commits, tags, release or destructive actions.
+- [ ] Update this book after material changes; never erase historical evidence.
+
+## 14. COMPLETE DECLARATION TO OPEN A NEW WORK SESSION
+
+> **Copy the following text into a new chat and attach this Development Book 12. Replace bracketed fields with actual current observations; do not guess.**
+
+```text
+START OF NEW GARLICSMTP DEVELOPMENT SESSION — DECLARATION
+
+I am resuming development of GarlicSMTP (https://github.com/giulsign/GarlicSMTP.git).
+The attached GarlicSMTP Development Book 12 is the continuity reference, not a substitute for reading current code.
+
+HISTORICAL AND CURRENT CONTEXT
+- Published historical milestone reported in Book 11: v0.1.0-alpha.1, release commit 212b9dd, package 0.1.0a1; application baseline 9bfc2f7.
+- Later development target: v0.1.1-alpha candidate, package 0.1.1a0; latest reported main/origin/main commit 8faf1c6.
+- Latest reported complete development suite: 1,974 passed. This is historical evidence until rerun in this session.
+- New work includes an optional configurable Onion HTML presence page in the Tkinter GUI, with enabled-path validation and restart requirement.
+- No published v0.1.1-alpha tag/release, independent security audit, certified clean install, upgrade or migration is established by this document.
+
+ARCHITECTURE AND INVARIANTS
+- Python SMTP/IMAP application; Tor Onion transport; distinct Onion, Ed25519 and X25519 identities; E2EE prepared before remote enqueue; persistent queue and retries.
+- SQLCipher Received/Sent/Queue and GSAT v1 attachments use the application DEK within documented boundaries.
+- Password and offline recovery wrap the same DEK. Recovery/reset must preserve keys, identities and data. Fail closed on missing/invalid DEK.
+- GUI is Tkinter. Login/setup precedes receiving; Sent is not proof of remote delivery; Retry pending is not a delivery receipt.
+- No blanket claims of anonymity, all-files encryption, audited security or supported Windows/macOS builds.
+
+WORKING RULES
+- FIRST inspect the existing relevant source code and tests; do not propose speculative changes.
+- One observable micro-goal at a time: targeted RED when a defect is demonstrated, minimal GREEN, regressions, full suite at a relevant gate.
+- The user applies source changes manually and approves Git actions; no automatic source rewrites, no git add ., reset, clean or destructive operations.
+- Preserve all unrelated working-tree changes, real data, recovery secrets and Onion identities. Never ask to disclose secrets.
+- Distinguish documented historical checks from tests actually executed in this session.
+
+CURRENT CHECKOUT — FILL FROM REAL COMMANDS
+Checkout path: [TO VERIFY]
+Branch / HEAD / remote: [TO VERIFY]
+Git status including untracked files: [TO VERIFY]
+Python and package version: [TO VERIFY]
+Last targeted and full test commands/results: [TO VERIFY]
+Next single objective and acceptance criteria: [TO DECIDE]
+Authorized scope of edits / Git actions: [TO CONFIRM]
+
+YOUR FIRST ACTION
+Confirm the context and unresolved evidence. Ask for the smallest set of current source files, tests and read-only command outputs needed to assess the chosen objective. Do not patch, refactor, stage, commit, tag or publish before inspecting the implementation and obtaining explicit authorization.
+
+END OF NEW SESSION DECLARATION
+```
+
+## Appendix A — Book 11, original English archival text
+
+The following is preserved verbatim as an historical source. It includes its own older appendices. Its checkpoint-specific statements, including the closure update, remain dated and must not override the newer Book 12 status.
+
+---
+
+```text
+CLOSURE UPDATE — RELEASE PUBLISHED (19 OCTOBER 2026)
+==============================================================================
+CURRENT VERIFIED STATUS: v0.1.0-alpha.1 MILESTONE COMPLETE.
+The public GitHub page confirms the release
+"GarlicSMTP v0.1.0-alpha.1 — First Official Alpha", marked "Pre-release".
+URL: https://github.com/giulsign/GarlicSMTP/releases/tag/v0.1.0-alpha.1
+Tag: v0.1.0-alpha.1; release commit: 212b9dd;
+Python package version: 0.1.0a1; application baseline: 9bfc2f7.
+The page documents features, validation, Alpha limitations, and references.
+No fresh installer validation or independent security certification is
+claimed. GitHub's displayed release assets do not establish the presence
+of additional binary builds or packaged installers.
+The README and CHANGELOG frozen in the tag accurately described publication
+as unconfirmed when drafted. These are superseded historical statements,
+not errors that require rewriting the tagged snapshot.
+Earlier Book 11 statements that publication was unconfirmed or pending
+refer to the PREVIOUS checkpoint, before this public verification.
+No new commits, tags, tests, or source changes were made for this
+out-of-repository documentation update.
+Next decision: a separate subsequent milestone, if desired.
+
+GARLICSMTP
+DEVELOPMENT BOOK 11 — ENGLISH EDITION
+Development history, verified status, decisions, and continuity guide
+Checkpoint: 19 October 2026
+Reference version: v0.1.0-alpha.1
+Status: continuity record, NOT evidence of a published release
+
+EDITORIAL NOTE
+This edition updates Development Book 10 without retroactively rewriting
+historical checkpoints. The new sections describe the latest reported
+status. The complete original Italian Book 10, including its historical
+appendices, is preserved after this English narrative. Source code and
+actual tests always take precedence over documentation.
+
+CONTENTS
+1. Executive summary
+2. Baseline and Git status
+3. Working features and real-world validation
+4. Encryption at rest
+5. Recovery and authentication
+6. Targeted audit of alternative entry points
+7. Test evidence and limitations
+8. Recorded CLI anomaly
+9. Updated roadmap
+10. Working method and safeguards
+11. Handoff message
+Appendix A: Original Italian Development Book 10 (historical source)
+
+==============================================================================
+1. EXECUTIVE SUMMARY
+==============================================================================
+GarlicSMTP has a working alpha baseline. The user confirmed real message
+and attachment exchange among the developer environment, virtual machines,
+and physical machines; recovery tests in those environments; connection
+and disconnection tests; and sending to invalid addresses.
+These validations should not be repeated without a relevant code change
+or an observed defect.
+
+The targeted audit of standard DEK acquisition and propagation paths
+concluded positively within the inspected scope. No DEK bypass was found.
+This is neither an independent cryptographic security audit nor proof
+that every sensitive artifact on disk is encrypted.
+
+==============================================================================
+2. BASELINE AND GIT STATUS
+==============================================================================
+Agreed version: v0.1.0-alpha.1.
+Latest HEAD and origin/main reported in this conversation:
+212b9dd — docs: prepare v0.1.0-alpha.1 release documentation.
+The v0.1.0-alpha.1 Git tag was created. Publication of a GitHub Release
+has NOT been confirmed; a tag is not the same as a published release.
+
+The previously VM-tested application-code baseline was 9bfc2f7;
+212b9dd is a documentation commit. Do not attribute new runtime tests
+to that commit without supporting evidence.
+
+The working tree contains unrelated changes: modified
+tests/test_install_manifest.py, deleted old documentation, untracked
+documents, a file named 'None', and an attachment_store backup.
+Preserve all of them. No destructive reset/clean/checkout, git add .,
+or unapproved Git operations.
+
+==============================================================================
+3. WORKING FEATURES AND REAL-WORLD VALIDATION
+==============================================================================
+The user directly confirmed:
+- sending and receiving between virtual and physical machines;
+- messages with attachments;
+- recovery on developer, VM, and physical machines;
+- connection and disconnection;
+- sending to invalid addresses.
+Developer ↔ Ubuntu VM, self-send, and attachment validations were already
+documented in Book 10. Do not invent message counts, additional operating
+systems, or protocols not mentioned in the evidence.
+SMTP/IMAP/Tor/E2EE core, pipeline, and delivery semantics remain frozen
+unless a concrete, reproducible defect is established.
+
+==============================================================================
+4. ENCRYPTION AT REST
+==============================================================================
+The three persistent application databases — Received, Sent, and Queue —
+use SQLCipher with a mandatory 32-byte DEK in the inspected standard paths.
+AttachmentStore uses the encrypted GSAT v1 format with AEAD and protected
+metadata, as documented in Book 10.
+Do NOT claim that private identities, caches, backups, logs, temporary
+files, and every secondary artifact are all encrypted. The evidence is
+narrower. Database header checks are supporting evidence, not standalone
+cryptographic proof.
+
+==============================================================================
+5. RECOVERY AND AUTHENTICATION
+==============================================================================
+The password and offline recovery key independently wrap the same DEK;
+recovery must not regenerate the DEK or identities.
+The user confirmed practical recovery tests on developer, VM, and physical
+machines. The inspected GUI code performs login/setup before constructing
+the ViewModel, rejects values other than 32-byte bytes objects, destroys
+the Tk root on cancellation/failure, and displays the main window only
+after a successful build.
+
+==============================================================================
+6. TARGETED AUDIT OF ALTERNATIVE ENTRY POINTS
+==============================================================================
+Mailbox CLI:
+- unlocks via account credentials using unlock_dek_with_password;
+- passes the DEK to the SQLite message store;
+- exits without opening the store when the DEK is unavailable.
+
+Bootstrap:
+- build_context rejects a missing or invalid DEK before building.
+
+ApplicationBuilder:
+- build rejects a missing/invalid DEK;
+- standard Received and Queue backends receive dek=self.dek;
+- AttachmentStore receives dek=self.dek;
+- the SMTP pipeline uses the builder's store and queue.
+
+GUI:
+- run_gui initially hides the window;
+- login/setup precedes build_view_model;
+- build_view_model validates the DEK and supplies it to the builder
+  and the Sent database;
+- ApplicationViewModel.start delegates to ApplicationController.start,
+  which starts context.runtime and its runtime thread;
+- no pre-login SMTP start was found in the inspected ordinary GUI path.
+
+run_gui has an optional authenticate parameter used in tests to supply
+an alternate authenticator; its returned DEK is still validated.
+Injected backends are extension/testing points. No bypass was demonstrated,
+but arbitrary third-party integrations were not comprehensively audited.
+Do not implement speculative patches.
+
+Precise conclusion: no DEK bypass was found in the inspected standard
+paths. The targeted audit is closed; this does not imply a general audit.
+
+==============================================================================
+7. TEST EVIDENCE AND LIMITATIONS
+==============================================================================
+- Historical full developer suite from Book 10: 1844 passed
+  (NOT rerun during this conversation).
+- Focused CLI/Bootstrap tests during this conversation: 23 passed.
+- Subsequent GUI/ApplicationBuilder/Bootstrap tests: 120 passed,
+  as reported by the user.
+The groups may overlap: do NOT add 23 and 120 as unique test counts,
+and do NOT claim that the 1844-test full suite ran again today.
+Code inspection was static and targeted, supplemented by test results.
+Real-world validations were user-confirmed and are distinct from pytest.
+
+==============================================================================
+8. RECORDED CLI ANOMALY
+==============================================================================
+The no-subcommand CLI entry point calls run_server(), which constructs
+Bootstrap() without a DEK. Because Bootstrap.build_context() rejects a
+missing DEK, that route appears unable to start the server: a possible
+fail-closed functional defect, NOT an encryption bypass.
+No dedicated reproduction test was run for that exact route, and whether
+it is intentional/legacy was not established. No fix was authorized.
+Assess it only if the route is a product requirement.
+
+==============================================================================
+9. UPDATED ROADMAP
+==============================================================================
+1) Ubuntu VM and real end-to-end exchanges: COMPLETE within documented scope.
+2) Encryption at rest for three DBs and attachments: VERIFIED within scope.
+3) Alternative DEK entry-point audit: CLOSED for inspected standard paths.
+4) Continuity documentation: Italian and English Book 11 prepared.
+5) New functionality: NOT DEFINED; separate from frozen baseline.
+6) Final publication/GitHub Release: EXPLICIT USER DECISION STILL NEEDED.
+7) No-DEK CLI server anomaly: RECORDED, not a security priority.
+Pre-existing data migration and renewed installer validation are not
+automatically reopened; they were excluded from the agreed roadmap.
+No source change is required to complete Book 11.
+
+==============================================================================
+10. WORKING METHOD AND SAFEGUARDS
+==============================================================================
+Read actual source code, tests, and fixtures before any change.
+Handle one reproducible defect at a time: focused RED only when warranted
+and observed, minimal GREEN, targeted tests, regressions, and full pytest
+at relevant gates. Use GREEN characterization tests for existing behavior.
+The user manually applies every source change and approves commits.
+Do not generate scripts that automatically rewrite repository files.
+Do not touch real databases, credentials, recovery keys, identities,
+backups, or VMs. Do not demand repeated real E2E tests without a relevant
+change. Preserve the working tree and unrelated modifications.
+
+==============================================================================
+11. HANDOFF MESSAGE FOR A NEW CHAT
+==============================================================================
+“I am continuing GarlicSMTP from milestone v0.1.0-alpha.1.
+The latest HEAD confirmed in the conversation is 212b9dd on
+main/origin/main, and the v0.1.0-alpha.1 Git tag was created;
+a GitHub Release has not been confirmed.
+The VM-tested application baseline was 9bfc2f7.
+The user confirmed real send/receive and attachments between virtual
+and physical machines, recovery on developer/VM/physical machines,
+connection/disconnection, and sending to invalid addresses.
+Do not repeat these validations without technical justification.
+Historical full suite: 1844 passed; in the targeted audit conversation,
+23 passed and then 120 passed in potentially overlapping groups.
+The targeted standard-path DEK audit covering mailbox CLI, Bootstrap,
+builder, and GUI found no bypass. A possible no-DEK CLI server
+functional defect is recorded but not fixed.
+Do not claim every disk artifact is encrypted or arbitrary external
+backends are certified. The working tree contains unrelated changes
+that must be preserved. Read REAL source and tests before suggesting
+code. No automatic modifications. The next decision is whether to
+publish the alpha release or define a separate new milestone without
+reopening the validated core.”
+
+
+==============================================================================
+APPENDIX A — ORIGINAL ITALIAN DEVELOPMENT BOOK 10 (UNTRANSLATED ARCHIVE)
+==============================================================================
+
 GARLICSMTP
 STORIA DELLO SVILUPPO, METODO DI LAVORO E GUIDA ALLA CONTINUITÀ
 Development Book — edizione 10, 19/10/2026
@@ -1115,3 +1568,4 @@ METODO OBBLIGATORIO: inspect → una proprietà e un solo RED focalizzato → mi
 OBIETTIVO PRIORITARIO: riprendere dalla fase 1 della roadmap, verificando in modo reale e circoscritto SQLCipher end-to-end e l’assenza di accessi plaintext nei percorsi storage/queue, senza toccare il core se non strettamente necessario. Successivamente: flussi SMTP/IMAP/queue cifrati, allegati e residui, recovery e migrazione crash-safe, VM Ubuntu 24.04, packaging e documentazione. Le stime 20–36 ore (25–45 con margine) sono preliminari, non risultati garantiti.
 
 RUOLI: io eseguo i comandi, fornisco sorgenti e test, approvo ogni micro-intervento e decido i commit; tu mi guidi passo per passo, in italiano, con file e comandi esatti. Non attribuirti test o commit non confermati. Non eseguire modifiche autonome. Per iniziare, dammi soltanto (a) stato realizzato e aperto in poche righe, (b) confini intoccabili, (c) i primi file reali e test da ispezionare per un solo micro-obiettivo SQLCipher. Attendi il mio riscontro prima di generare codice. A fine chat aiutami ad aggiornare il Development Book con i soli delta confermati.
+```

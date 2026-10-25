@@ -15,7 +15,7 @@ Project: GarlicSMTP
 
 __title__ = "GarlicSMTP"
 
-__version__ = "0.0.1-alpha"
+__version__ = "0.1.1a0"
 
 __author__ = "GarlicSMTP Project - Giuliano Signorelli"
 

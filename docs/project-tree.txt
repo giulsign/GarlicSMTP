@@ -1,57 +1,31 @@
-GARLICSMTP — PROJECT FILE TREE
-Documented version: v0.1.0-alpha.1 | updated: 19/10/2026
-Source: actual tree -J supplied by the user (updated draft, October 2026).
-Formatting and cleanup criteria inherited from project-tree.txt dated 08/10/2026.
-Caches, .venv, .git, build directories, databases, logs, spool files, artifacts and backups excluded.
-The five updated documents are shown as intended destinations, not proof that they exist in the checkout.
-This structure reflects the uploaded tree, NOT a new tree command run against commit 9bfc2f7.
+GARLICSMTP — PROJECT TREE
+Release: v0.1.1-alpha
+Python package version: 0.1.1a0
+Inventory generated from the local release candidate.
+Only files directly under docs/ and files in docs/personalized_html/ are published.
+Historical snapshots and local backups are excluded.
 
 GarlicSMTP/
-├── CHANGELOG.md
-├── CLA.md
-├── COMMERCIAL-LICENSE.md
-├── CONTRIBUTING.md
-├── LICENSE
-├── NOTICE
-├── README.md
-├── SECURITY.md
-├── THIRD_PARTY_LICENSES.md
 ├── bin/
 │   └── garlicsmtp
-├── check_onion_smtp.py
 ├── config/
 │   └── default.toml
 ├── docs/
-│   ├── develop_snapshots/
-│   │   ├── GarlicSMTP - Ripresa 5 - Validazione Alpha.docx
-│   │   ├── GarlicSMTP%20-%20ripresa%208%20-%20snapshot.txt
-│   │   ├── GarlicSMTP_Architettura_e_Funzionamento 03 09 26.docx
-│   │   ├── GarlicSMTP_Architettura_e_Funzionamento_versione2_06%2009%2026.docx
-│   │   ├── GarlicSMTP_Handoff_Tecnico_Completo_2026-09-27_RIGENERATO.docx
-│   │   ├── GarlicSMTP_Metodologia_Ingegneristica 03 09 26.docx
-│   │   ├── GarlicSMTP_Metodologia_Ingegneristica_versione2_06%2009%2026.docx
-│   │   ├── GarlicSMTP_Punto_di_Aggiornamento_Sviluppo_09_09_26.docx
-│   │   ├── GarlicSMTP_Riepilogo_Tecnico 03 09 26.docx
-│   │   ├── GarlicSMTP_Riepilogo_Tecnico_versione2_06%2009%2026.docx
-│   │   ├── GarlicSMTP_Ripresa_7_Snapshot_Tecnico_Ripresa_Completa_02_10_26.txt
-│   │   ├── GarlicSMTP_Snapshot_Ripresa_Completa_09_09_26.docx
-│   │   ├── GarlicSMTP_Snapshot_Ripresa_Completa_15_09_26.docx
-│   │   ├── GarlicSMTP_Snapshot_Tecnico_Ripresa_Completa_27_09_26.docx
-│   │   └── GarlicSMTP_handoff_2026-09-15.docx
-│   ├── GarlicSMTP-development-book-10.txt
-│   ├── GarlicSMTP-development-book-8.txt
-│   ├── GarlicSMTP-development-book-9.txt
+│   ├── personalized_html/
+│   │   └── personalized_html.html
+│   ├── CHANGELOG.md
+│   ├── CLA.md
+│   ├── COMMERCIAL-LICENSE.md
+│   ├── CONTRIBUTING.md
+│   ├── GarlicSMTP-development-book-12.md
 │   ├── GarlicSMTP-Handbook.txt
-│   ├── GarlicSMTP-Handbook_aggiornato_13_10_26.txt
-│   ├── GarlicSMTP_Ripresa_8_Snapshot_Tecnico_Ripresa_Completa_13_10_26.docx
 │   ├── installation-architecture.md
-│   ├── installation-architecture_aggiornato_13_10_26.md
 │   ├── project-tree.txt
-│   ├── project-tree_annotato_13_10_26.txt
 │   ├── quicklaunch.md
-│   └── quicklaunch_aggiornato_13_10_26.md
+│   ├── README.md
+│   ├── SECURITY.md
+│   └── THIRD_PARTY_LICENSES.md
 ├── garlicsmtp/
-│   ├── __init__.py
 │   ├── api/
 │   │   └── __init__.py
 │   ├── application/
@@ -77,6 +51,7 @@ GarlicSMTP/
 │   │   ├── message_list_view_model.py
 │   │   ├── message_preview_view_model.py
 │   │   ├── message_summary.py
+│   │   ├── onion_presence_http_service.py
 │   │   ├── status.py
 │   │   ├── status_provider.py
 │   │   ├── tor_monitor_service.py
@@ -87,14 +62,13 @@ GarlicSMTP/
 │   │   ├── __init__.py
 │   │   ├── __main__.py
 │   │   └── mailbox.py
-│   ├── config.py
 │   ├── configuration/
 │   │   ├── __init__.py
 │   │   ├── loader.py
+│   │   ├── onion_page_writer.py
 │   │   ├── paths.py
 │   │   └── settings.py
 │   ├── core/
-│   │   ├── __init__.py
 │   │   ├── engine/
 │   │   │   ├── __init__.py
 │   │   │   ├── app.py
@@ -115,17 +89,18 @@ GarlicSMTP/
 │   │   │   ├── logger.py
 │   │   │   ├── pipeline.py
 │   │   │   └── stage.py
+│   │   ├── __init__.py
 │   │   ├── service.py
 │   │   └── tickable.py
 │   ├── crypto/
 │   │   └── __init__.py
-│   ├── exceptions.py
-│   ├── first_run.py
 │   ├── gui/
 │   │   ├── __init__.py
 │   │   ├── __main__.py
 │   │   ├── application.py
 │   │   ├── folder_opener.py
+│   │   ├── onion_page_gui_factory.py
+│   │   ├── onion_page_preferences.py
 │   │   ├── tk_activity_section.py
 │   │   ├── tk_application_section.py
 │   │   ├── tk_authentication.py
@@ -140,6 +115,7 @@ GarlicSMTP/
 │   │   ├── tk_message_received_preview_section.py
 │   │   ├── tk_message_sent_list_section.py
 │   │   ├── tk_message_sent_preview_section.py
+│   │   ├── tk_onion_page_section.py
 │   │   ├── tk_services_section.py
 │   │   ├── tk_theme.py
 │   │   └── tk_tor_section.py
@@ -162,9 +138,6 @@ GarlicSMTP/
 │   │   ├── server.py
 │   │   ├── session.py
 │   │   └── store_event_adapter.py
-│   ├── install_first_run.py
-│   ├── install_runtime_config.py
-│   ├── logger.py
 │   ├── models/
 │   │   ├── __init__.py
 │   │   ├── envelope.py
@@ -173,7 +146,6 @@ GarlicSMTP/
 │   │   ├── onion.py
 │   │   └── smtp.py
 │   ├── network/
-│   │   ├── __init__.py
 │   │   ├── client/
 │   │   │   └── __init__.py
 │   │   ├── server/
@@ -188,9 +160,10 @@ GarlicSMTP/
 │   │   │   ├── exceptions.py
 │   │   │   ├── reply.py
 │   │   │   └── request.py
-│   │   └── text/
-│   │       ├── __init__.py
-│   │       └── connection.py
+│   │   ├── text/
+│   │   │   ├── __init__.py
+│   │   │   └── connection.py
+│   │   └── __init__.py
 │   ├── plugins/
 │   │   └── __init__.py
 │   ├── protocol/
@@ -209,11 +182,7 @@ GarlicSMTP/
 │   │   ├── stage.py
 │   │   ├── storage.py
 │   │   └── worker.py
-│   ├── runtime_config.py
 │   ├── security/
-│   │   ├── __init__.py
-│   │   ├── at_rest_cipher.py
-│   │   ├── at_rest_key_manager.py
 │   │   ├── auth/
 │   │   │   ├── __init__.py
 │   │   │   ├── account_credentials.py
@@ -223,31 +192,28 @@ GarlicSMTP/
 │   │   │   ├── password_hasher.py
 │   │   │   ├── persistent_imap_authenticator.py
 │   │   │   └── rejecting.py
-│   │   ├── canonicalizer.py
-│   │   ├── decryptor.py
 │   │   ├── dkim/
 │   │   │   └── __init__.py
+│   │   ├── policy/
+│   │   │   └── __init__.py
+│   │   ├── spf/
+│   │   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   ├── at_rest_cipher.py
+│   │   ├── at_rest_key_manager.py
+│   │   ├── canonicalizer.py
+│   │   ├── decryptor.py
 │   │   ├── encrypted_sqlite.py
 │   │   ├── encryption_capability.py
 │   │   ├── encryption_identity.py
 │   │   ├── encryption_key_store.py
 │   │   ├── encryptor.py
-│   │   ├── policy/
-│   │   │   └── __init__.py
 │   │   ├── signature_header.py
 │   │   ├── signer.py
 │   │   ├── signing_identity.py
-│   │   ├── spf/
-│   │   │   └── __init__.py
 │   │   ├── trust_store.py
 │   │   └── verifier.py
 │   ├── smtp/
-│   │   ├── __init__.py
-│   │   ├── connection.py
-│   │   ├── datareceiver.py
-│   │   ├── dispatcher.py
-│   │   ├── engine.py
-│   │   ├── fsm.py
 │   │   ├── handlers/
 │   │   │   ├── __init__.py
 │   │   │   ├── base.py
@@ -256,6 +222,12 @@ GarlicSMTP/
 │   │   │   ├── mail.py
 │   │   │   ├── rcpt.py
 │   │   │   └── register.py
+│   │   ├── __init__.py
+│   │   ├── connection.py
+│   │   ├── datareceiver.py
+│   │   ├── dispatcher.py
+│   │   ├── engine.py
+│   │   ├── fsm.py
 │   │   ├── headerparser.py
 │   │   ├── mime.py
 │   │   ├── parser.py
@@ -266,6 +238,14 @@ GarlicSMTP/
 │   │   ├── session.py
 │   │   └── state.py
 │   ├── storage/
+│   │   ├── filesystem/
+│   │   │   └── __init__.py
+│   │   ├── memory/
+│   │   │   ├── __init__.py
+│   │   │   └── backend.py
+│   │   ├── sqlite/
+│   │   │   ├── __init__.py
+│   │   │   └── backend.py
 │   │   ├── __init__.py
 │   │   ├── attachment_store.py
 │   │   ├── backend.py
@@ -274,20 +254,11 @@ GarlicSMTP/
 │   │   ├── entry.py
 │   │   ├── entry_serializer.py
 │   │   ├── event_sink.py
-│   │   ├── filesystem/
-│   │   │   └── __init__.py
 │   │   ├── mailbox.py
-│   │   ├── memory/
-│   │   │   ├── __init__.py
-│   │   │   └── backend.py
 │   │   ├── null_event_sink.py
 │   │   ├── serializer.py
-│   │   ├── sqlite/
-│   │   │   ├── __init__.py
-│   │   │   └── backend.py
 │   │   └── store.py
 │   ├── tor/
-│   │   ├── __init__.py
 │   │   ├── control/
 │   │   │   ├── __init__.py
 │   │   │   ├── auth_challenge.py
@@ -300,23 +271,20 @@ GarlicSMTP/
 │   │   │   ├── protocol_info.py
 │   │   │   ├── reply.py
 │   │   │   └── safecookie.py
+│   │   ├── __init__.py
 │   │   ├── onion_service_factory.py
 │   │   └── onion_service_manager.py
 │   ├── transport/
-│   │   ├── __init__.py
-│   │   ├── base.py
 │   │   ├── dns/
 │   │   │   ├── __init__.py
 │   │   │   ├── exceptions.py
 │   │   │   ├── records.py
 │   │   │   └── resolver.py
-│   │   ├── dummy.py
 │   │   ├── lmtp/
 │   │   │   └── __init__.py
 │   │   ├── local/
 │   │   │   ├── __init__.py
 │   │   │   └── transport.py
-│   │   ├── manager.py
 │   │   ├── onion/
 │   │   │   ├── __init__.py
 │   │   │   ├── dummy.py
@@ -332,10 +300,22 @@ GarlicSMTP/
 │   │   │   └── transport.py
 │   │   ├── socks5/
 │   │   │   └── __init__.py
-│   │   └── tls/
-│   │       └── __init__.py
+│   │   ├── tls/
+│   │   │   └── __init__.py
+│   │   ├── __init__.py
+│   │   ├── base.py
+│   │   ├── dummy.py
+│   │   └── manager.py
 │   ├── utils/
 │   │   └── __init__.py
+│   ├── __init__.py
+│   ├── config.py
+│   ├── exceptions.py
+│   ├── first_run.py
+│   ├── install_first_run.py
+│   ├── install_runtime_config.py
+│   ├── logger.py
+│   ├── runtime_config.py
 │   └── version.py
 ├── install/
 │   ├── assets/
@@ -353,17 +333,12 @@ GarlicSMTP/
 │   ├── tor_runtime.py
 │   ├── uninstaller.py
 │   └── validator.py
-├── install.sh
-├── mypy.ini
-├── pyproject.toml
-├── pytest.ini
-├── requirements.txt
 ├── tests/
-│   ├── __init__.py
-│   ├── conftest.py
 │   ├── support/
 │   │   ├── __init__.py
 │   │   └── application.py
+│   ├── __init__.py
+│   ├── conftest.py
 │   ├── test_account_credentials.py
 │   ├── test_application_activity.py
 │   ├── test_application_builder.py
@@ -483,6 +458,10 @@ GarlicSMTP/
 │   ├── test_mime_decoder.py
 │   ├── test_onion_address.py
 │   ├── test_onion_end_to_end_local.py
+│   ├── test_onion_page_configuration_writer.py
+│   ├── test_onion_page_gui_factory.py
+│   ├── test_onion_page_preferences.py
+│   ├── test_onion_presence_http_service.py
 │   ├── test_onion_service_manager.py
 │   ├── test_onion_transport.py
 │   ├── test_onion_validator.py
@@ -527,6 +506,8 @@ GarlicSMTP/
 │   ├── test_tcp_server.py
 │   ├── test_text_connection.py
 │   ├── test_tickable.py
+│   ├── test_tk_onion_page_integration.py
+│   ├── test_tk_onion_page_section.py
 │   ├── test_tor_control_auth_challenge.py
 │   ├── test_tor_control_authenticator.py
 │   ├── test_tor_control_client.py
@@ -546,14 +527,27 @@ GarlicSMTP/
 │   ├── test_transport_smtp_protocol.py
 │   ├── test_transport_smtp_transport.py
 │   └── test_trust_store.py
-└── tools/
-    ├── __init__.py
-    ├── check_onion_smtp.py
-    ├── inspect_receiver_queue.py
-    ├── run_onion_receiver.py
-    ├── send_onion_mail.py
-    └── verify_tor_delivery.py
-
-BASELINE DOCUMENTALE: v0.1.0-alpha.1 — commit 9bfc2f7 (main/origin/main, push riferito).
-Il tag Git e la release non sono attestati come creati.
-Gli elementi del tree sono tratti dalla bozza caricata; verificare prima di usarlo come inventario release.
+├── tools/
+│   ├── __init__.py
+│   ├── check_onion_smtp.py
+│   ├── inspect_receiver_queue.py
+│   ├── run_onion_receiver.py
+│   ├── send_onion_mail.py
+│   └── verify_tor_delivery.py
+├── .gitignore
+├── CHANGELOG.md
+├── check_onion_smtp.py
+├── CLA.md
+├── COMMERCIAL-LICENSE.md
+├── CONTRIBUTING.md
+├── garlicsmtp-architecture-snapshot.zip
+├── install.sh
+├── LICENSE
+├── mypy.ini
+├── NOTICE
+├── pyproject.toml
+├── pytest.ini
+├── README.md
+├── requirements.txt
+├── SECURITY.md
+└── THIRD_PARTY_LICENSES.md

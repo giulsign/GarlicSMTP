@@ -1,8 +1,8 @@
 GARLICSMTP — HANDBOOK
 User manual and guide to current limitations
-Document edition: 19/10/2026 — version v0.1.0-alpha.1 — baseline commit 9bfc2f7
+Document edition: 25/10/2026 — candidate v0.1.1-alpha (package 0.1.1a0), development commit 8faf1c6
 
-This manual updates the 08/10 baseline with checkpoints from 13–19/10, the 1844-test suite and developer/Ubuntu VM verification. It is not a new test execution, an independent audit or evidence that a Git tag has been created.
+This manual consolidates the 08/10 baseline, the historical 13–19/10 checkpoints and the later 0.1.1a0 development status. The 1974 passing tests are reported from development, not rerun for this handbook. It is not a new test execution, an independent audit or evidence that a Git tag has been created.
 
 ===============================================================================
 1. WHAT IS GARLICSMTP?
@@ -89,10 +89,10 @@ The GUI must remain hidden until authentication; closing the GUI must stop recei
 6. INSTALLATION AND FIRST START
 ===============================================================================
 
-The documented and validated route is Ubuntu 24.04. For copyable commands, use `quicklaunch.md`.
+The documented and validated route is Ubuntu 24.04. For copyable commands, use `quicklaunch-en.md`.
 
 Summary:
-1) Official repository: https://github.com/giulsign/GarlicSMTP.git; the baseline is commit 9bfc2f7, to be formalized as tag v0.1.0-alpha.1 before distribution as an immutable release.
+1) Official repository: https://github.com/giulsign/GarlicSMTP.git; the development checkpoint is commit 8faf1c6; v0.1.1-alpha is not a confirmed published tag or release.
 2) Clone the project onto the Ubuntu computer.
 3) From the repository directory run `./install.sh` as a normal user, without prepending sudo.
 4) Wait for completion; the installer handles prerequisites and creates the isolated venv.
@@ -112,7 +112,7 @@ GUI account password:
 - The documented policy requires at least eight characters, one uppercase letter, one digit and one special character.
 - The GUI account is not automatically the Onion identity or the Ed25519/X25519 keys.
 
-Local data protection in baseline v0.1.0-alpha.1:
+Local data protection in the v0.1.1-alpha candidate:
 - `data/mailboxes.db` (Received), `data/sent.db` (Sent) and `state/queue.db` (Queue) use SQLCipher with a mandatory 32-byte DEK. On developer and Ubuntu VM, none of the three database headers matched plaintext SQLite; this observation must be considered together with the tests, not alone.
 - `data/attachments/` stores GSAT v1 blobs: ChaCha20-Poly1305 with a subkey derived from the DEK via HKDF-SHA256; file contents and metadata are encrypted and authenticated. An attachment exported by the user becomes a readable file at the chosen destination.
 - The DEK is independent of the password. Password and recovery key protect the same DEK through wrapping; resetting the password must not regenerate the DEK, Onion identity or message keys.
@@ -155,7 +155,7 @@ IMPLEMENTED AND VALIDATED WITHIN THE DOCUMENTED BOUNDARIES:
 - SQLCipher for Received, Sent and Queue; GSAT v1 for application attachments.
 - Login and offline recovery with persistent DEK, recovery confirmation and fail-closed GUI behavior.
 - Real bidirectional developer ↔ Ubuntu VM sending/receiving, including attachments.
-- Complete developer suite: 1844 tests passed.
+- Latest reported full developer suite: 1974 tests passed (not rerun for this document).
 
 LIMITATIONS AND UNFINISHED ACTIVITIES:
 - Only Ubuntu 24.04 was validated as a Linux desktop environment; native Windows/macOS not established.
@@ -163,7 +163,19 @@ LIMITATIONS AND UNFINISHED ACTIVITIES:
 - No plaintext legacy archive migration, certified backup/restore procedure or independent audit.
 - No general assurance for private keys, backups, temporary remnants or exported files.
 - A message in Sent does not prove remote delivery; Retry pending is not a receipt.
-- v0.1.0-alpha.1 is the agreed documentation baseline; Git tag/release not yet confirmed.
+- v0.1.1-alpha is a candidate; Git tag/release, clean installation and upgrade validation of this build remain unconfirmed.
+
+===============================================================================
+10A. OPTIONAL CUSTOM ONION HTML PRESENCE PAGE
+===============================================================================
+
+The development checkpoint adds an optional Onion HTML presence page, configured
+in GUI preferences. When enabled, select a valid nonempty HTML file path;
+validation rejects an empty path. Restart the relevant services after changing
+the preference. The page does not replace SMTP/IMAP or the Onion mail identity.
+Review custom HTML before publishing: do not embed private keys, credentials,
+identifying data or external resources that could compromise privacy. No
+independent security review of arbitrary custom HTML is claimed.
 
 ===============================================================================
 11. SHORT GLOSSARY
@@ -192,6 +204,6 @@ Main sources: 31/07 recap; architecture/methodology/summary dated 03/09 and 06/0
 
 This manual should be updated after every behavior change confirmed by tests and, where relevant, a real Ubuntu 24.04 verification. Future features must not be presented as already available.
 
-Checkpoints after 08/10: 13/10 (1797 tests and recovery/SQLCipher), 18/10 (1830 tests and manual developer recovery), 19/10 (1844 tests, GUI send fix, commit 9bfc2f7, developer/VM E2E and read-only database/attachment checks). These counts are distinct checkpoints, not simultaneous results.
+Latest checkpoint: 8faf1c6, 1974 tests passed; optional Onion HTML presence page and GUI preference validation. Historical checkpoints after 08/10: 13/10 (1797 tests and recovery/SQLCipher), 18/10 (1830 tests and manual developer recovery), 19/10 (1844 tests, GUI send fix, commit 9bfc2f7, developer/VM E2E and read-only database/attachment checks). These counts are distinct checkpoints, not simultaneous results.
 
-END OF HANDBOOK — v0.1.0-alpha.1
+END OF HANDBOOK — v0.1.1-alpha candidate

@@ -1,173 +1,105 @@
 # GarlicSMTP Security Policy
 
-GarlicSMTP is security-sensitive software designed to transport
-email through Tor Onion Services.
+## Purpose and project status
 
-Security and privacy reports are taken seriously.
+GarlicSMTP is security-sensitive software designed to transport email through Tor Onion Services. Security and privacy reports are welcome.
 
-## Project Status
+This policy is being reviewed for the **0.1.1a0 development version**, intended for a future **v0.1.1-alpha** release. At the time of this review, the v0.1.1-alpha Git tag and public release have **not** been confirmed. The previously documented v0.1.0-alpha.1 baseline (source commit `9bfc2f7`) is historical, not evidence that v0.1.1-alpha has been released. The latest development changes discussed during this review are associated with commit `8faf1c6`; that commit is not presented here as a certified security baseline.
 
-GarlicSMTP `v0.1.0-alpha.1` is the designated first official Alpha
-baseline, associated with validated source commit `9bfc2f7`.
-The Git tag and public release have not yet been confirmed.
+GarlicSMTP has not undergone an independent professional security audit. Its design and test results do not guarantee anonymity, confidentiality, integrity, or resistance to endpoint compromise. Evaluate the deployment environment and threat model before using it for sensitive communications.
 
-It has not undergone an independent professional security audit and
-must not be considered a guarantee of anonymity, confidentiality,
-integrity, or resistance to endpoint compromise.
+## Security properties and their limits
 
-Users should evaluate the risks of their environment and threat
-model before relying on GarlicSMTP for sensitive communications.
+The previously validated Alpha implementation uses a password-unlocked 32-byte data-encryption key (DEK) and SQLCipher for the Received, Sent, and Queue databases. Local attachment content and metadata are stored in authenticated GSAT v1 files. GUI and mailbox CLI flows unlock the DEK before database access; SMTP reception uses an application builder equipped with the DEK.
 
-## Security properties and boundaries of the Alpha
+Historical read-only checks on a development machine and Ubuntu VM found no plaintext SQLite headers in the checked databases and identified the GSAT v1 format in checked attachment files. These checks were limited observations: they were **not** a comprehensive cryptographic audit, forensic assessment, or verification of every file, temporary artifact, backup, private key, or deployment configuration. They must not be interpreted as proof that all data at rest is encrypted.
 
-The validated baseline uses a password-unlocked 32-byte DEK and SQLCipher
-for Received, Sent and Queue databases. Local attachment content and
-metadata are protected in authenticated GSAT v1 files. GUI and mailbox
-CLI paths unlock the DEK before database access; SMTP reception uses
-the DEK-equipped application builder. Read-only checks on developer and
-Ubuntu VM found no plaintext SQLite headers and confirmed GSAT v1 file
-format. These observations are not a comprehensive cryptographic audit,
-forensic examination or guarantee of protection for all local files,
-backups, temporary files or private keys.
+The earlier policy recorded a CLI `start` bootstrap limitation: it failed closed when no DEK was available. Whether this limitation still applies to the candidate release must be rechecked against current code and tests before publication. No migration of existing plaintext data has been certified by this policy.
 
-The CLI `start` bootstrap currently fails closed without a DEK; this is
-a known functional limitation and not a confirmed confidentiality flaw.
-No migration of existing plaintext data is certified. Protect recovery
-material, private keys, local backups and the host operating system.
+The installed development environment was observed to load `sqlcipher3` 0.6.3 with SQLCipher `4.12.0 community` and SQLite `3.51.1`. This establishes the versions observed in that environment; it does not independently verify all packaged binaries, build flags, or cryptographic properties. See `THIRD_PARTY_LICENSES.md` for dependency and licensing information.
 
-## Reporting a Vulnerability
+Protect recovery material, passwords, private keys, local backups, and the host operating system. Security depends on their handling as well as on application code.
 
-Please do not publicly disclose a suspected security vulnerability
-before the maintainer has had a reasonable opportunity to
-investigate it.
+## Reporting a vulnerability
 
-Security reports may be sent privately to:
+Please report suspected vulnerabilities **privately** to:
 
-giulisign@gmail.com
+**giulisign@gmail.com**
 
-Please include, where possible:
+Avoid public disclosure until the maintainer has had a reasonable opportunity to investigate and coordinate an appropriate response. This is a request for coordinated disclosure, not a promise of a fixed embargo or response deadline.
 
-- the affected GarlicSMTP version or commit;
-- the affected component;
-- a description of the vulnerability;
-- steps required to reproduce it;
-- the potential security or privacy impact;
-- relevant logs or diagnostic information, after removing secrets
-  and personally identifying information;
-- any proposed mitigation or patch.
+Where possible, include:
 
-Do not include private Onion Service keys, authentication cookies,
-passwords, private cryptographic keys, or other credentials in a
-security report.
+- the affected GarlicSMTP version or commit and operating environment;
+- the affected component and a clear description of the issue;
+- minimal, reproducible steps or a safe proof of concept;
+- the expected and observed behavior and potential security or privacy impact;
+- relevant diagnostic details with secrets and personal information removed;
+- a proposed mitigation or patch, if available.
 
-## Scope
+**Do not send** Onion Service private keys, Tor authentication cookies, passwords, recovery secrets, private cryptographic keys, mailbox contents, or other credentials. If evidence contains sensitive material, describe it without attaching it and request a safe handling procedure first. Email itself should not be assumed to provide end-to-end confidentiality.
 
-Examples of issues considered security-relevant include:
+## Issues in scope
 
-- disclosure of a user's network address;
-- bypass of intended Tor routing;
-- unintended clearnet connections;
-- Onion Service identity disclosure;
-- authentication or authorization bypass;
-- remote code execution;
-- command or protocol injection;
-- unsafe message parsing;
-- unauthorized mailbox access;
-- disclosure of message contents or metadata;
-- insecure storage of cryptographic material;
-- signature or encryption verification failures;
-- vulnerabilities that materially weaken GarlicSMTP's intended
-  privacy or anonymity properties.
+Examples of security-relevant reports include:
 
-## Third-Party Vulnerabilities
+- disclosure of a user's network address or Onion Service identity;
+- bypass of intended Tor routing or unexpected clearnet connections;
+- authentication or authorization bypass and unauthorized mailbox access;
+- remote code execution, command injection, protocol injection, or unsafe message parsing;
+- exposure of message content, attachments, metadata, or cryptographic material;
+- failures in encryption, authentication, signature verification, or key handling;
+- unsafe logs, temporary files, backups, or application configuration that materially expose sensitive information;
+- vulnerabilities that materially weaken intended privacy or anonymity protections.
 
-GarlicSMTP depends on third-party software, including Tor, Python,
-and other libraries.
+Functional bugs without a plausible security impact may be handled through the ordinary issue-reporting process. If unsure, report privately.
 
-A vulnerability originating entirely in a third-party component
-should normally also be reported to that component's upstream
-security team.
+## Third-party vulnerabilities
 
-Reports are still welcome when a third-party vulnerability is
-exposed or made materially worse by the way GarlicSMTP integrates
-that component.
+GarlicSMTP relies on third-party components, including Python packages, SQLCipher, and the external Tor daemon. Vulnerabilities originating in those components should generally also be reported through the relevant upstream security channels. Reports are welcome when GarlicSMTP's integration exposes or amplifies the impact of such an issue.
 
-## Tor and Anonymity
+A package installed in a developer's virtual environment is not necessarily a dependency shipped with GarlicSMTP. The runtime manifest and the actual release artifacts, rather than `pip freeze` alone, determine the distribution's contents.
 
-GarlicSMTP's use of Tor Onion Services can reduce exposure of the
-network locations of communicating endpoints.
+## Tor and anonymity boundaries
 
-This does not provide absolute anonymity.
+Tor Onion Services can reduce exposure of communicating endpoints' network locations, but **do not provide absolute anonymity**. Threats include endpoint or operating-system compromise, malicious dependencies, traffic analysis or correlation, application-level metadata, persistent Onion Service identities, unsafe logging, configuration mistakes, cryptographic errors, and disclosure of stored messages or keys.
 
-Security can still be affected by, among other things:
+Tor does not protect information compromised at an endpoint before entering or after leaving the Tor-protected communication path. Do not assume that application content, identity information, or local data are safe solely because Tor is in use.
 
-- endpoint compromise;
-- operating-system compromise;
-- malicious dependencies;
-- traffic analysis and correlation;
-- application-level metadata;
-- persistent pseudonymous Onion Service identities;
-- unsafe logging;
-- user configuration;
-- cryptographic implementation errors;
-- disclosure of locally stored messages or keys.
+## Sensitive information and operational precautions
 
-Tor cannot protect information that is compromised at an endpoint
-before entering or after leaving the Tor-protected communication
-path.
+An installation may contain Onion Service identity keys, Tor authentication material, recovery material, mailbox databases, queued messages, attachments, sender and recipient identifiers, metadata, and configuration. Do not commit these materials to source control, attach them to public issues, or share them in unredacted logs.
 
-## Security-Sensitive Data
+Restrict filesystem permissions, protect the host and backups, review logging and exported files, and use a controlled environment for security testing. These are operational precautions, not evidence of a completed security assessment.
 
-GarlicSMTP installations may contain sensitive material including:
+## Supported versions and security maintenance
 
-- Onion Service private identity keys;
-- Tor authentication material;
-- queued messages;
-- stored mailbox messages;
-- sender and recipient identifiers;
-- message metadata;
-- application configuration.
+The **v0.1.1-alpha candidate is not yet a confirmed public release**. This policy does not designate it as a supported security-maintenance branch. The earlier `v0.1.0-alpha.1` baseline is historical; no guaranteed support period has been established for it. Older commits, prereleases, and development snapshots should not be assumed to receive security fixes.
 
-Such material should not be committed to source control or included
-in public bug reports.
+When a public release is made, this section should be updated to identify the actual released tag, relevant source commit, and any support commitment. Until then, do not infer a security-support guarantee from a version string or passing tests.
 
-## Supported Versions
+## Coordinated disclosure and security research
 
-The designated current Alpha baseline is `v0.1.0-alpha.1` (`9bfc2f7`).
-Security maintenance for that version has not been assigned a guaranteed
-support period. Subsequent fixes may require a new prerelease version;
-older snapshots should not be assumed supported.
+The maintainer intends to make a reasonable effort to acknowledge credible reports, investigate their impact, coordinate fixes when appropriate, protect reporter information where feasible, and communicate security-relevant findings when doing so helps users. **No specific acknowledgment, remediation, or publication deadline is guaranteed.**
 
-Older commits and development snapshots may contain known or
-unknown vulnerabilities.
+Good-faith research is welcome when lawful and performed without intentionally harming other people, systems, or networks. Test preferably against systems and Onion Services you control; avoid accessing third-party data or disrupting services.
 
-## Responsible Disclosure
+## Release security review: outstanding checks
 
-The maintainer will make a reasonable effort to:
+Before publishing v0.1.1-alpha, verify against the current code and final release artifacts:
 
-1. acknowledge credible vulnerability reports;
-2. investigate their impact;
-3. develop or coordinate a correction where appropriate;
-4. avoid unnecessary disclosure of reporter information;
-5. publish security information when doing so is appropriate for
-   protecting users.
+- the actual version, Git tag, source commit, and security-support wording;
+- whether the documented CLI `start` limitation remains present;
+- the current DEK unlock paths, database encryption behavior, and GSAT v1 handling;
+- the handling of Onion HTML page paths and other externally influenced configuration;
+- logging, temporary files, backups, key permissions, and error paths;
+- the precise packaged runtime dependencies and bundled native components;
+- the final test results and any security-relevant known limitations.
 
-No specific response or remediation time is guaranteed.
+These are **open review items**, not claims of failed tests or discovered vulnerabilities. The previously reported 1,974 passing tests are a functional test result, not a substitute for a security audit.
 
-## Security Research
+## No security warranty
 
-Good-faith security research intended to improve GarlicSMTP is
-welcome when performed lawfully and without intentionally harming
-other users, systems, or networks.
+GarlicSMTP is provided subject to the warranty and liability terms of its applicable license, PolyForm Noncommercial License 1.0.0, for the original project code. Third-party components retain their own license terms.
 
-Testing should preferably be performed against systems and Onion
-Services controlled by the researcher.
-
-## No Security Warranty
-
-GarlicSMTP is provided under the warranty and liability provisions
-of its applicable license.
-
-Nothing in this security policy constitutes a warranty, guarantee,
-or representation that GarlicSMTP is secure, anonymous, or suitable
-for any particular threat model.
+Nothing in this policy guarantees that GarlicSMTP is secure, anonymous, or suitable for any particular threat model.

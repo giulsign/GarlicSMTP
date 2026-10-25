@@ -37,7 +37,7 @@ def test_install_manifest_rejects_project_metadata_duplication():
 
     manifest = load_install_manifest()
     manifest["project"] = {
-        "version": "0.1.0a1",
+        "version": "0.1.1a0",
         "requires-python": ">=3.12",
         "dependencies": ["dnspython>=2.8,<3"],
     }
@@ -65,7 +65,7 @@ def test_project_metadata_is_loaded_from_pyproject():
     metadata = load_project_metadata(PROJECT_ROOT / "pyproject.toml")
 
     assert metadata == {
-        "version": "0.1.0a1",
+        "version": "0.1.1a0",
         "requires-python": ">=3.12",
         "dependencies": [
             "dnspython>=2.8,<3",

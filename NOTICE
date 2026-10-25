@@ -1,58 +1,43 @@
-GarlicSMTP
-===========
+# GarlicSMTP — Legal Notices
 
 Copyright © 2026 Giuliano Signorelli
 GarlicSMTP Project
 
-GarlicSMTP is source-available software licensed under the
-PolyForm Noncommercial License 1.0.0.
+## Project license
 
-The authoritative license terms are contained in the LICENSE
-file distributed with this software.
+GarlicSMTP is source-available software. The original GarlicSMTP software is made available under the **PolyForm Noncommercial License 1.0.0**, subject to its terms and conditions.
 
-NONCOMMERCIAL USE
------------------
+The authoritative license text is provided in the `LICENSE` file distributed with GarlicSMTP. This notice is informational and does not replace, amend, or expand that license.
 
-GarlicSMTP may be used, studied, modified, and distributed only
-as permitted by the PolyForm Noncommercial License 1.0.0.
+## Noncommercial and other uses
 
-COMMERCIAL USE
---------------
+You may use, study, modify, and distribute the original GarlicSMTP software only to the extent permitted by the applicable license. Whether a particular activity is permitted must be determined from the actual PolyForm Noncommercial License 1.0.0 terms, not from this summary.
 
-The PolyForm Noncommercial License 1.0.0 does not grant a general
-license for commercial use of GarlicSMTP.
+Activities outside the permissions of that license require a separate authorization from the relevant rights holder. Separate commercial licensing may be available by written agreement; this notice itself grants no additional rights.
 
-Commercial use requires a separate license granted by:
-
+**Copyright holder and commercial licensing contact:**
 Giuliano Signorelli
-
-Commercial licensing contact:
+GarlicSMTP Project
 giulisign@gmail.com
 
-Commercial licensing requests may also be submitted through the
-official GarlicSMTP repository.
+Licensing inquiries may also be made through the official GarlicSMTP repository.
 
-THIRD-PARTY SOFTWARE
---------------------
+## Third-party software
 
-GarlicSMTP uses third-party software and libraries.
+GarlicSMTP uses or may be distributed alongside third-party components. Such components remain subject to their own applicable licenses, copyright notices, attribution requirements, and other conditions. The PolyForm Noncommercial License 1.0.0 does not replace or relicense third-party software.
 
-Those components remain subject to their respective copyright
-notices and license terms. The GarlicSMTP license does not replace,
-modify, restrict, or relicense the licenses applicable to third-party
-software.
+A separate commercial license for original GarlicSMTP code does not, by itself, grant rights to third-party components or waive their license obligations.
 
-See THIRD_PARTY_LICENSES.md for additional information.
+See `THIRD_PARTY_LICENSES.md` and any license or notice files accompanying the particular distribution. That document is an inventory and attribution aid, not a substitute for the authoritative third-party licenses.
 
-TRADEMARKS AND PROJECT NAME
----------------------------
+## Project name and trademarks
 
-The copyright license for GarlicSMTP does not itself grant rights
-to trademarks, service marks, logos, or branding associated with
-GarlicSMTP, except where applicable law provides otherwise.
+No trademark, service mark, logo, or branding rights are granted by this notice or by a copyright license for GarlicSMTP, except as expressly agreed in writing or provided by applicable law.
 
-NO WARRANTY
------------
+## Warranty and liability
 
-GarlicSMTP is provided subject to the warranty and liability terms
-contained in the applicable license.
+GarlicSMTP is provided subject to the warranty disclaimers and liability limitations of its applicable license. This notice creates no additional warranty, security guarantee, or undertaking.
+
+## Release context
+
+This notice is prepared for the GarlicSMTP `0.1.1a0` / planned `v0.1.1-alpha` documentation review. It does not state that the corresponding Git tag, release artifacts, or GitHub release have been published. The legal terms remain those of the applicable license, independently of the software version.

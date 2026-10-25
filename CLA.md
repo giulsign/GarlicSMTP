@@ -110,3 +110,19 @@ GarlicSMTP Project
 Licensing contact:
 
 giulisign@gmail.com
+
+---
+
+## Document status and project release context
+
+This Agreement remains **Version 1.0 (2026)**. Its terms are not changed
+merely because GarlicSMTP is preparing package version `0.1.1a0`
+(the proposed `v0.1.1-alpha` release). This document does not announce
+a Git tag or published release.
+
+The confirmation statement in Section 9 must be reproduced exactly as
+written when submitting a contribution, consistent with `CONTRIBUTING.md`.
+This Agreement applies to contributions, not to independently licensed
+third-party components; see `THIRD_PARTY_LICENSES.md`.
+
+This document is not a substitute for legal advice.
