@@ -1,9 +1,5 @@
 GARLICSMTP — PROJECT TREE
-Release: v0.1.1-alpha
-Python package version: 0.1.1a0
-Inventory generated from the local release candidate.
-Only files directly under docs/ and files in docs/personalized_html/ are published.
-Historical snapshots and local backups are excluded.
+Release candidate: v0.1.2-alpha
 
 GarlicSMTP/
 ├── bin/
@@ -19,6 +15,7 @@ GarlicSMTP/
 │   ├── CONTRIBUTING.md
 │   ├── GarlicSMTP-development-book-12.md
 │   ├── GarlicSMTP-Handbook.txt
+│   ├── GarlicSMTP_Static_Audit_Report_2026-10-27.md
 │   ├── installation-architecture.md
 │   ├── project-tree.txt
 │   ├── quicklaunch.md
@@ -95,6 +92,7 @@ GarlicSMTP/
 │   ├── crypto/
 │   │   └── __init__.py
 │   ├── gui/
+│   │   ├── sections/
 │   │   ├── __init__.py
 │   │   ├── __main__.py
 │   │   ├── application.py
@@ -247,6 +245,7 @@ GarlicSMTP/
 │   │   │   ├── __init__.py
 │   │   │   └── backend.py
 │   │   ├── __init__.py
+│   │   ├── attachment_store - Copia.py.backup
 │   │   ├── attachment_store.py
 │   │   ├── backend.py
 │   │   ├── composite_event_sink.py
@@ -534,13 +533,11 @@ GarlicSMTP/
 │   ├── run_onion_receiver.py
 │   ├── send_onion_mail.py
 │   └── verify_tor_delivery.py
-├── .gitignore
 ├── CHANGELOG.md
 ├── check_onion_smtp.py
 ├── CLA.md
 ├── COMMERCIAL-LICENSE.md
 ├── CONTRIBUTING.md
-├── garlicsmtp-architecture-snapshot.zip
 ├── install.sh
 ├── LICENSE
 ├── mypy.ini

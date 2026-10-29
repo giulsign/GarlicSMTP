@@ -49,8 +49,9 @@ class SMTPServer(Service, Tickable):
             encryption_private_key
         )
         self._connection_threads = set()
+        self._active_clients = set()
         self._threads_lock = threading.Lock()
-        
+
 
     def start(self) -> None:
         self.server.start()
@@ -63,13 +64,29 @@ class SMTPServer(Service, Tickable):
         self.running = True
 
     def stop(self) -> None:
-        self.running = False
+        with self._threads_lock:
+            self.running = False
+
         self.server.stop()
 
         with self._threads_lock:
+            clients = list(
+                self._active_clients
+            )
             threads = list(
                 self._connection_threads
             )
+
+        for client in clients:
+            try:
+                client.shutdown(2)
+            except (OSError, AttributeError):
+                pass
+
+            try:
+                client.close()
+            except Exception:
+                pass
 
         for thread in threads:
             thread.join(
@@ -128,12 +145,40 @@ class SMTPServer(Service, Tickable):
             name="smtp-connection",
         )
 
-        with self._threads_lock:
-            self._connection_threads.add(
-                thread
-            )
+        start_error = None
 
-        thread.start()
+        with self._threads_lock:
+            if not self.running:
+                should_start = False
+            else:
+                should_start = True
+
+                self._connection_threads.add(
+                    thread
+                )
+                self._active_clients.add(
+                    client
+                )
+
+                try:
+                    thread.start()
+                except Exception as exc:
+                    self._connection_threads.discard(
+                        thread
+                    )
+                    self._active_clients.discard(
+                        client
+                    )
+                    start_error = exc
+
+        if not should_start or start_error is not None:
+            try:
+                client.close()
+            except Exception:
+                pass
+
+        if start_error is not None:
+            raise start_error
 
     def _serve_connection(
         self,
@@ -163,6 +208,9 @@ class SMTPServer(Service, Tickable):
             with self._threads_lock:
                 self._connection_threads.discard(
                     current
+                )
+                self._active_clients.discard(
+                    client
                 )
 
     @property

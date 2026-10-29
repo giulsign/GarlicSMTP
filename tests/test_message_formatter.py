@@ -93,7 +93,7 @@ def test_message_formatter_formats_multiple_flags():
     ) == "● ⚑ ✎ ⌫"
 
 
-def test_message_formatter_formats_today():
+def test_message_formatter_formats_today_with_fixed_timestamp():
     formatter = MessageFormatter(
         now_provider=fixed_now
     )

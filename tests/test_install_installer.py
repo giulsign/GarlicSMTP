@@ -11,7 +11,7 @@ from install.prerequisites import (
         command_exists_on_path,
         probe_python_version,
         probe_python_venv_available,
-        shared_library_exists, 
+        shared_library_exists,
         probe_python_module_available,
     )
 from install.installer import (
@@ -383,6 +383,14 @@ def test_execute_installation_requires_password_for_first_run(
         home=tmp_path,
     )
 
+    calls = []
+
+    def system_installation(*args, **kwargs):
+        calls.append("system")
+
+    def environment_run(command, **kwargs):
+        calls.append("environment")
+
     with pytest.raises(
         ValueError,
         match="IMAP password is required for first-run",
@@ -398,9 +406,12 @@ def test_execute_installation_requires_password_for_first_run(
             python_venv_available=lambda executable: True,
             python_module_available=lambda executable, module: True,
             system_run=lambda command, **kwargs: None,
-            environment_run=lambda command, **kwargs: None,
+            environment_run=environment_run,
+            system_installation=system_installation,
             application_paths=paths,
         )
+
+    assert calls == []
 
 
 def test_execute_installation_passes_tor_provisioning_inputs_to_system(
@@ -911,7 +922,7 @@ def test_execute_installation_runs_runtime_config_in_refreshed_user_process(
         {
             "check": True,
         },
-    ) 
+    )
 
 
 def test_execute_installation_does_not_run_first_run_when_runtime_config_fails(

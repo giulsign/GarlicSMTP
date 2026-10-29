@@ -25,32 +25,35 @@ class SMTPTransport(Transport):
         mx = mx_records[0]
 
         connection = self.connection_factory()
-        connection.connect(mx.exchange, 25)
 
-        protocol = SMTPClientProtocol(connection)
+        try:
+            connection.connect(mx.exchange, 25)
 
-        greeting = protocol.read_reply()
+            protocol = SMTPClientProtocol(connection)
 
-        if greeting.code != 220:
-            raise SMTPClientError(
-                f"SMTP greeting failed ({greeting.code})"
+            greeting = protocol.read_reply()
+
+            if greeting.code != 220:
+                raise SMTPClientError(
+                    f"SMTP greeting failed ({greeting.code})"
+                )
+
+            protocol.ehlo("[127.0.0.1]")
+
+            protocol.mail_from(
+                item.message.envelope.sender
             )
 
-        protocol.ehlo("[127.0.0.1]")
+            for recipient in item.message.envelope.recipients:
+                protocol.rcpt_to(recipient)
 
-        protocol.mail_from(
-            item.message.envelope.sender
-        )
+            protocol.data(
+                item.message.body
+            )
 
-        for recipient in item.message.envelope.recipients:
-            protocol.rcpt_to(recipient)
+            protocol.quit()
 
-        protocol.data(
-            item.message.body
-        )
+            return True
 
-        protocol.quit()
-
-        connection.close()
-
-        return True
+        finally:
+            connection.close()

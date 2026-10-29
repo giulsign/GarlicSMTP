@@ -77,3 +77,30 @@ def test_socks5_handshake_failure():
 
     with pytest.raises(Socks5HandshakeError):
         conn.handshake()
+
+
+def test_socks5_connection_closes_previous_socket_on_reconnect(
+    monkeypatch,
+):
+    first_socket = FakeSocket()
+    second_socket = FakeSocket()
+    sockets = iter([first_socket, second_socket])
+
+    monkeypatch.setattr(
+        "garlicsmtp.network.socks5.connection.socket.create_connection",
+        lambda *args, **kwargs: next(sockets),
+    )
+
+    conn = Socks5Connection()
+
+    conn.connect()
+    assert conn.socket is first_socket
+
+    conn.connect()
+
+    assert first_socket.closed is True
+    assert conn.socket is second_socket
+
+    conn.close()
+    assert second_socket.closed is True
+    assert conn.socket is None

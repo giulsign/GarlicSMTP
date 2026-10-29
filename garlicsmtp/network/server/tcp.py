@@ -14,10 +14,25 @@ class TCPServer:
         self.socket: socket.socket | None = None
 
     def start(self) -> None:
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.socket.bind((self.host, self.port))
-        self.socket.listen(self.backlog)
+        if self.socket is not None:
+            raise RuntimeError("TCP server is already started")
+
+        self.socket = socket.socket(
+            socket.AF_INET,
+            socket.SOCK_STREAM,
+        )
+
+        try:
+            self.socket.setsockopt(
+                socket.SOL_SOCKET,
+                socket.SO_REUSEADDR,
+                1,
+            )
+            self.socket.bind((self.host, self.port))
+            self.socket.listen(self.backlog)
+        except Exception:
+            self.stop()
+            raise
 
     def accept(self):
         if self.socket is None:

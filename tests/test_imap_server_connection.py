@@ -3,6 +3,9 @@
 #
 # See LICENSE for the full license terms.
 
+import threading
+import pytest
+
 from garlicsmtp.storage.store import MessageStore
 from garlicsmtp.security.auth import MemoryAuthenticator
 from garlicsmtp.imap.server import (
@@ -527,3 +530,90 @@ def test_imap_idle_receives_store_exists_notification(
     server.store_event_sink.remove(
         context.store_event_adapter
     )
+
+
+def test_imap_server_closes_socket_when_context_creation_fails(
+    monkeypatch,
+):
+    class FakeSocket:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    server = IMAPServer()
+    client_socket = FakeSocket()
+    current = threading.current_thread()
+
+    with server._threads_lock:
+        server._connection_threads.add(current)
+
+    def fail_context_creation(sock):
+        raise RuntimeError("context creation failed")
+
+    monkeypatch.setattr(
+        server,
+        "_create_connection_context",
+        fail_context_creation,
+    )
+
+    try:
+        with pytest.raises(
+            RuntimeError,
+            match="context creation failed",
+        ):
+            server._serve_connection(
+                client_socket,
+                ("127.0.0.1", 10000),
+            )
+
+        assert client_socket.closed is True
+        assert server.active_connections == 0
+
+    finally:
+        with server._threads_lock:
+            server._connection_threads.discard(current)
+
+
+def test_imap_tick_cleans_up_when_thread_start_fails(
+    monkeypatch,
+):
+    class FakeSocket:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeTCPServer:
+        def __init__(self, client_socket):
+            self.client_socket = client_socket
+
+        def accept_once(self):
+            return (
+                self.client_socket,
+                ("127.0.0.1", 10000),
+            )
+
+    client_socket = FakeSocket()
+    server = IMAPServer()
+    server.server = FakeTCPServer(client_socket)
+    server.running = True
+
+    def fail_thread_start(self):
+        raise RuntimeError("thread start failed")
+
+    monkeypatch.setattr(
+        "garlicsmtp.imap.server.threading.Thread.start",
+        fail_thread_start,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="thread start failed",
+    ):
+        server.tick()
+
+    assert client_socket.closed is True
+    assert server.active_connections == 0

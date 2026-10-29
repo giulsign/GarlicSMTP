@@ -28,8 +28,8 @@ class QueueWorker(Service, Tickable):
         self.logger = logger or Logger()
         self.running = False
         self.retry_policy = retry_policy or RetryPolicy()
-        
-    
+
+
     def process(self):
 
         item = self.queue.peek()
@@ -65,6 +65,20 @@ class QueueWorker(Service, Tickable):
             self.queue.ack(item)
             raise
 
+        except Exception as exc:
+
+            item.attempts += 1
+
+            item.last_error = type(exc).__name__
+
+            item.next_retry = self.retry_policy.next_retry(
+                item.attempts
+            )
+
+            self.queue.update(item)
+            self.queue.nack(item)
+
+            raise
 
         if delivered:
             self.queue.ack(item)
@@ -73,12 +87,12 @@ class QueueWorker(Service, Tickable):
 
         return delivered
 
-    
+
     def start(self):
         self.running = True
         self.logger.info("QueueWorker started")
 
-    
+
     def stop(self):
         self.running = False
         self.logger.info("QueueWorker stopped")

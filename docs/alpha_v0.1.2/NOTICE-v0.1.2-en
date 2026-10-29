@@ -1,0 +1,43 @@
+# GarlicSMTP — Legal Notices
+
+Copyright © 2026 Giuliano Signorelli
+GarlicSMTP Project
+
+## Project license
+
+GarlicSMTP is source-available software. The original GarlicSMTP software is made available under the **PolyForm Noncommercial License 1.0.0**, subject to its terms and conditions.
+
+The authoritative license text is provided in the `LICENSE` file distributed with GarlicSMTP. This notice is informational and does not replace, amend, or expand that license.
+
+## Noncommercial and other uses
+
+You may use, study, modify, and distribute the original GarlicSMTP software only to the extent permitted by the applicable license. Whether a particular activity is permitted must be determined from the actual PolyForm Noncommercial License 1.0.0 terms, not from this summary.
+
+Activities outside the permissions of that license require a separate authorization from the relevant rights holder. Separate commercial licensing may be available by written agreement; this notice itself grants no additional rights.
+
+**Copyright holder and commercial licensing contact:**
+Giuliano Signorelli
+GarlicSMTP Project
+giulisign@gmail.com
+
+Licensing inquiries may also be made through the official GarlicSMTP repository.
+
+## Third-party software
+
+GarlicSMTP uses or may be distributed alongside third-party components. Such components remain subject to their own applicable licenses, copyright notices, attribution requirements, and other conditions. The PolyForm Noncommercial License 1.0.0 does not replace or relicense third-party software.
+
+A separate commercial license for original GarlicSMTP code does not, by itself, grant rights to third-party components or waive their license obligations.
+
+See `THIRD_PARTY_LICENSES.md` and any license or notice files accompanying the particular distribution. That document is an inventory and attribution aid, not a substitute for the authoritative third-party licenses.
+
+## Project name and trademarks
+
+No trademark, service mark, logo, or branding rights are granted by this notice or by a copyright license for GarlicSMTP, except as expressly agreed in writing or provided by applicable law.
+
+## Warranty and liability
+
+GarlicSMTP is provided subject to the warranty disclaimers and liability limitations of its applicable license. This notice creates no additional warranty, security guarantee, or undertaking.
+
+## Release context
+
+This notice is prepared for the planned GarlicSMTP `v0.1.2-alpha` release documentation review. The project and application version declarations have been aligned to `0.1.2a0`. It does not state that the corresponding Git tag, release artifacts, or GitHub release have been published. The legal terms remain those of the applicable license, independently of the software version.

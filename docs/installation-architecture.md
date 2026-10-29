@@ -1,15 +1,15 @@
-# GarlicSMTP — Installation Architecture — 0.1.1a0
+# GarlicSMTP — Installation Architecture — v0.1.2-alpha
 
-**Document status:** release-candidate architecture; 25 October 2026. **Release target:** `v0.1.1-alpha`.
+**Document status:** consolidated release-candidate architecture; 29 October 2026. **Proposed release:** `v0.1.2-alpha` (tag and publication not yet confirmed).
 
 ## 1. Scope, source hierarchy and release state
 
-This is the **current architecture and release-readiness specification**, not evidence that an installer was executed during this documentation update. Sources: the four supplied architecture documents (historical baseline dated 6 September; updates 8, 13, 18 and 19 October 2026), and the subsequent development checkpoints provided for the `0.1.1a0` candidate. Where historical statements conflict, the newer dated implementation evidence takes precedence **only for implementation status**, not for the original requirements.
+This is the **current architecture and release-readiness specification**, not evidence that an installer was executed during this documentation update. Sources: the four supplied architecture documents (historical baseline dated 6 September; updates 8, 13, 18 and 19 October 2026), and subsequent development checkpoints, the completed internal audit, the current installation manifest, and targeted read-only repository searches for the `v0.1.2-alpha` candidate. Where historical statements conflict, the newer dated implementation evidence takes precedence **only for implementation status**, not for the original requirements.
 
-- **Candidate:** Python package version `0.1.1a0`; proposed Git tag `v0.1.1-alpha` (not confirmed as created or released).
-- **Development baseline:** commit `8faf1c6` reported pushed on `main`; complete development suite **1,974 passed**. This is not a newly executed test run for this document.
-- **Historical checkpoint:** commit `9bfc2f7`, 1,844 passed and developer ↔ Ubuntu VM SMTP/attachment exchange. Those checks are not a fresh installer qualification for `0.1.1a0`.
-- **Target platform:** Ubuntu 24.04 Desktop / GNOME for the installation manifest; Ubuntu 22.04 GUI VM observations are not a substitute for Ubuntu 24.04 clean-install validation. Windows WSL is a development environment, not a native Windows release target.
+- **Candidate:** proposed Git tag `v0.1.2-alpha` (not confirmed as created or released). `pyproject.toml` still declares `0.1.1a0`; version metadata must be aligned before building release artifacts.
+- **Development validation:** **1,993 tests passed** during the internal audit. This does not establish a frozen release commit, independent audit, or reproducible release build.
+- **Historical checkpoint:** commit `9bfc2f7`, 1,844 passed and developer ↔ Ubuntu VM SMTP/attachment exchange. Those checks are not a fresh installer qualification for `v0.1.2-alpha`.
+- **Declared installation profiles:** Ubuntu 24.04, Kali 2026.1, and Debian 13, as specified in `install/manifest.toml`. Debian 13 installation was verified during development; this does not establish fresh clean-install or upgrade validation for the final release artifacts on all three platforms. Historical Ubuntu 22.04 GUI VM observations do not add a declared profile. WSL is a development environment, not a native Windows release target.
 
 ## 2. Installation ownership and flow
 
@@ -33,7 +33,7 @@ Tor is a system prerequisite. Tor Control is local (`127.0.0.1:9051` in the docu
 
 ## 4. Persistent layout and ownership
 
-`ApplicationPaths.for_user()` is authoritative. The documented installation root is `~/.local/share/garlicsmtp/`:
+`ApplicationPaths.for_user()` is authoritative. The documented installation root is `~/.local/share/garlicsmtp/`. Read-only source searches confirmed the `ApplicationPaths` definitions for the credentials, Received/Sent/Queue databases, and attachments; they did not independently validate the complete resolved directory layout or a fresh installation:
 
 | Path | Purpose / boundary |
 |---|---|
@@ -59,20 +59,20 @@ The encryption boundary does not establish universal protection for backups, tem
 
 ## 6. Optional Onion HTML page
 
-The candidate adds a configurable Onion HTTP presence page, with GUI preferences validation. The HTTP page is a distinct service from Onion SMTP/IMAP; changing its configuration must not regenerate or replace mail/Onion identities. Validate configuration through the GUI and apply changes by restarting the relevant services as required by the implementation. Treat custom HTML as untrusted content and avoid publishing private information. Verify the current service module, preferences code, and tests before modifying implementation or declaring specific binding/path details.
+The existing Alpha implementation includes a configurable Onion HTTP presence page, with GUI preferences validation. The HTTP page is a distinct service from Onion SMTP/IMAP; changing its configuration must not regenerate or replace mail/Onion identities. Validate configuration through the GUI and apply changes by restarting the relevant services as required by the implementation. Treat custom HTML as untrusted content and avoid publishing private information. Verify the current service module, preferences code, and tests before modifying implementation or declaring specific binding/path details.
 
 ## 7. Verification, release gates and safe operations
 
 | Gate | Current evidence | Remaining work |
 |---|---|---|
-| Development tests | 1,974 passed for `0.1.1a0` | Repeat on the exact release candidate after changes |
+| Development tests | 1,993 passed during the internal audit | Repeat on the exact release candidate after changes |
 | Transport and attachments | Historical developer ↔ VM tests | Repeat if the candidate changes relevant behavior |
 | SQLCipher / GSAT | Historical read-only headers and attachment checks | Full target-platform, recovery and crash/backup coverage |
-| Installer and dependencies | Earlier Ubuntu 24.04 installation validation | **Fresh clean install and upgrade of `0.1.1a0` not established** |
+| Installer and dependencies | Manifest declares Ubuntu 24.04, Kali 2026.1 and Debian 13; Debian 13 installation verified during development | **Fresh clean install and upgrade from final `v0.1.2-alpha` artifacts not established across all declared profiles** |
 | Migration | No validated plaintext-to-encrypted migration | Explicit safe migration plan, backups and rollback testing |
-| Release | Version metadata reported as `0.1.1a0` | Verify manifest, tag, artifacts and publish only by explicit decision |
+| Release | `pyproject.toml` still declares `0.1.1a0`; existing `dist/` files are historical `0.1.0a0` artifacts | Align version metadata, inspect new artifacts, verify tag and publish only by explicit decision |
 
-Never test migration or destructive repair on real user databases or Onion identities. Never run `git add .`, reset/clean a working tree or create tags/commits implicitly. Inspect real source and tests before any implementation change; use focused regression, full suite and VM tests as applicable. The documented uninstaller (`python3 -m install.uninstaller` from checkout root) requires `DELETE` and **irreversibly removes application data and Onion identities** while preserving the source checkout; it is not a password reset.
+Never test migration or destructive repair on real user databases or Onion identities. Never run `git add .`, reset/clean a working tree or create tags/commits implicitly. Inspect real source and tests before any implementation change; use focused regression, full suite and VM tests as applicable. The uninstaller source contains a literal `DELETE` confirmation check and a recursive-removal operation. Treat uninstall as **potentially irreversible destruction of application data and Onion identities**; review its exact removal targets in source before execution. It is not a password reset. The historical documentation describes invoking it with `python3 -m install.uninstaller` from the checkout root, but that invocation was not executed during this review.
 
 ## 8. Architectural requirements and continuity
 
@@ -139,4 +139,4 @@ Never test migration or destructive repair on real user databases or Onion ident
 
 ## 9. Document control
 
-Historical source documents are retained unchanged. Before promoting this candidate, reconcile this specification with the actual repository source, installation manifest and release artifacts. No fresh repository inspection or VM execution was performed for this document.
+Historical source documents are retained unchanged. This revision incorporates the supplied `pyproject.toml`, `requirements.txt`, and `install/manifest.toml`, the reported 1,993-test internal audit, and targeted read-only searches of `garlicsmtp/` and `install/` for persistent paths, desktop launcher, Tor group, and uninstaller confirmation. These searches are not a complete code review or execution of the installer/uninstaller. Before promotion, verify the resolved paths, exact uninstall targets, current CLI bootstrap behavior, version metadata, native dependency notices, and final release artifacts. No new VM installation or migration test was performed for this document.

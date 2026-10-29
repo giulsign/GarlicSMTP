@@ -115,10 +115,11 @@ giulisign@gmail.com
 
 ## Document status and project release context
 
-This Agreement remains **Version 1.0 (2026)**. Its terms are not changed
-merely because GarlicSMTP is preparing package version `0.1.1a0`
-(the proposed `v0.1.1-alpha` release). This document does not announce
-a Git tag or published release.
+This Agreement remains **Version 1.0 (2026)**. Its terms are unchanged
+while GarlicSMTP prepares the proposed `v0.1.2-alpha` release. The release
+is not announced or represented as published by this document. The Python
+package version and final release artifacts must be aligned and verified
+separately before publication.
 
 The confirmation statement in Section 9 must be reproduced exactly as
 written when submitting a contribution, consistent with `CONTRIBUTING.md`.

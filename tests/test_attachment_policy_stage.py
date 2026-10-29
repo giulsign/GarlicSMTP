@@ -1,3 +1,8 @@
+# Copyright (c) 2026 Giuliano Signorelli
+# SPDX-License-Identifier: LicenseRef-PolyForm-Noncommercial-1.0.0
+#
+# See LICENSE for the full license terms.
+
 import pytest
 
 from garlicsmtp.application.attachment_policy_stage import (
@@ -70,39 +75,6 @@ def test_attachment_policy_stage_rejects_total_size_over_limit(
     )
 
 
-def test_attachment_policy_stage_rejects_total_size_over_limit(
-    message,
-):
-    context = PipelineContext(
-        message=message,
-        attachments=[
-            MimeAttachment(
-                filename="first.pdf",
-                declared_mime="application/pdf",
-                content=(
-                    b"%PDF-1.4\n"
-                    + b"a" * 600_000
-                ),
-            ),
-            MimeAttachment(
-                filename="second.pdf",
-                declared_mime="application/pdf",
-                content=(
-                    b"%PDF-1.4\n"
-                    + b"b" * 448_576
-                ),
-            ),
-        ],
-    )
-
-    stage = AttachmentPolicyStage()
-
-    stage.process(context)
-
-    assert context.accepted is False
-    assert context.reject_reason == (
-        "Attachment rejected"
-    )   
 
 
 def test_attachment_policy_stage_accepts_valid_attachment(
@@ -175,40 +147,5 @@ def test_attachment_policy_stage_uses_configured_size_limit(
 
     assert result.accepted is False
     assert result.reject_reason == (
-        "Attachment rejected"
-    )
-
-
-def test_attachment_policy_stage_rejects_total_size_over_limit(
-    message,
-):
-    context = PipelineContext(
-        message=message,
-        attachments=[
-            MimeAttachment(
-                filename="first.pdf",
-                declared_mime="application/pdf",
-                content=(
-                    b"%PDF-1.4\n"
-                    + b"a" * 600_000
-                ),
-            ),
-            MimeAttachment(
-                filename="second.pdf",
-                declared_mime="application/pdf",
-                content=(
-                    b"%PDF-1.4\n"
-                    + b"b" * 448_576
-                ),
-            ),
-        ],
-    )
-
-    stage = AttachmentPolicyStage()
-
-    stage.process(context)
-
-    assert context.accepted is False
-    assert context.reject_reason == (
         "Attachment rejected"
     )

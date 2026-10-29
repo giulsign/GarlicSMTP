@@ -88,3 +88,36 @@ def test_transport_connects_to_mx(message):
         f"{message.body}\r\n.\r\n",
         "QUIT\r\n",
     ]
+
+
+def test_transport_closes_connection_when_smtp_greeting_fails(
+    message,
+):
+    import pytest
+
+    from garlicsmtp.transport.smtp.exceptions import (
+        SMTPClientError,
+    )
+
+    class FailingGreetingConnection(FakeConnection):
+        def __init__(self):
+            super().__init__()
+            self.replies = [
+                "421 Service unavailable\r\n",
+            ]
+
+    connection = FailingGreetingConnection()
+
+    transport = SMTPTransport()
+    transport.resolver = FakeResolver()
+    transport.connection_factory = lambda: connection
+
+    with pytest.raises(
+        SMTPClientError,
+        match=r"SMTP greeting failed \(421\)",
+    ):
+        transport.deliver(
+            QueueFactory.create(message)
+        )
+
+    assert connection.closed is True

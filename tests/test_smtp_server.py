@@ -3,6 +3,7 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
 import threading
 
 from garlicsmtp.core.pipeline import Pipeline
@@ -411,3 +412,296 @@ def test_smtp_server_passes_verifier_to_protocol(
         captured["encryption_private_key"]
         is encryption_private_key
     )
+
+
+def test_smtp_tick_cleans_up_when_thread_start_fails(
+    monkeypatch,
+):
+    class FakeClient:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeTCPServer:
+        def __init__(self, client):
+            self.client = client
+
+        def accept_once(self):
+            return (
+                self.client,
+                ("127.0.0.1", 10000),
+            )
+
+    client = FakeClient()
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        pipeline=build_pipeline(),
+    )
+
+    server.server = FakeTCPServer(client)
+    server.running = True
+
+    def fail_thread_start(self):
+        raise RuntimeError("thread start failed")
+
+    monkeypatch.setattr(
+        "garlicsmtp.smtp.server.threading.Thread.start",
+        fail_thread_start,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="thread start failed",
+    ):
+        server.tick()
+
+    assert client.closed is True
+    assert server.active_connections == 0
+
+
+def test_smtp_stop_closes_active_client_connections():
+    entered = threading.Event()
+    released = threading.Event()
+
+    class FakeClient:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+            released.set()
+
+    class FakeTCPServer:
+        def __init__(self, client):
+            self.client = client
+            self.accepted = False
+
+        def accept_once(self):
+            if self.accepted:
+                return None
+
+            self.accepted = True
+            return (
+                self.client,
+                ("127.0.0.1", 10000),
+            )
+
+        def stop(self):
+            pass
+
+    client = FakeClient()
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        pipeline=build_pipeline(),
+    )
+
+    server.server = FakeTCPServer(client)
+    server.running = True
+
+    def fake_handle_connection(client_socket, address):
+        entered.set()
+        released.wait(timeout=5)
+
+    server.handle_connection = fake_handle_connection
+
+    server.tick()
+
+    assert entered.wait(timeout=1)
+    assert server.active_connections == 1
+
+    server.stop()
+
+    assert client.closed is True
+    assert server.active_connections == 0
+
+
+def test_smtp_tick_does_not_start_connection_after_stop():
+    accept_entered = threading.Event()
+    release_accept = threading.Event()
+
+    class FakeClient:
+        def __init__(self):
+            self.closed = False
+
+        def close(self):
+            self.closed = True
+
+    class FakeTCPServer:
+        def __init__(self, client):
+            self.client = client
+
+        def accept_once(self):
+            accept_entered.set()
+
+            assert release_accept.wait(
+                timeout=5
+            )
+
+            return (
+                self.client,
+                ("127.0.0.1", 10000),
+            )
+
+        def stop(self):
+            pass
+
+    client = FakeClient()
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        pipeline=build_pipeline(),
+    )
+
+    server.server = FakeTCPServer(client)
+    server.running = True
+
+    connection_started = threading.Event()
+
+    def fake_handle_connection(
+        client_socket,
+        address,
+    ):
+        connection_started.set()
+
+    server.handle_connection = (
+        fake_handle_connection
+    )
+
+    tick_thread = threading.Thread(
+        target=server.tick,
+    )
+
+    tick_thread.start()
+
+    try:
+        assert accept_entered.wait(
+            timeout=2
+        )
+
+        server.stop()
+
+    finally:
+        release_accept.set()
+        tick_thread.join(timeout=5)
+
+    assert not tick_thread.is_alive()
+    assert client.closed is True
+    assert connection_started.is_set() is False
+    assert server.active_connections == 0
+
+
+def test_smtp_stop_handles_registered_thread_not_yet_started(
+    monkeypatch,
+):
+    start_entered = threading.Event()
+    release_start = threading.Event()
+
+    class FakeClient:
+        def __init__(self):
+            self.closed = False
+
+        def shutdown(self, how):
+            pass
+
+        def close(self):
+            self.closed = True
+
+    class FakeTCPServer:
+        def __init__(self, client):
+            self.client = client
+            self.accepted = False
+
+        def accept_once(self):
+            if self.accepted:
+                return None
+
+            self.accepted = True
+
+            return (
+                self.client,
+                ("127.0.0.1", 10000),
+            )
+
+        def stop(self):
+            pass
+
+    client = FakeClient()
+
+    server = SMTPServer(
+        host="127.0.0.1",
+        port=0,
+        pipeline=build_pipeline(),
+    )
+
+    server.server = FakeTCPServer(client)
+    server.running = True
+
+    original_start = threading.Thread.start
+
+    def delayed_start(self):
+        if self.name == "smtp-connection":
+            start_entered.set()
+
+            assert release_start.wait(
+                timeout=5
+            )
+
+        return original_start(self)
+
+    monkeypatch.setattr(
+        "garlicsmtp.smtp.server.threading.Thread.start",
+        delayed_start,
+    )
+
+    tick_thread = threading.Thread(
+        target=server.tick,
+        name="smtp-tick-test",
+    )
+
+    tick_thread.start()
+
+    stop_finished = threading.Event()
+    stop_errors = []
+
+    def stop_server():
+        try:
+            server.stop()
+        except Exception as exc:
+            stop_errors.append(exc)
+        finally:
+            stop_finished.set()
+
+    stop_thread = threading.Thread(
+        target=stop_server,
+        name="smtp-stop-test",
+    )
+
+    try:
+        assert start_entered.wait(timeout=2)
+
+        stop_thread.start()
+
+        # stop() deve attendere che thread.start()
+        # abbia completato la fase protetta dal lock.
+        assert not stop_finished.wait(timeout=0.1)
+
+    finally:
+        release_start.set()
+        tick_thread.join(timeout=5)
+
+        if stop_thread.ident is not None:
+            stop_thread.join(timeout=5)
+
+    assert not tick_thread.is_alive()
+    assert not stop_thread.is_alive()
+    assert stop_finished.is_set()
+    assert stop_errors == []
+    assert client.closed is True
+    assert server.active_connections == 0

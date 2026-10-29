@@ -23,6 +23,8 @@ class Socks5Connection:
         self.socket = None
 
     def connect(self) -> None:
+        self.close()
+
         try:
             self.socket = socket.create_connection(
                 (self.proxy_host, self.proxy_port),
@@ -56,8 +58,8 @@ class Socks5Connection:
             raise Socks5HandshakeError(
                 "SOCKS5 proxy rejected no-authentication method"
             )
-        
-    
+
+
     def receive_exactly(self, size: int) -> bytes:
         if self.socket is None:
             raise Socks5ConnectionError(

@@ -3,6 +3,8 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+
 from garlicsmtp.configuration import (
     ConfigurationLoader,
 )
@@ -232,3 +234,35 @@ def test_distributed_configuration_disables_custom_onion_page():
 
     assert settings.tor.onion_custom_page_enabled is False
     assert settings.tor.onion_custom_page_path == ""
+
+
+def test_configuration_rejects_non_loopback_smtp_host(
+    tmp_path,
+):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        '[smtp]\nhost = "0.0.0.0"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="SMTP.*loopback",
+    ):
+        ConfigurationLoader().load(config_path)
+
+
+def test_configuration_rejects_non_loopback_imap_host(
+    tmp_path,
+):
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        '[imap]\nhost = "0.0.0.0"\n',
+        encoding="utf-8",
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="IMAP.*loopback",
+    ):
+        ConfigurationLoader().load(config_path)

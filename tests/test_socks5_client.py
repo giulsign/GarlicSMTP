@@ -3,6 +3,11 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+
+from garlicsmtp.network.socks5.exceptions import (
+    Socks5HandshakeError,
+)
 from garlicsmtp.network.socks5.client import Socks5Client
 
 
@@ -83,7 +88,7 @@ class FakeReplyConnection:
         del self.chunks[:size]
 
         return result
-    
+
 def test_socks5_client_reads_complete_connect_reply():
 
     connection = FakeReplyConnection()
@@ -99,3 +104,33 @@ def test_socks5_client_reads_complete_connect_reply():
 
     assert result is connection
     assert connection.chunks == bytearray()
+
+
+def test_socks5_client_closes_connection_on_handshake_failure():
+    class FailingHandshakeConnection:
+        def __init__(self):
+            self.connected = False
+            self.closed = False
+
+        def connect(self):
+            self.connected = True
+
+        def handshake(self):
+            raise Socks5HandshakeError(
+                "SOCKS5 handshake rejected"
+            )
+
+        def close(self):
+            self.closed = True
+
+    connection = FailingHandshakeConnection()
+    client = Socks5Client(connection=connection)
+
+    with pytest.raises(
+        Socks5HandshakeError,
+        match="SOCKS5 handshake rejected",
+    ):
+        client.connect("example.onion", 25)
+
+    assert connection.connected is True
+    assert connection.closed is True

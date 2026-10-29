@@ -22,30 +22,35 @@ class Socks5Client:
         host: str,
         port: int,
     ) -> Socks5Connection:
-        self.connection.connect()
+        try:
+            self.connection.connect()
 
-        self.connection.handshake()
+            self.connection.handshake()
 
-        request = Socks5ConnectRequest(
-            host=host,
-            port=port,
-        )
-
-        self.connection.send(
-            request.serialize()
-        )
-
-        reply_data = self._receive_connect_reply()
-
-        reply = Socks5Reply.parse(reply_data)
-
-        if not reply.success:
-            raise Socks5HandshakeError(
-                reply.message
+            request = Socks5ConnectRequest(
+                host=host,
+                port=port,
             )
 
-        return self.connection
-    
+            self.connection.send(
+                request.serialize()
+            )
+
+            reply_data = self._receive_connect_reply()
+
+            reply = Socks5Reply.parse(reply_data)
+
+            if not reply.success:
+                raise Socks5HandshakeError(
+                    reply.message
+                )
+
+            return self.connection
+
+        except Exception:
+            self.connection.close()
+            raise
+
 
     def _receive_connect_reply(self) -> bytes:
         header = self.connection.receive_exactly(4)

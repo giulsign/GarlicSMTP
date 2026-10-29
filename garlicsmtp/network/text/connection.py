@@ -25,6 +25,8 @@ class TextConnection:
         host: str,
         port: int = 25,
     ) -> None:
+        self.close()
+
         self.socket = socket.create_connection(
             (host, port),
             timeout=self.timeout,
@@ -89,7 +91,7 @@ class TextConnection:
             )
 
             return line.decode("utf-8").rstrip("\r")
-        
+
 
 
     def receive_bytes(

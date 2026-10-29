@@ -5,6 +5,7 @@
 
 from dataclasses import dataclass, field
 from pathlib import Path
+from ipaddress import IPv4Address
 
 
 @dataclass(slots=True)
@@ -12,12 +13,37 @@ class SMTPSettings:
     host: str = "127.0.0.1"
     port: int = 2525
 
+    def __post_init__(self) -> None:
+        try:
+            address = IPv4Address(self.host)
+        except ValueError as exc:
+            raise ValueError(
+                "SMTP host must be an IPv4 loopback address"
+            ) from exc
+
+        if not address.is_loopback:
+            raise ValueError(
+                "SMTP host must be an IPv4 loopback address"
+            )
+
 
 @dataclass(slots=True)
 class IMAPSettings:
     host: str = "127.0.0.1"
     port: int = 1143
 
+    def __post_init__(self) -> None:
+        try:
+            address = IPv4Address(self.host)
+        except ValueError as exc:
+            raise ValueError(
+                "IMAP host must be an IPv4 loopback address"
+            ) from exc
+
+        if not address.is_loopback:
+            raise ValueError(
+                "IMAP host must be an IPv4 loopback address"
+            )
 
 @dataclass(slots=True)
 class LoggingSettings:

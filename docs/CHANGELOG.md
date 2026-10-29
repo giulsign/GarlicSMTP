@@ -2,6 +2,36 @@
 
 This changelog distinguishes historical validation from work preparing the next Alpha release. Entries describe documented changes and checks, not an independent security audit.
 
+## v0.1.2-alpha (`0.1.2a0` target) — Release preparation, 29 October 2026
+
+**Status:** Candidate under preparation, not a confirmed published release. The Git tag, final source commit, release artifacts, and GitHub release have not yet been verified or published as part of this preparation. The project and application version declarations have since been aligned to `0.1.2a0`, and the full suite passed 1,993 tests. Previously inspected installed metadata and `dist/` artifacts reflected `0.1.0a0`; fresh release artifacts remain to be built and verified. This entry does not claim that `0.1.2a0` is already installed or tagged.
+
+### Security and reliability changes
+
+- Strengthened SMTP input bounds: maximum accepted SMTP line size **64 KiB** and maximum message DATA size **2 MiB (2,097,152 bytes)**. The attachment size limit remains **1 MiB (1,048,576 bytes)**.
+- Restricted configurable SMTP and IMAP listener hosts to loopback addresses, while permitting addresses in the `127.0.0.x` range.
+- Improved socket, connection, and thread lifecycle cleanup in TCP, SOCKS5, text transport, SMTP transport, and SMTP/IMAP service startup and shutdown paths.
+- Improved delivery-queue handling of unexpected exceptions so failed attempts follow retry/backoff behavior rather than immediately repeating in a tight loop.
+- Ensured installer IMAP-password validation takes place before installation side effects.
+- Strengthened test assertions and removed duplicate/shadowed tests found during the internal review.
+
+### Review and validation
+
+- **1,993 tests passed** in the reported full `python -m pytest -q` development-suite run after the reviewed changes. This is a developer-reported test result, not an independent security audit or clean-install certification.
+- Reviewed logging privacy, SQLCipher queue transaction recovery, IMAP authentication/session state, and incomplete SMTP DATA handling on EOF; no additional production change was required for those specific checks.
+- Reviewed third-party Python dependency metadata and installed license files. Observed `dnspython 2.8.0` (ISC), `cryptography 46.0.7` (Apache-2.0 OR BSD-3-Clause), `sqlcipher3 0.6.3` (installed license file), `cffi 2.1.1` (MIT-0), and `pycparser 3.0` (BSD-3-Clause). Native extension linkage was inspected with `ldd`; this does not establish a complete inventory of statically included components.
+- Confirmed that `install/manifest.toml` declares installer profiles for **Ubuntu 24.04**, **Kali 2026.1**, and **Debian 13**. Declared profiles are not, by themselves, a claim of validated installation from final release artifacts.
+- Updated release-candidate documentation for the current audit and release-preparation state.
+
+### Checks remaining before publication
+
+- Align package and application version declarations with the intended `0.1.2a0` release and verify the final Git state.
+- Build and inspect fresh wheel/source-distribution artifacts, including included files, native components, third-party licenses, and required notices; historical `0.1.0a0` files in `dist/` do not validate this candidate.
+- Validate clean installation and any supported upgrade/migration path on the intended target environments, and record actual results.
+- Recheck the historical CLI `start` behavior when the DEK is unavailable; do not assume that the earlier limitation has been fixed.
+- Verify the final release commit, tag, and public publication only after those actions actually occur.
+- Obtain independent security review where possible; no independent professional security audit is claimed.
+
 ## v0.1.1-alpha (`0.1.1a0`) — 25 October 2026
 
 **Status:** Release preparation; the `v0.1.1-alpha` Git tag, final release commit, distribution artifacts and GitHub publication have not been confirmed. Development commit `8faf1c6` is a reviewed reference point, **not** a release tag.

@@ -1,8 +1,8 @@
 GARLICSMTP — HANDBOOK
 User manual and guide to current limitations
-Document edition: 25/10/2026 — candidate v0.1.1-alpha (package 0.1.1a0), development commit 8faf1c6
+Document edition: 29/10/2026 — documentation target v0.1.2-alpha (not yet published); last reported package metadata 0.1.1a0
 
-This manual consolidates the 08/10 baseline, the historical 13–19/10 checkpoints and the later 0.1.1a0 development status. The 1974 passing tests are reported from development, not rerun for this handbook. It is not a new test execution, an independent audit or evidence that a Git tag has been created.
+This manual consolidates historical checkpoints and the post-audit development/documentation review of 29/10/2026. The latest reported full development regression is 1,993 passing tests; earlier results remain historical. This handbook is not a new test execution, an independent security audit, or evidence of a published v0.1.2-alpha tag or release.
 
 ===============================================================================
 1. WHAT IS GARLICSMTP?
@@ -30,16 +30,21 @@ The documented licensing model is source-available: PolyForm Noncommercial 1.0.0
 3. OPERATING SYSTEMS AND ENVIRONMENTS
 ===============================================================================
 
-VALIDATED ON A REAL INSTALLATION:
-- Ubuntu 24.04 Desktop: clean-machine installation, first-run, Tor, GUI/CLI and real sending/receiving; Desktop launcher validated.
+REPORTED REAL INSTALLATION CHECKS:
+- Ubuntu 24.04 Desktop: historical clean-machine installation, first-run, Tor, GUI/CLI and real sending/receiving; Desktop launcher validated.
+- Kali 2026.1: empirical installation validation reported by the project author.
+- Debian 13: installation separately reported as verified during later project work.
+
+DECLARED INSTALLER PROFILES:
+- Ubuntu 24.04, Kali 2026.1 and Debian 13 are declared in the later install/manifest.toml. This does not establish clean-install verification of the exact v0.1.2-alpha release artifact on all three systems.
 
 DOCUMENTED DEVELOPMENT ENVIRONMENT:
 - Windows with WSL Ubuntu: repository at /mnt/c/garlicsmtp, virtualenv and Python commands run inside WSL. This does not mean GarlicSMTP was validated as a native Windows application.
 
 NOT ESTABLISHED AS SUPPORTED:
-- macOS, native Windows and other Linux distributions. The Python code may be portable, but the installer profile and system Tor prerequisites were specifically validated for Ubuntu 24.04. Do not confuse potential portability with official support.
+- macOS, native Windows and Linux distributions outside the three declared profiles. The Python code may be portable, but this does not establish a validated installation or official support.
 
-Historical Python requirement: >=3.12. The installer creates a dedicated venv. Users must not run GarlicSMTP as root.
+Declared Python requirement: >=3.12. The installer creates a dedicated venv. Users must not run GarlicSMTP as root.
 
 ===============================================================================
 4. HOW IT WORKS: FROM MESSAGE TO DELIVERY
@@ -89,14 +94,14 @@ The GUI must remain hidden until authentication; closing the GUI must stop recei
 6. INSTALLATION AND FIRST START
 ===============================================================================
 
-The documented and validated route is Ubuntu 24.04. For copyable commands, use `quicklaunch-en.md`.
+The documented installer profiles are Ubuntu 24.04, Kali 2026.1 and Debian 13. Ubuntu has historical desktop validation; Kali and Debian have separately reported installation checks. For copyable commands and the current validation boundaries, use `quicklaunch-en.md`.
 
 Summary:
-1) Official repository: https://github.com/giulsign/GarlicSMTP.git; the development checkpoint is commit 8faf1c6; v0.1.1-alpha is not a confirmed published tag or release.
+1) Official repository: https://github.com/giulsign/GarlicSMTP.git. The historical 0.1.1a0 checkpoint was commit 8faf1c6; a local v0.1.1-alpha tag was later observed in the 27/10 audit, but GitHub publication was not independently verified. The v0.1.2-alpha release has not been confirmed published.
 2) Clone the project onto the Ubuntu computer.
 3) From the repository directory run `./install.sh` as a normal user, without prepending sudo.
 4) Wait for completion; the installer handles prerequisites and creates the isolated venv.
-5) If `debian-tor` group membership was changed, log out of and back into the Ubuntu graphical session.
+5) If `debian-tor` group membership was changed, log out of and back into the graphical session.
 6) Open the GarlicSMTP Desktop icon or run `~/.local/share/garlicsmtp/venv/bin/garlicsmtp-gui`.
 7) Complete account setup without default passwords; then start services from the interface.
 
@@ -112,7 +117,7 @@ GUI account password:
 - The documented policy requires at least eight characters, one uppercase letter, one digit and one special character.
 - The GUI account is not automatically the Onion identity or the Ed25519/X25519 keys.
 
-Local data protection in the v0.1.1-alpha candidate:
+Local data protection in the reviewed Alpha development implementation:
 - `data/mailboxes.db` (Received), `data/sent.db` (Sent) and `state/queue.db` (Queue) use SQLCipher with a mandatory 32-byte DEK. On developer and Ubuntu VM, none of the three database headers matched plaintext SQLite; this observation must be considered together with the tests, not alone.
 - `data/attachments/` stores GSAT v1 blobs: ChaCha20-Poly1305 with a subkey derived from the DEK via HKDF-SHA256; file contents and metadata are encrypted and authenticated. An attachment exported by the user becomes a readable file at the chosen destination.
 - The DEK is independent of the password. Password and recovery key protect the same DEK through wrapping; resetting the password must not regenerate the DEK, Onion identity or message keys.
@@ -123,7 +128,7 @@ Local data protection in the v0.1.1-alpha candidate:
 8. TOR, ONION AND CONNECTIVITY
 ===============================================================================
 
-GarlicSMTP uses Tor as a system prerequisite. The expected Tor Control endpoint in the validated profile is local (`127.0.0.1:9051`) and requires SAFECOOKIE. The application dynamically manages its Onion Service and retains its persistent identity, rather than requiring a second static HiddenService in torrc.
+GarlicSMTP uses Tor as a system prerequisite. The expected Tor Control endpoint in the declared Linux profiles is local (`127.0.0.1:9051`) and requires SAFECOOKIE. The application dynamically manages its Onion Service and retains its persistent identity, rather than requiring a second static HiddenService in torrc.
 
 If sending or receiving seems stuck:
 - Check Tor and runtime status in the GUI.
@@ -145,7 +150,7 @@ Attachments are stored separately from the message database. Exporting/materiali
 
 For backups, preserve the necessary data and identities together without exposing private keys. No certified end-to-end backup/restore procedure is documented: check the current code and installer behavior before any restoration.
 
-Uninstallation was tested historically on Ubuntu 24.04, but may remove persistent state and Onion identities. **The source directory `~/GarlicSMTP` must remain intact.** Do not manually delete directories to simulate uninstallation or invent uninstall commands not confirmed by the repository.
+Uninstallation was tested historically on Ubuntu 24.04. The documented command, run from the repository root, is `python3 -m install.uninstaller`; the reviewed code requires typing `DELETE` to confirm. It is destructive and may remove application-owned persistent state, credentials, keys, messages, attachments and Onion identities. **The source checkout must remain intact.** Do not use uninstallation to reset a password or repair a temporary Tor problem. The documentation review confirmed the confirmation prompt and deletion mechanism by source search, not by executing a new uninstall test.
 
 ===============================================================================
 10. CURRENT LIMITATIONS AND FUTURE FEATURES
@@ -155,15 +160,18 @@ IMPLEMENTED AND VALIDATED WITHIN THE DOCUMENTED BOUNDARIES:
 - SQLCipher for Received, Sent and Queue; GSAT v1 for application attachments.
 - Login and offline recovery with persistent DEK, recovery confirmation and fail-closed GUI behavior.
 - Real bidirectional developer ↔ Ubuntu VM sending/receiving, including attachments.
-- Latest reported full developer suite: 1974 tests passed (not rerun for this document).
+- Latest reported full developer suite: 1,993 tests passed after the 27/10 static audit. Historical 1,974-test results belong to an earlier checkpoint.
+- Later targeted checks: queue unexpected-exception backoff, SQLCipher duplicate-insert recovery, IMAP authentication/session state, loopback-only SMTP/IMAP listeners, SMTP incomplete-DATA EOF inspection, and bounded SMTP input.
+- SMTP limits in the reviewed implementation: 64 KiB per line, 2 MiB (2,097,152 bytes) per message and 1 MiB (1,048,576 bytes) per attachment.
 
 LIMITATIONS AND UNFINISHED ACTIVITIES:
-- Only Ubuntu 24.04 was validated as a Linux desktop environment; native Windows/macOS not established.
-- The review of alternative CLI/bootstrap/receiving entry points had started but was not closed in this document's checkpoint.
+- Installer profiles exist for Ubuntu 24.04, Kali 2026.1 and Debian 13, but a fresh installation of the exact v0.1.2-alpha distribution on all three has not been established; native Windows/macOS not established.
+- Alternative CLI/bootstrap/receiving entry points, broader resource lifecycle behavior and live Tor reconnection have not been comprehensively certified.
 - No plaintext legacy archive migration, certified backup/restore procedure or independent audit.
 - No general assurance for private keys, backups, temporary remnants or exported files.
 - A message in Sent does not prove remote delivery; Retry pending is not a receipt.
-- v0.1.1-alpha is a candidate; Git tag/release, clean installation and upgrade validation of this build remain unconfirmed.
+- v0.1.2-alpha is the documentation target, not a confirmed published release. Package metadata was last reported as 0.1.1a0; final version alignment, tag, build artifacts, upgrade and release-specific clean installation remain unconfirmed.
+- The 27/10 static audit finding A-14 (SQLite IMAP UID monotonicity after deletion of the highest UID) remains open pending a targeted fix and regression evidence. Other audit findings must not be treated as closed without finding-specific verification.
 
 ===============================================================================
 10A. OPTIONAL CUSTOM ONION HTML PRESENCE PAGE
@@ -200,10 +208,14 @@ Recovery key: offline secret for restoring access without regenerating the DEK.
 12. SOURCES AND VALIDITY OF THIS MANUAL
 ===============================================================================
 
-Main sources: 31/07 recap; architecture/methodology/summary dated 03/09 and 06/09; installation-architecture.md; snapshots 09/09 and 15/09, alpha validation 17/09, handoff 27/09, recovery checkpoint 7 on 02/10 and checkpoint 8 on 08/10. For technical details and test checkpoints see `GarlicSMTP-development-book-10.txt`; for commands see `quicklaunch.md`.
+Main sources: 31/07 recap; architecture/methodology/summary dated 03/09 and 06/09; installation-architecture.md; snapshots 09/09 and 15/09, alpha validation 17/09, handoff 27/09, recovery checkpoint 7 on 02/10 and checkpoint 8 on 08/10. For technical details and test checkpoints see `GarlicSMTP-development-book-10.txt`; for commands see `quicklaunch-en.md`. The 27/10 static audit and its approved 29/10 post-audit follow-up provide the current findings and evidence boundaries.
 
-This manual should be updated after every behavior change confirmed by tests and, where relevant, a real Ubuntu 24.04 verification. Future features must not be presented as already available.
+This manual should be updated after every behavior change confirmed by tests and, where relevant, real installation verification against the exact target release and platform. Future features must not be presented as already available.
 
-Latest checkpoint: 8faf1c6, 1974 tests passed; optional Onion HTML presence page and GUI preference validation. Historical checkpoints after 08/10: 13/10 (1797 tests and recovery/SQLCipher), 18/10 (1830 tests and manual developer recovery), 19/10 (1844 tests, GUI send fix, commit 9bfc2f7, developer/VM E2E and read-only database/attachment checks). These counts are distinct checkpoints, not simultaneous results.
+Latest reported post-audit development regression: 1,993 tests passed. Historical checkpoint: 8faf1c6, 1,974 tests passed, optional Onion HTML presence page and GUI preference validation. Earlier checkpoints: 13/10 (1,797 tests and recovery/SQLCipher), 18/10 (1,830 tests and manual developer recovery), 19/10 (1,844 tests, GUI send fix, commit 9bfc2f7, developer/VM E2E and read-only database/attachment checks). These are distinct checkpoints, not simultaneous results.
 
-END OF HANDBOOK — v0.1.1-alpha candidate
+POST-AUDIT STATUS (29/10/2026): B-01/B-03 test-definition and assertion improvements; D-05 earlier IMAP password validation; A-08a and related socket/thread cleanup; S-01 logging privacy inspection (no defect found); S-02 queue exception retry/backoff; S-03 SQLCipher queue duplicate-insert recovery; S-04 IMAP authentication/session checks; S-05/S-06 loopback listener restrictions; S-07 incomplete SMTP DATA EOF inspection (no defect found); S-08 SMTP limits. These are reported subsequent engineering checks, not independent certification. A-14 and other unverified original audit findings remain open or pending disposition.
+
+DOCUMENTATION STATUS: The v0.1.2-alpha review approved project-tree.txt, THIRD_PARTY_LICENSES.md, CONTRIBUTING.md, SECURITY.md, README.md, CHANGELOG.md, CLA.md, installation-architecture-en.md, quicklaunch-en.md, COMMERCIAL-LICENSE.md and NOTICE. LICENSE was checked unchanged, but separate explicit approval had not been recorded. The 29/10 audit follow-up was subsequently approved. The handbook itself remains subject to approval.
+
+END OF HANDBOOK — v0.1.2-alpha documentation candidate

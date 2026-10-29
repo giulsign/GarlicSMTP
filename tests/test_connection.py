@@ -3,7 +3,10 @@
 #
 # See LICENSE for the full license terms.
 
+import pytest
+
 from garlicsmtp.smtp.connection import SMTPConnection
+from garlicsmtp.smtp.datareceiver import SMTPDataReceiver
 
 
 class FakeSocket:
@@ -60,3 +63,35 @@ def test_connection_ip():
 
     assert conn.ip == "10.0.0.1"
     assert conn.port == 5000
+
+
+def test_connection_rejects_oversized_line():
+    sock = FakeSocket()
+    sock.buffer.append(b"A" * (64 * 1024 + 1))
+
+    conn = SMTPConnection(
+        sock,
+        ("127.0.0.1", 2525),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="SMTP line too long",
+    ):
+        conn.receive_line()
+
+
+def test_data_receiver_rejects_message_over_two_mib():
+    receiver = SMTPDataReceiver()
+
+    receiver.append("A" * (1024 * 1024))
+    receiver.append("B" * (1024 * 1024 - 1))
+
+    # Esattamente 2 MiB, incluso il separatore.
+    assert len(receiver.body().encode("utf-8")) == 2_097_152
+
+    with pytest.raises(
+        ValueError,
+        match="SMTP message too large",
+    ):
+        receiver.append("C")

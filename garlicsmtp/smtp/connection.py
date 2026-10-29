@@ -14,6 +14,7 @@ class SMTPConnection:
     """
 
     BUFFER_SIZE = 4096
+    MAX_LINE_SIZE = 64 * 1024
 
     def __init__(
         self,
@@ -46,13 +47,23 @@ class SMTPConnection:
                 if not self._buffer:
                     return None
 
+                if len(self._buffer) > self.MAX_LINE_SIZE:
+                    raise ValueError("SMTP line too long")
+
                 line = self._buffer
                 self._buffer = b""
                 return line.decode("utf-8").rstrip("\r\n")
 
             self._buffer += data
 
+            if b"\n" not in self._buffer:
+                if len(self._buffer) > self.MAX_LINE_SIZE:
+                    raise ValueError("SMTP line too long")
+
         line, self._buffer = self._buffer.split(b"\n", 1)
+
+        if len(line) + 1 > self.MAX_LINE_SIZE:
+            raise ValueError("SMTP line too long")
 
         return line.decode("utf-8").rstrip("\r\n")
 

@@ -17,7 +17,7 @@ from garlicsmtp.imap.reply import IMAPReply
 from garlicsmtp.imap.session import IMAPSessionState
 from garlicsmtp.network.server import TCPServer
 from garlicsmtp.network.text import TextConnection
-from garlicsmtp.security.auth import (  
+from garlicsmtp.security.auth import (
     Authenticator,
     RejectingAuthenticator,
 )
@@ -151,7 +151,17 @@ class IMAPServer:
                 thread
             )
 
-        thread.start()
+        try:
+            thread.start()
+        except Exception:
+            try:
+                client_socket.close()
+            finally:
+                with self._threads_lock:
+                    self._connection_threads.discard(
+                        thread
+                    )
+            raise
 
     @staticmethod
     def _send_continuation(
@@ -170,21 +180,21 @@ class IMAPServer:
         address,
     ) -> None:
         current = threading.current_thread()
-
-        context = self._create_connection_context(
-            client_socket,
-        )
-
-        handler = IMAPConnectionHandler(
-            self,
-            context,
-        )
-
-        connection = context.connection
-        protocol = context.protocol
-        idle = context.idle
+        context = None
 
         try:
+            context = self._create_connection_context(
+                client_socket,
+            )
+
+            handler = IMAPConnectionHandler(
+                self,
+                context,
+            )
+
+            connection = context.connection
+            protocol = context.protocol
+
             self._send_replies(
                 connection,
                 protocol.greeting(),
@@ -195,16 +205,21 @@ class IMAPServer:
                     break
 
         finally:
-            self.store_event_sink.remove(   
-                context.store_event_adapter
-            )
-
-            connection.close()
-
-            with self._threads_lock:
-                self._connection_threads.discard(
-                    current
-                )
+            try:
+                if context is not None:
+                    try:
+                        self.store_event_sink.remove(
+                            context.store_event_adapter
+                        )
+                    finally:
+                        context.connection.close()
+                else:
+                    client_socket.close()
+            finally:
+                with self._threads_lock:
+                    self._connection_threads.discard(
+                        current
+                    )
 
     @staticmethod
     def _send_replies(
@@ -239,12 +254,12 @@ class IMAPServer:
             authenticator=self.authenticator,
             store=self.store,
         )
-    
+
     def _create_idle_session(
             self,
         ) -> IMAPIdleSession:
             return IMAPIdleSession()
-        
+
     def _create_connection_context(
         self,
         client_socket,
@@ -283,7 +298,7 @@ class IMAPServer:
             idle=idle,
             store_event_adapter=adapter,
         )
-    
+
 
 class IMAPConnectionHandler:
 
@@ -325,7 +340,7 @@ class IMAPConnectionHandler:
         )
 
         return not self._should_close_connection()
-        
+
     def _should_close_connection(
         self,
     ) -> bool:
@@ -333,7 +348,7 @@ class IMAPConnectionHandler:
             self._context.protocol.session.state
             is IMAPSessionState.LOGOUT
         )
-    
+
 
     def _execute_command(
         self,
@@ -399,7 +414,7 @@ class IMAPConnectionHandler:
         )
 
 
-    
+
     def _send_idle_notifications(
         self,
     ) -> None:

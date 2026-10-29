@@ -139,3 +139,39 @@ def test_text_connection_returns_none_on_incomplete_bytes():
     assert connection.receive_bytes(
         10
     ) is None
+
+
+def test_text_connection_reconnect_closes_socket_and_clears_buffer(
+    monkeypatch,
+):
+    first_socket = FakeSocket(
+        b"220 first.example\r\nOLD-DATA\r\n"
+    )
+    second_socket = FakeSocket(
+        b"220 second.example\r\n"
+    )
+
+    sockets = iter([first_socket, second_socket])
+
+    monkeypatch.setattr(
+        "garlicsmtp.network.text.connection.socket.create_connection",
+        lambda *args, **kwargs: next(sockets),
+    )
+
+    connection = TextConnection()
+
+    connection.connect("first.example", 25)
+
+    assert connection.receive_line() == "220 first.example"
+
+    connection.connect("second.example", 25)
+
+    assert first_socket.closed is True
+    assert connection.socket is second_socket
+
+    assert connection.receive_line() == "220 second.example"
+
+    connection.close()
+
+    assert second_socket.closed is True
+    assert connection.socket is None

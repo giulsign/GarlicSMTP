@@ -3,6 +3,9 @@
 #
 # See LICENSE for the full license terms.
 
+from sqlcipher3 import dbapi2 as sqlite3
+import pytest
+
 from garlicsmtp.queue.factory import QueueFactory
 from garlicsmtp.queue.sqlite import SQLiteQueueBackend
 from datetime import UTC, datetime, timedelta
@@ -71,13 +74,18 @@ def test_sqlite_queue_empty(tmp_path, dek):
 
 
 def test_sqlite_backend_can_be_closed(tmp_path, dek):
-
     backend = SQLiteQueueBackend(
         tmp_path / "queue.db",
         dek=dek,
     )
 
     backend.close()
+
+    with pytest.raises(
+        sqlite3.ProgrammingError,
+        match="closed",
+    ):
+        backend.connection.execute("SELECT 1")
 
 
 def test_sqlite_queue_update_persists_changes(tmp_path, message, dek):
@@ -262,3 +270,33 @@ def test_sqlite_queue_wrong_dek_preserves_existing_item(
         assert restored.id == item.id
     finally:
         restored_backend.close()
+
+
+def test_sqlite_queue_recovers_after_duplicate_insert(
+    tmp_path,
+    message,
+    dek,
+):
+    backend = SQLiteQueueBackend(
+        tmp_path / "queue.db",
+        dek=dek,
+    )
+
+    first = QueueFactory.create(message)
+    second = QueueFactory.create(message)
+
+    backend.enqueue(first)
+
+    second.id = first.id
+
+    with pytest.raises(sqlite3.IntegrityError):
+        backend.enqueue(second)
+
+    assert backend.size() == 1
+
+    third = QueueFactory.create(message)
+    backend.enqueue(third)
+
+    assert backend.size() == 2
+
+    backend.close()

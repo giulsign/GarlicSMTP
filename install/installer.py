@@ -63,6 +63,24 @@ def execute_installation(
     password: str | None = None,
 ) -> None:
 
+    if application_paths is not None:
+        credentials_file = getattr(
+            application_paths,
+            "imap_credentials_file",
+            None,
+        )
+
+        if (
+            password is None
+            and (
+                credentials_file is None
+                or not credentials_file.exists()
+            )
+        ):
+            raise ValueError(
+                "IMAP password is required for first-run"
+            )
+
     profile = detect_platform_profile(
         os_release,
         manifest["platform"]["profiles"],
@@ -114,26 +132,8 @@ def execute_installation(
     )
 
     if application_paths is not None:
-        credentials_file = getattr(
-            application_paths,
-            "imap_credentials_file",
-            None,
-        )
-
-        if (
-            password is None
-            and (
-                credentials_file is None
-                or not credentials_file.exists()
-            )
-        ):
-            raise ValueError(
-                "IMAP password is required for first-run"
-            )
-
         settings_file = application_paths.settings_file
 
-        
         runtime_config_action = build_refreshed_user_action(
                 runtime_user=runtime_user,
                 command=[
@@ -146,7 +146,7 @@ def execute_installation(
         execute_system_action(
                 runtime_config_action,
                 run=system_run,
-            )   
+            )
 
         first_run_action = build_refreshed_user_action(
             runtime_user=runtime_user,
@@ -197,7 +197,7 @@ def run_installation(
         manifest=load_manifest(
             project_root / "install" / "manifest.toml"
         ),
-        project_metadata=load_metadata( 
+        project_metadata=load_metadata(
             project_root / "pyproject.toml"
         ),
         os_release=read_platform(),
@@ -248,4 +248,4 @@ def main(
 
 
 if __name__ == "__main__":
-    main()  
+    main()

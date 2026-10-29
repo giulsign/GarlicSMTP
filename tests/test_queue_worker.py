@@ -227,7 +227,11 @@ def test_worker_keeps_item_when_transport_fails(message):
     worker.stop()
 
     assert queue.size() == 1
-    assert queue.peek() is item
+    assert queue.peek() is None
+
+    assert item.attempts == 1
+    assert item.next_retry is not None
+    assert item.last_error == "RuntimeError"
 
     assert (
         "QueueWorker error [RuntimeError]"
@@ -237,6 +241,42 @@ def test_worker_keeps_item_when_transport_fails(message):
     assert all(
         "delivery failed" not in message
         for message in logger.messages
+    )
+
+
+def test_worker_schedules_retry_on_unexpected_transport_error(
+    message,
+):
+    queue = QueueManager()
+    item = QueueFactory.create(message)
+    queue.enqueue(item)
+
+    logger = SpyLogger()
+
+    worker = QueueWorker(
+        queue=queue,
+        transport=TransportManager(
+            default_transport=BrokenTransport(),
+        ),
+        logger=logger,
+        retry_policy=FixedRetryPolicy(),
+    )
+
+    worker.start()
+    worker.tick()
+    worker.stop()
+
+    assert queue.size() == 1
+    assert queue.peek() is None
+    assert item.attempts == 1
+    assert item.next_retry == datetime(
+        2030, 1, 1, tzinfo=UTC
+    )
+    assert item.last_error == "RuntimeError"
+
+    assert (
+        "QueueWorker error [RuntimeError]"
+        in logger.messages
     )
 
 
@@ -299,31 +339,6 @@ def test_worker_keeps_item_on_temporary_error(message):
         == "TemporaryDeliveryError"
     )
 
-
-def test_worker_discards_item_on_permanent_error(message):
-
-    queue = QueueManager()
-
-    item = QueueFactory.create(message)
-    queue.enqueue(item)
-
-    transport = TransportManager(
-        default_transport=PermanentFailingTransport(),
-    )
-
-    logger = SpyLogger()
-
-    worker = QueueWorker(
-        queue=queue,
-        transport=transport,
-        logger=logger,
-    )
-
-    worker.start()
-    worker.tick()
-    worker.stop()
-
-    assert queue.size() == 0
 
 
 def test_worker_skips_item_not_ready(message):
@@ -789,4 +804,3 @@ def test_worker_retries_changed_onion_e2ee_key_without_overwriting_pin(
         socks.connection.closed
         is True
     )
-    
