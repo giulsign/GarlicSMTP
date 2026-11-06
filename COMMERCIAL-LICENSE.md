@@ -3,7 +3,7 @@
 Copyright © 2026 Giuliano Signorelli
 GarlicSMTP Project
 
-**Document status:** Commercial licensing information for the planned GarlicSMTP `v0.1.2-alpha` release. The Python package and application version declarations are aligned to `0.1.2a0`; release packaging and publication remain subject to verification. This document is informational and does not itself grant a license or announce a published release.
+**Document status:** Commercial licensing information for GarlicSMTP `0.1.2a0` (Git tag `v0.1.2-alpha`). The maintainer has confirmed that the Python package and application version declarations are aligned and that the tag is present on GitHub. The existence, publication, and validation of any GitHub Release or downloadable release artifacts have not been established by this documentation review. This document is informational and does not itself grant a license or announce the availability of release artifacts.
 
 ## 1. Default license
 

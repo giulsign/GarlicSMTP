@@ -1,8 +1,8 @@
 # GarlicSMTP — Third-Party Software and License Review
 
-**Target release:** v0.1.2-alpha (planned Python package version `0.1.2a0`)
-**Status:** Maintainer-review draft; release-artifact compliance checks remain open
-**Review updated:** 29 October 2026
+**Project version:** `0.1.2a0` · **Git tag:** `v0.1.2-alpha` (maintainer-confirmed)
+**Status:** Preliminary third-party license inventory; release-artifact compliance checks remain open
+**Review updated:** 5 November 2026 (historical environment evidence from October 2026)
 
 Copyright © 2026 Giuliano Signorelli — GarlicSMTP Project.
 
@@ -10,13 +10,15 @@ Copyright © 2026 Giuliano Signorelli — GarlicSMTP Project.
 
 Original GarlicSMTP code is licensed under **PolyForm Noncommercial License 1.0.0**, identified in `pyproject.toml` as `LicenseRef-PolyForm-Noncommercial-1.0.0` and documented in the project's `LICENSE`. This does **not** relicense third-party software. Each dependency retains its own license, copyright, conditions and notices. This inventory separates direct dependencies, transitive dependencies, operating-system prerequisites and development-only packages. A package listed in the development environment is not necessarily shipped.
 
-This review describes the inspected **Python 3.12 WSL development environment**, not a completed v0.1.2 release artifact or a legal certification.
+This review describes the previously inspected **Python 3.12 WSL development environment** and the maintainer-confirmed project version and Git tag. It is **not** an inspection of the tagged release artifacts or a legal certification.
 
 ## 2. Evidence and version alignment
 
-Evidence supplied by the maintainer: `pyproject.toml`, `requirements.txt`, `install/manifest.toml`, `pip list --format=freeze`, `dist/` filenames, installed distribution license metadata and paths, extension-module paths, `ldd` output, and the earlier inspection of the `sqlcipher3` license and SQLCipher runtime. License-file presence was confirmed; full text for every dependency was **not** independently reviewed in this update.
+Historical evidence supplied by the maintainer: `pyproject.toml`, `requirements.txt`, `install/manifest.toml`, `pip list --format=freeze`, `dist/` filenames, installed distribution license metadata and paths, extension-module paths, `ldd` output, and the earlier inspection of the `sqlcipher3` license and SQLCipher runtime. License-file presence was confirmed; full text for every dependency was **not** independently reviewed in this update.
 
-The current `pyproject.toml` specifies **`0.1.2a0`**, the installed GarlicSMTP distribution reports **`0.1.0a0`**, and `dist/` contains **`garlicsmtp-0.1.0a0-py3-none-any.whl`** and **`garlicsmtp-0.1.0a0.tar.gz`**. These are not v0.1.2 release artifacts. The planned `0.1.2a0` version and fresh artifacts must be verified during release consolidation.
+The maintainer has confirmed that `pyproject.toml` and `garlicsmtp/__init__.py` are aligned to **`0.1.2a0`** and that the Git tag **`v0.1.2-alpha`** exists on GitHub. These confirmations establish the stated source version and tag, **not** the contents or validation of downloadable release artifacts.
+
+In the previously inspected development environment, the installed GarlicSMTP distribution reported **`0.1.0a0`**. The supplied local project-tree snapshot also lists `dist/garlicsmtp-0.1.0a0-py3-none-any.whl` and `dist/garlicsmtp-0.1.0a0.tar.gz`. These are **historical local build outputs**, not evidence of a `0.1.2a0` wheel or source distribution. No new package build or artifact inspection was performed for this documentation update.
 
 ## 3. Direct runtime dependencies
 
@@ -63,11 +65,11 @@ References: https://www.torproject.org/ ; https://docs.python.org/3/license.html
 
 ## 7. Development-only and unrelated environment packages
 
-The development environment additionally contains tools such as `build`, `pytest`, `pluggy`, `iniconfig`, `packaging`, `Pygments`, `pyproject_hooks`, `PyYAML`, `PySocks`, and Qt/PySide6-related packages (`PySide6`, `PySide6_Addons`, `PySide6_Essentials`, `shiboken6`, version `6.11.1`). The maintainer reports that **PySide6 is no longer used**; it is absent from the declared application dependencies. None of these packages should be treated as redistributed application components solely because they appear in `pip list`. The build requirement `setuptools>=77` likewise does not by itself establish that setuptools is bundled with the installed application.
+The previously inspected development environment additionally contained tools such as `build`, `pytest`, `pluggy`, `iniconfig`, `packaging`, `Pygments`, `pyproject_hooks`, `PyYAML`, `PySocks`, and Qt/PySide6-related packages (`PySide6`, `PySide6_Addons`, `PySide6_Essentials`, `shiboken6`, version `6.11.1`). The maintainer reports that **PySide6 is no longer used**; it is absent from the declared application dependencies. None of these packages should be treated as redistributed application components solely because they appear in `pip list`. The build requirement `setuptools>=77` likewise does not by itself establish that setuptools is bundled with the installed application.
 
 ## 8. Preliminary compatibility assessment
 
-No inherent conflict has been identified between GarlicSMTP's PolyForm Noncommercial 1.0.0 licensing and the **declared** permissively licensed Python dependencies, provided all applicable third-party terms are respected. This is **not** a determination that the future release artifacts are legally cleared for redistribution. A source distribution, a Python wheel and a bundled executable/image may have different contents and obligations. The installed native extensions and complete release-artifact notices still require verification.
+The historical preliminary review identified no inherent conflict between GarlicSMTP's PolyForm Noncommercial 1.0.0 licensing and the **declared** permissively licensed Python dependencies, provided all applicable third-party terms are respected. This is **not** a determination that the future release artifacts are legally cleared for redistribution. A source distribution, a Python wheel and a bundled executable/image may have different contents and obligations. A Git tag does not by itself demonstrate that a GitHub Release or validated binary distributions exist. The installed native extensions and complete release-artifact notices still require verification.
 
 ## 9. Release compliance checklist — v0.1.2-alpha
 
@@ -76,8 +78,8 @@ No inherent conflict has been identified between GarlicSMTP's PolyForm Noncommer
 - [x] Confirm the previously inspected `sqlcipher3` binding license and SQLCipher Community Edition runtime version.
 - [x] Identify native extension paths and inspect their direct dynamic linkage with `ldd`.
 - [x] Update installer profile inventory to Ubuntu 24.04, Kali 2026.1 and Debian 13.
-- [x] Update and verify the project/package version as `0.1.2a0`.
-- [ ] Build and inspect fresh release artifacts; historical `0.1.0a0` outputs do not validate this candidate.
+- [x] Confirm with the maintainer that the project/package version is `0.1.2a0` and the Git tag `v0.1.2-alpha` exists; no independent source or tag inspection was performed in this documentation review.
+- [ ] Establish whether release artifacts for `0.1.2a0` have been built or published, then inspect them; historical `0.1.0a0` outputs do not validate the tagged version.
 - [ ] Inspect exact release wheel and source archive, their file inventories, provenance, dependencies and hashes; check any future bundled image separately.
 - [ ] Review complete authoritative license/copyright texts for the exact versions and any incorporated native components; determine whether SQLCipher, SQLite, OpenSSL or other notices must be included with distributed binaries.
 - [ ] Supply the complete applicable third-party license texts, conditions, disclaimers and notices in the appropriate release distribution or accessible notices location; references in this review alone are insufficient.

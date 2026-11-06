@@ -4,7 +4,7 @@
 
 GarlicSMTP is security-sensitive Alpha software designed to transport email through Tor Onion Services. Responsible security and privacy reports are welcome, including reports from independent researchers and auditors.
 
-This policy describes the **v0.1.2-alpha release candidate**. The corresponding Git tag, published release, and final package metadata must be verified during release consolidation; this document does not claim that they already exist. The project and application version declarations are now aligned to `0.1.2a0`; previously inspected installed metadata and distribution archives reflected earlier versions and have not yet been revalidated. Those artifacts are not evidence of a completed v0.1.2-alpha release.
+This policy applies to the **tagged experimental Alpha baseline `v0.1.2-alpha`**. The project maintainer confirms that the tag exists on GitHub and that `pyproject.toml` and `garlicsmtp/__init__.py` declare `0.1.2a0`. These confirmations are not an independent inspection of the tagged source tree. A Git tag does **not** establish publication of a GitHub Release or validation of new wheel/source-distribution artifacts. Previously inspected installed metadata and distribution archives reflected earlier versions; their status is historical and does not establish the contents of any current artifacts.
 
 GarlicSMTP has **not undergone an independent professional security audit**. Internal review, automated tests, and successful Tor communication cannot guarantee anonymity, confidentiality, integrity, or resistance to endpoint compromise. Assess the deployment environment and threat model before using GarlicSMTP for sensitive communications.
 
@@ -67,6 +67,15 @@ Tor Onion Services can reduce exposure of communicating endpoints' network locat
 
 Tor cannot protect information compromised at an endpoint before entering or after leaving the Tor-protected path. Neither Tor connectivity nor a passing test suite establishes that a deployment is anonymous or secure.
 
+## Experimental Tor connectivity evidence (5 November 2026)
+
+The [integrated audit and T8 report](docs/GarlicSMTP_Integrated_Audit_2026-11-05_T8.md) records operator-executed tests using WSL2 Ubuntu and an Ubuntu 24.04 VirtualBox VM:
+
+- **T0–T4:** bidirectional Onion-to-Onion SMTP delivery succeeded in the tested scenarios, including outbound TCP/UDP destination-port-53 DNS filtering and an isolated Tor bootstrap from an empty data directory in the recorded earlier tests.
+- **T8:** bidirectional Onion-to-Onion SMTP delivery succeeded with temporary `nftables` OUTPUT filtering active on both hosts, permitting loopback and traffic from the Tor service account while dropping other outbound traffic. Direct-connection failures, local SOCKS5 handshakes and Tor-mediated SOCKS CONNECT successes were observed. The experiment's firewall table was removed on both hosts afterward.
+
+**Evidence boundaries:** T8 did not itself repeat an empty-data-directory Tor bootstrap. The experiment did not systematically validate every UDP, ICMP, IPv6, kernel, privileged-process, forwarding, proxy or alternate DNS path, and it was not an anonymity, traffic-correlation or endpoint-compromise assessment. It demonstrates successful operation under the specified temporary filtering rules, **not** universal Tor-only enforcement or proof of zero leaks. The audit's dated source-level findings remain historical records; successful network tests do not independently establish their remediation in the tagged code.
+
 ## Sensitive information and operational precautions
 
 An installation may contain Onion Service identity keys, Tor authentication material, recovery material, mailbox databases, queued messages, attachments, sender and recipient identifiers, metadata, and configuration. Never commit these materials to source control, attach them to public issues, or disclose them in unredacted diagnostics.
@@ -75,9 +84,7 @@ Restrict filesystem permissions, protect the host and backups, inspect logging a
 
 ## Supported versions and security maintenance
 
-**v0.1.2-alpha is a release candidate, not a confirmed published security-maintenance branch.** No guaranteed security-support period has been established for it or for historical Alpha releases. Older commits, prereleases, and development snapshots should not be assumed to receive security fixes.
-
-After publication, update this section to identify the actual release tag and source commit and to state any explicit maintenance commitment. A version number or passing tests alone does not create a security-support guarantee.
+**`v0.1.2-alpha` is a confirmed Git tag, not a guaranteed security-maintenance branch.** No security-support period or fixed patch schedule has been established for it or for historical Alpha releases. Older commits, prereleases and development snapshots should not be assumed to receive security fixes. The exact tagged source commit and any separately published GitHub Release or distribution artifacts have not been independently verified in this documentation review. A version number, Git tag or passing tests alone does not create a security-support guarantee.
 
 ## Coordinated disclosure and security research
 
@@ -85,22 +92,22 @@ The maintainer intends to make reasonable efforts to acknowledge credible report
 
 Good-faith research is welcome when lawful and conducted without intentionally harming people, systems, or networks. Prefer testing against systems and Onion Services you control; avoid accessing third-party data or disrupting services.
 
-## v0.1.2-alpha security review and release checks
+## v0.1.2-alpha security review and artifact-verification boundaries
 
 The internal audit addressed targeted reliability and security-sensitive behaviors, including socket and thread lifecycle cleanup, queue retry handling, SQLCipher transaction recovery, IMAP session authentication, loopback-only SMTP/IMAP listeners, SMTP incomplete-DATA handling, and SMTP input-size limits. The reviewed implementation enforces a **64 KiB SMTP line limit** and a **2 MiB SMTP message limit**; the attachment limit remains **1 MiB**. These limits are implementation controls, not guarantees against all resource-exhaustion attacks.
 
 The latest reported complete development test run passed **1,993 tests**. This is a historical test result for the reviewed code, **not** proof that the final release artifacts have been tested or independently audited.
 
-Before publishing v0.1.2-alpha, confirm against the final source and distribution artifacts:
+Before claiming release-artifact qualification or extending support claims, verify against the exact tagged source and any distributed artifacts:
 
-- the actual package version, Git tag, source commit, and security-support wording;
+- the exact tagged source commit, package metadata, artifact provenance, and security-support wording;
 - the current CLI `start`/DEK bootstrap behavior and any documented limitation;
 - DEK unlock paths, SQLCipher database behavior, GSAT v1 handling, and recovery paths;
 - Onion HTML page paths and other externally influenced configuration;
 - logging, temporary files, backups, permissions, and error paths;
 - exact packaged dependencies and any statically incorporated native components;
 - installation behavior on the claimed target profiles, to the extent tested;
-- the full test results and security-relevant known limitations for the final release candidate.
+- the full test results and security-relevant known limitations for the exact tagged source or distributed artifacts.
 
 These are **verification items**, not assertions of known vulnerabilities or failed tests. Document any remaining limitations accurately rather than implying that internal testing constitutes an independent security audit.
 

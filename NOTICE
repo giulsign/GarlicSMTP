@@ -40,4 +40,4 @@ GarlicSMTP is provided subject to the warranty disclaimers and liability limitat
 
 ## Release context
 
-This notice is prepared for the planned GarlicSMTP `v0.1.2-alpha` release documentation review. The project and application version declarations have been aligned to `0.1.2a0`. It does not state that the corresponding Git tag, release artifacts, or GitHub release have been published. The legal terms remain those of the applicable license, independently of the software version.
+This notice applies to GarlicSMTP `0.1.2a0`, identified by the Git tag `v0.1.2-alpha`. The maintainer has confirmed that the project and application version declarations are aligned and that the tag is present on GitHub. The presence of the Git tag does not, by itself, establish that a GitHub Release or downloadable release artifacts have been published or validated. The legal terms remain those of the applicable license, independently of the software version.
