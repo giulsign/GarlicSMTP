@@ -1,0 +1,1733 @@
+GARLICSMTP — PROJECT TREE / FULL LOCAL WORKING-DIRECTORY INVENTORY
+Snapshot source: supplied terminal output `tree -J`, 5 November 2026
+Documentation revision proposed: 6 November 2026
+Project version: 0.1.2a0; Git tag: v0.1.2-alpha (maintainer-confirmed)
+Inventory mode: B — COMPLETE, including generated files, archives, backups and local data
+Status: DOCUMENTATION PROPOSAL — not a Git-tracked inventory or release manifest
+
+SOURCE AND INTERPRETATION
+This tree is a faithful textual rendering of the uploaded `tree -J` JSON snapshot.
+It retains the original child ordering, paths and file/directory names. The terminal
+prompt and JSON report wrapper are not filesystem entries. Directory names have a
+trailing `/` to distinguish them from files. The JSON report counts 151 directories (including the root `.`)
+and 1,509 files; these counts were reproduced from the JSON.
+
+This is a historical local working-directory snapshot, NOT an independently checked
+GitHub checkout, `git ls-files` listing, package manifest, clean-install inventory,
+or statement that all files should be committed or distributed. The confirmed Git
+tag and version do not imply that the local snapshot equals the tagged commit.
+Do not interpret the presence of `dist/` as evidence of validated 0.1.2a0 release
+assets. The local directory can contain personal data, generated build outputs,
+logs and database files that should not automatically be copied into a release.
+
+DIRECTORY CATEGORIES (classification by path/name; contents not inspected)
+- `garlicsmtp/`, `install/`, `bin/`, `config/`, `tests/`, `tools/`: source,
+  installation, configuration and test/tool areas in the snapshot.
+- `docs/`: current and historical documentation, including archived copies.
+- `build/`, `dist/`, `GarlicSMTP.egg-info/`: build/distribution metadata or outputs;
+  their presence does not establish publication or validity.
+- `logs/`, `spool/`, root `*.db`: local runtime/log/spool/database material;
+  handle as potentially sensitive, without assuming exact contents.
+- `*.backup`, archived document variants and the root `.zip`: backup/archive or
+  snapshot candidates identified by name; do not assume they are distributable.
+- Root `None` and `python`: literal names observed in the supplied JSON; their
+  origin, purpose and Git-tracking status are unknown. Do not silently delete or
+  rename them in a documentary reconstruction.
+- Hidden files or directories excluded by the original `tree` invocation may not
+  be represented. No independent filesystem scan was performed.
+
+DOCUMENTATION AND AUDIT CONTEXT
+The snapshot includes `docs/GarlicSMTP-development-book-13.md` and the integrated
+T8 audit, alongside older documentation and archive copies. Earlier curated
+`project-tree.txt` snapshots omit some of these entries; that is expected because
+this edition is an unfiltered local inventory. The 27 October audit and the 4–5
+November T0–T4/T8 tests are dated evidence, not a claim that the exact tagged
+source, packaged distributions or clean installations have been retested.
+
+CURRENT REVIEW WORKFLOW
+The user has approved the revised README, CHANGELOG, SECURITY, CONTRIBUTING,
+CLA, THIRD_PARTY_LICENSES, COMMERCIAL-LICENSE, NOTICE, installation-architecture,
+quicklaunch, Handbook and Development Book 13. LICENSE was confirmed unchanged.
+This project-tree revision is awaiting explicit approval. Approval does not itself
+mean that a file has been copied to GitHub, committed or released.
+
+COMPLETE SNAPSHOT TREE (JSON entry order preserved)
+GarlicSMTP/
+├── CHANGELOG.md
+├── CLA.md
+├── COMMERCIAL-LICENSE.md
+├── CONTRIBUTING.md
+├── GarlicSMTP.egg-info/
+│   ├── PKG-INFO
+│   ├── SOURCES.txt
+│   ├── dependency_links.txt
+│   ├── entry_points.txt
+│   ├── requires.txt
+│   └── top_level.txt
+├── LICENSE
+├── NOTICE
+├── None
+├── README.md
+├── SECURITY.md
+├── THIRD_PARTY_LICENSES.md
+├── bin/
+│   └── garlicsmtp
+├── build/
+│   ├── bdist.linux-x86_64/
+│   └── lib/
+│       └── garlicsmtp/
+│           ├── __init__.py
+│           ├── api/
+│           │   └── __init__.py
+│           ├── application/
+│           │   ├── __init__.py
+│           │   ├── activity.py
+│           │   ├── attachment_limit.py
+│           │   ├── attachment_limit_admin.py
+│           │   ├── attachment_policy.py
+│           │   ├── attachment_policy_stage.py
+│           │   ├── builder.py
+│           │   ├── compose_view_model.py
+│           │   ├── context.py
+│           │   ├── controller.py
+│           │   ├── event.py
+│           │   ├── event_hub.py
+│           │   ├── event_log.py
+│           │   ├── event_service.py
+│           │   ├── mail_composer.py
+│           │   ├── mailbox_summary.py
+│           │   ├── mailbox_view_model.py
+│           │   ├── message_explorer.py
+│           │   ├── message_formatter.py
+│           │   ├── message_list_view_model.py
+│           │   ├── message_preview_view_model.py
+│           │   ├── message_summary.py
+│           │   ├── onion_presence_http_service.py
+│           │   ├── status.py
+│           │   ├── status_provider.py
+│           │   ├── tor_monitor_service.py
+│           │   ├── tor_status.py
+│           │   ├── tor_status_provider.py
+│           │   └── view_model.py
+│           ├── cli/
+│           │   ├── __init__.py
+│           │   ├── __main__.py
+│           │   └── mailbox.py
+│           ├── config.py
+│           ├── configuration/
+│           │   ├── __init__.py
+│           │   ├── loader.py
+│           │   ├── onion_page_writer.py
+│           │   ├── paths.py
+│           │   └── settings.py
+│           ├── core/
+│           │   ├── __init__.py
+│           │   ├── engine/
+│           │   │   ├── __init__.py
+│           │   │   ├── app.py
+│           │   │   ├── bootstrap.py
+│           │   │   ├── config.py
+│           │   │   ├── runtime.py
+│           │   │   └── state.py
+│           │   ├── events/
+│           │   │   ├── __init__.py
+│           │   │   ├── base.py
+│           │   │   ├── bus.py
+│           │   │   ├── handler.py
+│           │   │   ├── mailaccepted.py
+│           │   │   └── registry.py
+│           │   ├── pipeline/
+│           │   │   ├── __init__.py
+│           │   │   ├── context.py
+│           │   │   ├── logger.py
+│           │   │   ├── pipeline.py
+│           │   │   └── stage.py
+│           │   ├── service.py
+│           │   └── tickable.py
+│           ├── crypto/
+│           │   └── __init__.py
+│           ├── exceptions.py
+│           ├── first_run.py
+│           ├── gui/
+│           │   ├── __init__.py
+│           │   ├── __main__.py
+│           │   ├── application.py
+│           │   ├── folder_opener.py
+│           │   ├── onion_page_gui_factory.py
+│           │   ├── onion_page_preferences.py
+│           │   ├── tk_activity_section.py
+│           │   ├── tk_application_section.py
+│           │   ├── tk_authentication.py
+│           │   ├── tk_compose_section.py
+│           │   ├── tk_dashboard_widgets.py
+│           │   ├── tk_mail_metrics_section.py
+│           │   ├── tk_mailbox_list_section.py
+│           │   ├── tk_main_window.py
+│           │   ├── tk_message_list_section.py
+│           │   ├── tk_message_preview_section.py
+│           │   ├── tk_message_received_list_section.py
+│           │   ├── tk_message_received_preview_section.py
+│           │   ├── tk_message_sent_list_section.py
+│           │   ├── tk_message_sent_preview_section.py
+│           │   ├── tk_onion_page_section.py
+│           │   ├── tk_services_section.py
+│           │   ├── tk_theme.py
+│           │   └── tk_tor_section.py
+│           ├── imap/
+│           │   ├── __init__.py
+│           │   ├── append.py
+│           │   ├── command_result.py
+│           │   ├── fetch.py
+│           │   ├── idle.py
+│           │   ├── literal.py
+│           │   ├── message_parser.py
+│           │   ├── notification_factory.py
+│           │   ├── notification_sink.py
+│           │   ├── null_notification_sink.py
+│           │   ├── parser.py
+│           │   ├── protocol.py
+│           │   ├── reply.py
+│           │   ├── response.py
+│           │   ├── search.py
+│           │   ├── server.py
+│           │   ├── session.py
+│           │   └── store_event_adapter.py
+│           ├── install_first_run.py
+│           ├── install_runtime_config.py
+│           ├── logger.py
+│           ├── models/
+│           │   ├── __init__.py
+│           │   ├── envelope.py
+│           │   ├── header.py
+│           │   ├── message.py
+│           │   ├── onion.py
+│           │   └── smtp.py
+│           ├── network/
+│           │   ├── __init__.py
+│           │   ├── client/
+│           │   │   └── __init__.py
+│           │   ├── server/
+│           │   │   ├── __init__.py
+│           │   │   └── tcp.py
+│           │   ├── socket/
+│           │   │   └── __init__.py
+│           │   ├── socks5/
+│           │   │   ├── __init__.py
+│           │   │   ├── client.py
+│           │   │   ├── connection.py
+│           │   │   ├── exceptions.py
+│           │   │   ├── reply.py
+│           │   │   └── request.py
+│           │   └── text/
+│           │       ├── __init__.py
+│           │       └── connection.py
+│           ├── plugins/
+│           │   └── __init__.py
+│           ├── protocol/
+│           │   └── __init__.py
+│           ├── queue/
+│           │   ├── __init__.py
+│           │   ├── backend.py
+│           │   ├── factory.py
+│           │   ├── item.py
+│           │   ├── manager.py
+│           │   ├── memory.py
+│           │   ├── retry.py
+│           │   ├── serializer.py
+│           │   ├── spool.py
+│           │   ├── sqlite.py
+│           │   ├── stage.py
+│           │   ├── storage.py
+│           │   └── worker.py
+│           ├── runtime_config.py
+│           ├── security/
+│           │   ├── __init__.py
+│           │   ├── at_rest_cipher.py
+│           │   ├── at_rest_key_manager.py
+│           │   ├── auth/
+│           │   │   ├── __init__.py
+│           │   │   ├── account_credentials.py
+│           │   │   ├── authenticator.py
+│           │   │   ├── imap_credentials.py
+│           │   │   ├── memory.py
+│           │   │   ├── password_hasher.py
+│           │   │   ├── persistent_imap_authenticator.py
+│           │   │   └── rejecting.py
+│           │   ├── canonicalizer.py
+│           │   ├── decryptor.py
+│           │   ├── dkim/
+│           │   │   └── __init__.py
+│           │   ├── encrypted_sqlite.py
+│           │   ├── encryption_capability.py
+│           │   ├── encryption_identity.py
+│           │   ├── encryption_key_store.py
+│           │   ├── encryptor.py
+│           │   ├── policy/
+│           │   │   └── __init__.py
+│           │   ├── signature_header.py
+│           │   ├── signer.py
+│           │   ├── signing_identity.py
+│           │   ├── spf/
+│           │   │   └── __init__.py
+│           │   ├── trust_store.py
+│           │   └── verifier.py
+│           ├── smtp/
+│           │   ├── __init__.py
+│           │   ├── connection.py
+│           │   ├── datareceiver.py
+│           │   ├── dispatcher.py
+│           │   ├── engine.py
+│           │   ├── fsm.py
+│           │   ├── handlers/
+│           │   │   ├── __init__.py
+│           │   │   ├── base.py
+│           │   │   ├── data.py
+│           │   │   ├── ehlo.py
+│           │   │   ├── mail.py
+│           │   │   ├── rcpt.py
+│           │   │   └── register.py
+│           │   ├── headerparser.py
+│           │   ├── mime.py
+│           │   ├── parser.py
+│           │   ├── protocol.py
+│           │   ├── replies.py
+│           │   ├── rfc5322.py
+│           │   ├── server.py
+│           │   ├── session.py
+│           │   └── state.py
+│           ├── storage/
+│           │   ├── __init__.py
+│           │   ├── attachment_store.py
+│           │   ├── backend.py
+│           │   ├── composite_event_sink.py
+│           │   ├── delivery_stage.py
+│           │   ├── entry.py
+│           │   ├── entry_serializer.py
+│           │   ├── event_sink.py
+│           │   ├── filesystem/
+│           │   │   └── __init__.py
+│           │   ├── mailbox.py
+│           │   ├── memory/
+│           │   │   ├── __init__.py
+│           │   │   └── backend.py
+│           │   ├── null_event_sink.py
+│           │   ├── serializer.py
+│           │   ├── sqlite/
+│           │   │   ├── __init__.py
+│           │   │   └── backend.py
+│           │   └── store.py
+│           ├── tor/
+│           │   ├── __init__.py
+│           │   ├── control/
+│           │   │   ├── __init__.py
+│           │   │   ├── auth_challenge.py
+│           │   │   ├── authenticator.py
+│           │   │   ├── client.py
+│           │   │   ├── connection.py
+│           │   │   ├── cookie_reader.py
+│           │   │   ├── exceptions.py
+│           │   │   ├── parser.py
+│           │   │   ├── protocol_info.py
+│           │   │   ├── reply.py
+│           │   │   └── safecookie.py
+│           │   ├── onion_service_factory.py
+│           │   └── onion_service_manager.py
+│           ├── transport/
+│           │   ├── __init__.py
+│           │   ├── base.py
+│           │   ├── dns/
+│           │   │   ├── __init__.py
+│           │   │   ├── exceptions.py
+│           │   │   ├── records.py
+│           │   │   └── resolver.py
+│           │   ├── dummy.py
+│           │   ├── lmtp/
+│           │   │   └── __init__.py
+│           │   ├── local/
+│           │   │   ├── __init__.py
+│           │   │   └── transport.py
+│           │   ├── manager.py
+│           │   ├── onion/
+│           │   │   ├── __init__.py
+│           │   │   ├── dummy.py
+│           │   │   ├── transport.py
+│           │   │   └── validator.py
+│           │   ├── smtp/
+│           │   │   ├── __init__.py
+│           │   │   ├── client.py
+│           │   │   ├── connection.py
+│           │   │   ├── exceptions.py
+│           │   │   ├── protocol.py
+│           │   │   ├── reply.py
+│           │   │   └── transport.py
+│           │   ├── socks5/
+│           │   │   └── __init__.py
+│           │   └── tls/
+│           │       └── __init__.py
+│           ├── utils/
+│           │   └── __init__.py
+│           └── version.py
+├── check_onion_smtp.py
+├── config/
+│   └── default.toml
+├── dist/
+│   ├── garlicsmtp-0.1.0a0-py3-none-any.whl
+│   └── garlicsmtp-0.1.0a0.tar.gz
+├── docs/
+│   ├── CHANGELOG.md
+│   ├── CLA.md
+│   ├── COMMERCIAL-LICENSE.md
+│   ├── CONTRIBUTING.md
+│   ├── GarlicSMTP-Handbook.txt
+│   ├── GarlicSMTP-development-book-13.md
+│   ├── GarlicSMTP_Integrated_Audit_2026-11-05_T8.md
+│   ├── GarlicSMTP_Static_Audit_Report_2026-10-27.md
+│   ├── GarlicSMTP_Static_Audit_Report_2026-10-27_followup_v0.1.2.md
+│   ├── GarlicSMTP_Static_Audit_Report_2026-11-04_Integrated.md
+│   ├── README.md
+│   ├── SECURITY.md
+│   ├── THIRD_PARTY_LICENSES.md
+│   ├── alpha_v0.1.0/
+│   │   ├── GarlicSMTP-Handbook-en.txt
+│   │   ├── GarlicSMTP-Handbook-it.txt
+│   │   ├── GarlicSMTP-Handbook.txt
+│   │   ├── GarlicSMTP-Handbook_aggiornato_13_10_26.txt
+│   │   ├── GarlicSMTP-development-book-10-en-PARTIAL.txt
+│   │   ├── GarlicSMTP-development-book-10-it.txt
+│   │   ├── GarlicSMTP-development-book-11-en.txt
+│   │   ├── GarlicSMTP-development-book-11-it.txt
+│   │   ├── GarlicSMTP-development-book-8.txt
+│   │   ├── GarlicSMTP-development-book-9.txt
+│   │   ├── GarlicSMTP_Ripresa_8_Snapshot_Tecnico_Ripresa_Completa_13_10_26.docx
+│   │   ├── develop_snapshots/
+│   │   │   ├── GarlicSMTP - Ripresa 5 - Validazione Alpha.docx
+│   │   │   ├── GarlicSMTP%20-%20ripresa%208%20-%20snapshot.txt
+│   │   │   ├── GarlicSMTP_Architettura_e_Funzionamento 03 09 26.docx
+│   │   │   ├── GarlicSMTP_Architettura_e_Funzionamento_versione2_06%2009%2026.docx
+│   │   │   ├── GarlicSMTP_Handoff_Tecnico_Completo_2026-09-27_RIGENERATO.docx
+│   │   │   ├── GarlicSMTP_Metodologia_Ingegneristica 03 09 26.docx
+│   │   │   ├── GarlicSMTP_Metodologia_Ingegneristica_versione2_06%2009%2026.docx
+│   │   │   ├── GarlicSMTP_Punto_di_Aggiornamento_Sviluppo_09_09_26.docx
+│   │   │   ├── GarlicSMTP_Riepilogo_Tecnico 03 09 26.docx
+│   │   │   ├── GarlicSMTP_Riepilogo_Tecnico_versione2_06%2009%2026.docx
+│   │   │   ├── GarlicSMTP_Ripresa_7_Snapshot_Tecnico_Ripresa_Completa_02_10_26.txt
+│   │   │   ├── GarlicSMTP_Snapshot_Ripresa_Completa_09_09_26.docx
+│   │   │   ├── GarlicSMTP_Snapshot_Ripresa_Completa_15_09_26.docx
+│   │   │   ├── GarlicSMTP_Snapshot_Tecnico_Ripresa_Completa_27_09_26.docx
+│   │   │   └── GarlicSMTP_handoff_2026-09-15.docx
+│   │   ├── installation-architecture-en-PARTIAL.md
+│   │   ├── installation-architecture-it.md
+│   │   ├── installation-architecture.md
+│   │   ├── installation-architecture_aggiornato_13_10_26.md
+│   │   ├── project-tree-en.txt
+│   │   ├── project-tree-it.txt
+│   │   ├── project-tree.txt
+│   │   ├── project-tree_annotato_13_10_26.txt
+│   │   ├── quicklaunch-en.md
+│   │   ├── quicklaunch-it.md
+│   │   ├── quicklaunch.md
+│   │   ├── quicklaunch_aggiornato_13_10_26.md
+│   │   └── tree aggiornato bozza.txt
+│   ├── alpha_v0.1.1/
+│   │   ├── CHANGELOG-en.md
+│   │   ├── CHANGELOG-it.md
+│   │   ├── CLA-en.md
+│   │   ├── CLA-it.md
+│   │   ├── COMMERCIAL-LICENSE-en.md
+│   │   ├── COMMERCIAL-LICENSE-it.md
+│   │   ├── CONTRIBUTING-en.md
+│   │   ├── CONTRIBUTING-it.md
+│   │   ├── GarlicSMTP-Handbook-en.txt
+│   │   ├── GarlicSMTP-Handbook-it.txt
+│   │   ├── GarlicSMTP-development-book-12-en.md
+│   │   ├── GarlicSMTP-development-book-12-it.md
+│   │   ├── LICENSE-en.md
+│   │   ├── LICENSE-it.md
+│   │   ├── NOTICE-en.md
+│   │   ├── NOTICE-it.md
+│   │   ├── README-en.md
+│   │   ├── README-it.md
+│   │   ├── SECURITY-en.md
+│   │   ├── SECURITY-it.md
+│   │   ├── THIRD_PARTY_LICENSES-en.md
+│   │   ├── THIRD_PARTY_LICENSES-it.md
+│   │   ├── installation-architecture-en.md
+│   │   ├── installation-architecture-it.md
+│   │   ├── project-tree-en.txt
+│   │   ├── project-tree-it.txt
+│   │   ├── quicklaunch-en.md
+│   │   └── quicklaunch-it.md
+│   ├── alpha_v0.1.2/
+│   │   ├── CHANGELOG-v0.1.2-en.md
+│   │   ├── CLA-v0.1.2-en.md
+│   │   ├── COMMERCIAL-LICENSE-v0.1.2-en.md
+│   │   ├── CONTRIBUTING-v0.1.2-en.md
+│   │   ├── GarlicSMTP-Handbook-v0.1.2-en.txt
+│   │   ├── GarlicSMTP-development-book-13-v0.1.2-en.md
+│   │   ├── GarlicSMTP_Integrated_Audit_2026-11-05_T8.md
+│   │   ├── GarlicSMTP_Static_Audit_Report_2026-10-27.md
+│   │   ├── GarlicSMTP_Static_Audit_Report_2026-10-27_followup_v0.1.2.md
+│   │   ├── GarlicSMTP_Static_Audit_Report_2026-11-04_Integrated.md
+│   │   ├── LICENSE-v0.1.2-en.md
+│   │   ├── NOTICE-v0.1.2-en
+│   │   ├── README-v0.1.2-en.md
+│   │   ├── SECURITY-v0.1.2-en.md
+│   │   ├── THIRD_PARTY_LICENSES-v0.1.2-en.md
+│   │   ├── installation-architecture-v0.1.2-en.md
+│   │   ├── project-tree-v0.1.2-en.txt
+│   │   └── quicklaunch-v0.1.2-en.md
+│   ├── installation-architecture.md
+│   ├── personalized_html/
+│   │   ├── personalized_html.html
+│   │   └── prova.html
+│   ├── project-tree.txt
+│   └── quicklaunch.md
+├── garlicsmtp/
+│   ├── __init__.py
+│   ├── __pycache__/
+│   │   ├── __init__.cpython-311.pyc
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── exceptions.cpython-311.pyc
+│   │   ├── exceptions.cpython-312.pyc
+│   │   ├── first_run.cpython-312.pyc
+│   │   ├── install_first_run.cpython-312.pyc
+│   │   ├── install_runtime_config.cpython-312.pyc
+│   │   ├── logger.cpython-311.pyc
+│   │   ├── logger.cpython-312.pyc
+│   │   ├── runtime_config.cpython-312.pyc
+│   │   └── version.cpython-312.pyc
+│   ├── api/
+│   │   └── __init__.py
+│   ├── application/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── activity.cpython-311.pyc
+│   │   │   ├── activity.cpython-312.pyc
+│   │   │   ├── attachment_limit.cpython-311.pyc
+│   │   │   ├── attachment_limit.cpython-312.pyc
+│   │   │   ├── attachment_limit_admin.cpython-311.pyc
+│   │   │   ├── attachment_limit_admin.cpython-312.pyc
+│   │   │   ├── attachment_policy.cpython-311.pyc
+│   │   │   ├── attachment_policy.cpython-312.pyc
+│   │   │   ├── attachment_policy_stage.cpython-311.pyc
+│   │   │   ├── attachment_policy_stage.cpython-312.pyc
+│   │   │   ├── builder.cpython-311.pyc
+│   │   │   ├── builder.cpython-312.pyc
+│   │   │   ├── compose_view_model.cpython-311.pyc
+│   │   │   ├── compose_view_model.cpython-312.pyc
+│   │   │   ├── context.cpython-311.pyc
+│   │   │   ├── context.cpython-312.pyc
+│   │   │   ├── controller.cpython-311.pyc
+│   │   │   ├── controller.cpython-312.pyc
+│   │   │   ├── event.cpython-311.pyc
+│   │   │   ├── event.cpython-312.pyc
+│   │   │   ├── event_hub.cpython-311.pyc
+│   │   │   ├── event_hub.cpython-312.pyc
+│   │   │   ├── event_log.cpython-311.pyc
+│   │   │   ├── event_log.cpython-312.pyc
+│   │   │   ├── event_service.cpython-311.pyc
+│   │   │   ├── event_service.cpython-312.pyc
+│   │   │   ├── mail_composer.cpython-311.pyc
+│   │   │   ├── mail_composer.cpython-312.pyc
+│   │   │   ├── mailbox_summary.cpython-311.pyc
+│   │   │   ├── mailbox_summary.cpython-312.pyc
+│   │   │   ├── mailbox_view_model.cpython-311.pyc
+│   │   │   ├── mailbox_view_model.cpython-312.pyc
+│   │   │   ├── message_explorer.cpython-311.pyc
+│   │   │   ├── message_explorer.cpython-312.pyc
+│   │   │   ├── message_formatter.cpython-311.pyc
+│   │   │   ├── message_formatter.cpython-312.pyc
+│   │   │   ├── message_list_view_model.cpython-311.pyc
+│   │   │   ├── message_list_view_model.cpython-312.pyc
+│   │   │   ├── message_preview_view_model.cpython-311.pyc
+│   │   │   ├── message_preview_view_model.cpython-312.pyc
+│   │   │   ├── message_summary.cpython-311.pyc
+│   │   │   ├── message_summary.cpython-312.pyc
+│   │   │   ├── onion_presence_http_service.cpython-312.pyc
+│   │   │   ├── status.cpython-311.pyc
+│   │   │   ├── status.cpython-312.pyc
+│   │   │   ├── status_provider.cpython-311.pyc
+│   │   │   ├── status_provider.cpython-312.pyc
+│   │   │   ├── tor_monitor_service.cpython-311.pyc
+│   │   │   ├── tor_monitor_service.cpython-312.pyc
+│   │   │   ├── tor_status.cpython-311.pyc
+│   │   │   ├── tor_status.cpython-312.pyc
+│   │   │   ├── tor_status_provider.cpython-311.pyc
+│   │   │   ├── tor_status_provider.cpython-312.pyc
+│   │   │   ├── view_model.cpython-311.pyc
+│   │   │   └── view_model.cpython-312.pyc
+│   │   ├── activity.py
+│   │   ├── attachment_limit.py
+│   │   ├── attachment_limit_admin.py
+│   │   ├── attachment_policy.py
+│   │   ├── attachment_policy_stage.py
+│   │   ├── builder.py
+│   │   ├── compose_view_model.py
+│   │   ├── context.py
+│   │   ├── controller.py
+│   │   ├── event.py
+│   │   ├── event_hub.py
+│   │   ├── event_log.py
+│   │   ├── event_service.py
+│   │   ├── mail_composer.py
+│   │   ├── mailbox_summary.py
+│   │   ├── mailbox_view_model.py
+│   │   ├── message_explorer.py
+│   │   ├── message_formatter.py
+│   │   ├── message_list_view_model.py
+│   │   ├── message_preview_view_model.py
+│   │   ├── message_summary.py
+│   │   ├── onion_presence_http_service.py
+│   │   ├── status.py
+│   │   ├── status_provider.py
+│   │   ├── tor_monitor_service.py
+│   │   ├── tor_status.py
+│   │   ├── tor_status_provider.py
+│   │   └── view_model.py
+│   ├── cli/
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── __main__.cpython-312.pyc
+│   │   │   └── mailbox.cpython-312.pyc
+│   │   └── mailbox.py
+│   ├── config.py
+│   ├── configuration/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── loader.cpython-311.pyc
+│   │   │   ├── loader.cpython-312.pyc
+│   │   │   ├── onion_page_writer.cpython-312.pyc
+│   │   │   ├── paths.cpython-311.pyc
+│   │   │   ├── paths.cpython-312.pyc
+│   │   │   ├── settings.cpython-311.pyc
+│   │   │   └── settings.cpython-312.pyc
+│   │   ├── loader.py
+│   │   ├── onion_page_writer.py
+│   │   ├── paths.py
+│   │   └── settings.py
+│   ├── core/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── service.cpython-311.pyc
+│   │   │   ├── service.cpython-312.pyc
+│   │   │   ├── tickable.cpython-311.pyc
+│   │   │   └── tickable.cpython-312.pyc
+│   │   ├── engine/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── app.cpython-311.pyc
+│   │   │   │   ├── app.cpython-312.pyc
+│   │   │   │   ├── bootstrap.cpython-311.pyc
+│   │   │   │   ├── bootstrap.cpython-312.pyc
+│   │   │   │   ├── config.cpython-311.pyc
+│   │   │   │   ├── config.cpython-312.pyc
+│   │   │   │   ├── runtime.cpython-311.pyc
+│   │   │   │   ├── runtime.cpython-312.pyc
+│   │   │   │   ├── state.cpython-311.pyc
+│   │   │   │   └── state.cpython-312.pyc
+│   │   │   ├── app.py
+│   │   │   ├── bootstrap.py
+│   │   │   ├── config.py
+│   │   │   ├── runtime.py
+│   │   │   └── state.py
+│   │   ├── events/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── base.cpython-312.pyc
+│   │   │   │   ├── bus.cpython-312.pyc
+│   │   │   │   ├── handler.cpython-312.pyc
+│   │   │   │   └── mailaccepted.cpython-312.pyc
+│   │   │   ├── base.py
+│   │   │   ├── bus.py
+│   │   │   ├── handler.py
+│   │   │   ├── mailaccepted.py
+│   │   │   └── registry.py
+│   │   ├── pipeline/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── context.cpython-311.pyc
+│   │   │   │   ├── context.cpython-312.pyc
+│   │   │   │   ├── logger.cpython-311.pyc
+│   │   │   │   ├── logger.cpython-312.pyc
+│   │   │   │   ├── pipeline.cpython-311.pyc
+│   │   │   │   ├── pipeline.cpython-312.pyc
+│   │   │   │   ├── stage.cpython-311.pyc
+│   │   │   │   └── stage.cpython-312.pyc
+│   │   │   ├── context.py
+│   │   │   ├── logger.py
+│   │   │   ├── pipeline.py
+│   │   │   └── stage.py
+│   │   ├── service.py
+│   │   └── tickable.py
+│   ├── crypto/
+│   │   └── __init__.py
+│   ├── exceptions.py
+│   ├── first_run.py
+│   ├── gui/
+│   │   ├── __init__.py
+│   │   ├── __main__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── __main__.cpython-311.pyc
+│   │   │   ├── __main__.cpython-312.pyc
+│   │   │   ├── application.cpython-311.pyc
+│   │   │   ├── application.cpython-312.pyc
+│   │   │   ├── dashboard_widgets.cpython-312.pyc
+│   │   │   ├── folder_opener.cpython-311.pyc
+│   │   │   ├── folder_opener.cpython-312.pyc
+│   │   │   ├── main_window.cpython-312.pyc
+│   │   │   ├── onion_page_gui_factory.cpython-312.pyc
+│   │   │   ├── onion_page_preferences.cpython-312.pyc
+│   │   │   ├── tk_activity_section.cpython-311.pyc
+│   │   │   ├── tk_activity_section.cpython-312.pyc
+│   │   │   ├── tk_application_section.cpython-311.pyc
+│   │   │   ├── tk_application_section.cpython-312.pyc
+│   │   │   ├── tk_authentication.cpython-311.pyc
+│   │   │   ├── tk_authentication.cpython-312.pyc
+│   │   │   ├── tk_compose_section.cpython-311.pyc
+│   │   │   ├── tk_compose_section.cpython-312.pyc
+│   │   │   ├── tk_dashboard_widgets.cpython-311.pyc
+│   │   │   ├── tk_dashboard_widgets.cpython-312.pyc
+│   │   │   ├── tk_mail_metrics_section.cpython-311.pyc
+│   │   │   ├── tk_mail_metrics_section.cpython-312.pyc
+│   │   │   ├── tk_mailbox_list_section.cpython-311.pyc
+│   │   │   ├── tk_mailbox_list_section.cpython-312.pyc
+│   │   │   ├── tk_main_window.cpython-311.pyc
+│   │   │   ├── tk_main_window.cpython-312.pyc
+│   │   │   ├── tk_message_list_section.cpython-312.pyc
+│   │   │   ├── tk_message_preview_section.cpython-312.pyc
+│   │   │   ├── tk_message_received_list_section.cpython-311.pyc
+│   │   │   ├── tk_message_received_list_section.cpython-312.pyc
+│   │   │   ├── tk_message_received_preview_section.cpython-311.pyc
+│   │   │   ├── tk_message_received_preview_section.cpython-312.pyc
+│   │   │   ├── tk_message_sent_list_section.cpython-311.pyc
+│   │   │   ├── tk_message_sent_list_section.cpython-312.pyc
+│   │   │   ├── tk_message_sent_preview_section.cpython-311.pyc
+│   │   │   ├── tk_message_sent_preview_section.cpython-312.pyc
+│   │   │   ├── tk_onion_page_section.cpython-312.pyc
+│   │   │   ├── tk_services_section.cpython-311.pyc
+│   │   │   ├── tk_services_section.cpython-312.pyc
+│   │   │   ├── tk_theme.cpython-311.pyc
+│   │   │   ├── tk_theme.cpython-312.pyc
+│   │   │   ├── tk_tor_section.cpython-311.pyc
+│   │   │   └── tk_tor_section.cpython-312.pyc
+│   │   ├── application.py
+│   │   ├── folder_opener.py
+│   │   ├── onion_page_gui_factory.py
+│   │   ├── onion_page_preferences.py
+│   │   ├── sections/
+│   │   │   └── __pycache__/
+│   │   │       ├── __init__.cpython-312.pyc
+│   │   │       ├── activity_section.cpython-312.pyc
+│   │   │       ├── application_section.cpython-312.pyc
+│   │   │       ├── compose_section.cpython-312.pyc
+│   │   │       ├── mail_metrics_section.cpython-312.pyc
+│   │   │       ├── mailbox_list_section.cpython-312.pyc
+│   │   │       ├── message_list_section.cpython-312.pyc
+│   │   │       ├── message_preview_section.cpython-312.pyc
+│   │   │       ├── services_section.cpython-312.pyc
+│   │   │       └── tor_section.cpython-312.pyc
+│   │   ├── tk_activity_section.py
+│   │   ├── tk_application_section.py
+│   │   ├── tk_authentication.py
+│   │   ├── tk_compose_section.py
+│   │   ├── tk_dashboard_widgets.py
+│   │   ├── tk_mail_metrics_section.py
+│   │   ├── tk_mailbox_list_section.py
+│   │   ├── tk_main_window.py
+│   │   ├── tk_message_list_section.py
+│   │   ├── tk_message_preview_section.py
+│   │   ├── tk_message_received_list_section.py
+│   │   ├── tk_message_received_preview_section.py
+│   │   ├── tk_message_sent_list_section.py
+│   │   ├── tk_message_sent_preview_section.py
+│   │   ├── tk_onion_page_section.py
+│   │   ├── tk_services_section.py
+│   │   ├── tk_theme.py
+│   │   └── tk_tor_section.py
+│   ├── imap/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── append.cpython-311.pyc
+│   │   │   ├── append.cpython-312.pyc
+│   │   │   ├── command_result.cpython-311.pyc
+│   │   │   ├── command_result.cpython-312.pyc
+│   │   │   ├── fetch.cpython-311.pyc
+│   │   │   ├── fetch.cpython-312.pyc
+│   │   │   ├── idle.cpython-311.pyc
+│   │   │   ├── idle.cpython-312.pyc
+│   │   │   ├── literal.cpython-311.pyc
+│   │   │   ├── literal.cpython-312.pyc
+│   │   │   ├── message_parser.cpython-311.pyc
+│   │   │   ├── message_parser.cpython-312.pyc
+│   │   │   ├── notification_factory.cpython-312.pyc
+│   │   │   ├── notification_sink.cpython-311.pyc
+│   │   │   ├── notification_sink.cpython-312.pyc
+│   │   │   ├── null_notification_sink.cpython-312.pyc
+│   │   │   ├── parser.cpython-311.pyc
+│   │   │   ├── parser.cpython-312.pyc
+│   │   │   ├── protocol.cpython-311.pyc
+│   │   │   ├── protocol.cpython-312.pyc
+│   │   │   ├── reply.cpython-311.pyc
+│   │   │   ├── reply.cpython-312.pyc
+│   │   │   ├── response.cpython-311.pyc
+│   │   │   ├── response.cpython-312.pyc
+│   │   │   ├── search.cpython-311.pyc
+│   │   │   ├── search.cpython-312.pyc
+│   │   │   ├── server.cpython-311.pyc
+│   │   │   ├── server.cpython-312.pyc
+│   │   │   ├── session.cpython-311.pyc
+│   │   │   ├── session.cpython-312.pyc
+│   │   │   ├── store_event_adapter.cpython-311.pyc
+│   │   │   └── store_event_adapter.cpython-312.pyc
+│   │   ├── append.py
+│   │   ├── command_result.py
+│   │   ├── fetch.py
+│   │   ├── idle.py
+│   │   ├── literal.py
+│   │   ├── message_parser.py
+│   │   ├── notification_factory.py
+│   │   ├── notification_sink.py
+│   │   ├── null_notification_sink.py
+│   │   ├── parser.py
+│   │   ├── protocol.py
+│   │   ├── reply.py
+│   │   ├── response.py
+│   │   ├── search.py
+│   │   ├── server.py
+│   │   ├── session.py
+│   │   └── store_event_adapter.py
+│   ├── install_first_run.py
+│   ├── install_runtime_config.py
+│   ├── logger.py
+│   ├── models/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── envelope.cpython-311.pyc
+│   │   │   ├── envelope.cpython-312.pyc
+│   │   │   ├── header.cpython-311.pyc
+│   │   │   ├── header.cpython-312.pyc
+│   │   │   ├── message.cpython-311.pyc
+│   │   │   ├── message.cpython-312.pyc
+│   │   │   ├── metadata.cpython-312.pyc
+│   │   │   ├── onion.cpython-311.pyc
+│   │   │   ├── onion.cpython-312.pyc
+│   │   │   ├── smtp.cpython-311.pyc
+│   │   │   └── smtp.cpython-312.pyc
+│   │   ├── envelope.py
+│   │   ├── header.py
+│   │   ├── message.py
+│   │   ├── onion.py
+│   │   └── smtp.py
+│   ├── network/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   └── __init__.cpython-312.pyc
+│   │   ├── client/
+│   │   │   └── __init__.py
+│   │   ├── server/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── tcp.cpython-311.pyc
+│   │   │   │   └── tcp.cpython-312.pyc
+│   │   │   └── tcp.py
+│   │   ├── socket/
+│   │   │   └── __init__.py
+│   │   ├── socks5/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── client.cpython-311.pyc
+│   │   │   │   ├── client.cpython-312.pyc
+│   │   │   │   ├── connection.cpython-311.pyc
+│   │   │   │   ├── connection.cpython-312.pyc
+│   │   │   │   ├── exceptions.cpython-311.pyc
+│   │   │   │   ├── exceptions.cpython-312.pyc
+│   │   │   │   ├── reply.cpython-311.pyc
+│   │   │   │   ├── reply.cpython-312.pyc
+│   │   │   │   ├── request.cpython-311.pyc
+│   │   │   │   └── request.cpython-312.pyc
+│   │   │   ├── client.py
+│   │   │   ├── connection.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── reply.py
+│   │   │   └── request.py
+│   │   └── text/
+│   │       ├── __init__.py
+│   │       ├── __pycache__/
+│   │       │   ├── __init__.cpython-311.pyc
+│   │       │   ├── __init__.cpython-312.pyc
+│   │       │   ├── connection.cpython-311.pyc
+│   │       │   └── connection.cpython-312.pyc
+│   │       └── connection.py
+│   ├── plugins/
+│   │   └── __init__.py
+│   ├── protocol/
+│   │   └── __init__.py
+│   ├── queue/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── backend.cpython-311.pyc
+│   │   │   ├── backend.cpython-312.pyc
+│   │   │   ├── factory.cpython-311.pyc
+│   │   │   ├── factory.cpython-312.pyc
+│   │   │   ├── item.cpython-311.pyc
+│   │   │   ├── item.cpython-312.pyc
+│   │   │   ├── manager.cpython-311.pyc
+│   │   │   ├── manager.cpython-312.pyc
+│   │   │   ├── memory.cpython-311.pyc
+│   │   │   ├── memory.cpython-312.pyc
+│   │   │   ├── retry.cpython-311.pyc
+│   │   │   ├── retry.cpython-312.pyc
+│   │   │   ├── serializer.cpython-311.pyc
+│   │   │   ├── serializer.cpython-312.pyc
+│   │   │   ├── sqlite.cpython-311.pyc
+│   │   │   ├── sqlite.cpython-312.pyc
+│   │   │   ├── stage.cpython-311.pyc
+│   │   │   ├── stage.cpython-312.pyc
+│   │   │   ├── storage.cpython-312.pyc
+│   │   │   ├── worker.cpython-311.pyc
+│   │   │   └── worker.cpython-312.pyc
+│   │   ├── backend.py
+│   │   ├── factory.py
+│   │   ├── item.py
+│   │   ├── manager.py
+│   │   ├── memory.py
+│   │   ├── retry.py
+│   │   ├── serializer.py
+│   │   ├── spool.py
+│   │   ├── sqlite.py
+│   │   ├── stage.py
+│   │   ├── storage.py
+│   │   └── worker.py
+│   ├── runtime_config.py
+│   ├── security/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── at_rest_cipher.cpython-312.pyc
+│   │   │   ├── at_rest_key_manager.cpython-312.pyc
+│   │   │   ├── canonicalizer.cpython-311.pyc
+│   │   │   ├── canonicalizer.cpython-312.pyc
+│   │   │   ├── decryptor.cpython-311.pyc
+│   │   │   ├── decryptor.cpython-312.pyc
+│   │   │   ├── encrypted_sqlite.cpython-312.pyc
+│   │   │   ├── encryption_capability.cpython-311.pyc
+│   │   │   ├── encryption_capability.cpython-312.pyc
+│   │   │   ├── encryption_identity.cpython-311.pyc
+│   │   │   ├── encryption_identity.cpython-312.pyc
+│   │   │   ├── encryption_key_store.cpython-311.pyc
+│   │   │   ├── encryption_key_store.cpython-312.pyc
+│   │   │   ├── encryptor.cpython-311.pyc
+│   │   │   ├── encryptor.cpython-312.pyc
+│   │   │   ├── signature_header.cpython-311.pyc
+│   │   │   ├── signature_header.cpython-312.pyc
+│   │   │   ├── signer.cpython-311.pyc
+│   │   │   ├── signer.cpython-312.pyc
+│   │   │   ├── signing_identity.cpython-311.pyc
+│   │   │   ├── signing_identity.cpython-312.pyc
+│   │   │   ├── trust_store.cpython-311.pyc
+│   │   │   ├── trust_store.cpython-312.pyc
+│   │   │   ├── verifier.cpython-311.pyc
+│   │   │   └── verifier.cpython-312.pyc
+│   │   ├── at_rest_cipher.py
+│   │   ├── at_rest_key_manager.py
+│   │   ├── auth/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── account_credentials.cpython-311.pyc
+│   │   │   │   ├── account_credentials.cpython-312.pyc
+│   │   │   │   ├── authenticator.cpython-311.pyc
+│   │   │   │   ├── authenticator.cpython-312.pyc
+│   │   │   │   ├── imap_credentials.cpython-311.pyc
+│   │   │   │   ├── imap_credentials.cpython-312.pyc
+│   │   │   │   ├── memory.cpython-311.pyc
+│   │   │   │   ├── memory.cpython-312.pyc
+│   │   │   │   ├── password_hasher.cpython-311.pyc
+│   │   │   │   ├── password_hasher.cpython-312.pyc
+│   │   │   │   ├── persistent_imap_authenticator.cpython-311.pyc
+│   │   │   │   ├── persistent_imap_authenticator.cpython-312.pyc
+│   │   │   │   ├── rejecting.cpython-311.pyc
+│   │   │   │   └── rejecting.cpython-312.pyc
+│   │   │   ├── account_credentials.py
+│   │   │   ├── authenticator.py
+│   │   │   ├── imap_credentials.py
+│   │   │   ├── memory.py
+│   │   │   ├── password_hasher.py
+│   │   │   ├── persistent_imap_authenticator.py
+│   │   │   └── rejecting.py
+│   │   ├── canonicalizer.py
+│   │   ├── decryptor.py
+│   │   ├── dkim/
+│   │   │   └── __init__.py
+│   │   ├── encrypted_sqlite.py
+│   │   ├── encryption_capability.py
+│   │   ├── encryption_identity.py
+│   │   ├── encryption_key_store.py
+│   │   ├── encryptor.py
+│   │   ├── policy/
+│   │   │   └── __init__.py
+│   │   ├── signature_header.py
+│   │   ├── signer.py
+│   │   ├── signing_identity.py
+│   │   ├── spf/
+│   │   │   └── __init__.py
+│   │   ├── trust_store.py
+│   │   └── verifier.py
+│   ├── smtp/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── connection.cpython-311.pyc
+│   │   │   ├── connection.cpython-312.pyc
+│   │   │   ├── datareceiver.cpython-311.pyc
+│   │   │   ├── datareceiver.cpython-312.pyc
+│   │   │   ├── dispatcher.cpython-311.pyc
+│   │   │   ├── dispatcher.cpython-312.pyc
+│   │   │   ├── engine.cpython-311.pyc
+│   │   │   ├── engine.cpython-312.pyc
+│   │   │   ├── fsm.cpython-311.pyc
+│   │   │   ├── fsm.cpython-312.pyc
+│   │   │   ├── headerparser.cpython-311.pyc
+│   │   │   ├── headerparser.cpython-312.pyc
+│   │   │   ├── mime.cpython-311.pyc
+│   │   │   ├── mime.cpython-312.pyc
+│   │   │   ├── parser.cpython-311.pyc
+│   │   │   ├── parser.cpython-312.pyc
+│   │   │   ├── protocol.cpython-311.pyc
+│   │   │   ├── protocol.cpython-312.pyc
+│   │   │   ├── replies.cpython-311.pyc
+│   │   │   ├── replies.cpython-312.pyc
+│   │   │   ├── rfc5322.cpython-311.pyc
+│   │   │   ├── rfc5322.cpython-312.pyc
+│   │   │   ├── server.cpython-311.pyc
+│   │   │   ├── server.cpython-312.pyc
+│   │   │   ├── session.cpython-311.pyc
+│   │   │   ├── session.cpython-312.pyc
+│   │   │   ├── state.cpython-311.pyc
+│   │   │   └── state.cpython-312.pyc
+│   │   ├── connection.py
+│   │   ├── datareceiver.py
+│   │   ├── dispatcher.py
+│   │   ├── engine.py
+│   │   ├── fsm.py
+│   │   ├── handlers/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── base.cpython-311.pyc
+│   │   │   │   ├── base.cpython-312.pyc
+│   │   │   │   ├── data.cpython-311.pyc
+│   │   │   │   ├── data.cpython-312.pyc
+│   │   │   │   ├── ehlo.cpython-311.pyc
+│   │   │   │   ├── ehlo.cpython-312.pyc
+│   │   │   │   ├── mail.cpython-311.pyc
+│   │   │   │   ├── mail.cpython-312.pyc
+│   │   │   │   ├── rcpt.cpython-311.pyc
+│   │   │   │   ├── rcpt.cpython-312.pyc
+│   │   │   │   ├── register.cpython-311.pyc
+│   │   │   │   └── register.cpython-312.pyc
+│   │   │   ├── base.py
+│   │   │   ├── data.py
+│   │   │   ├── ehlo.py
+│   │   │   ├── mail.py
+│   │   │   ├── rcpt.py
+│   │   │   └── register.py
+│   │   ├── headerparser.py
+│   │   ├── mime.py
+│   │   ├── parser.py
+│   │   ├── protocol.py
+│   │   ├── replies.py
+│   │   ├── rfc5322.py
+│   │   ├── server.py
+│   │   ├── session.py
+│   │   └── state.py
+│   ├── storage/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── attachment_migration.cpython-312.pyc
+│   │   │   ├── attachment_store.cpython-311.pyc
+│   │   │   ├── attachment_store.cpython-312.pyc
+│   │   │   ├── backend.cpython-311.pyc
+│   │   │   ├── backend.cpython-312.pyc
+│   │   │   ├── composite_event_sink.cpython-311.pyc
+│   │   │   ├── composite_event_sink.cpython-312.pyc
+│   │   │   ├── database_migration.cpython-312.pyc
+│   │   │   ├── delivery_stage.cpython-311.pyc
+│   │   │   ├── delivery_stage.cpython-312.pyc
+│   │   │   ├── entry.cpython-311.pyc
+│   │   │   ├── entry.cpython-312.pyc
+│   │   │   ├── entry_serializer.cpython-312.pyc
+│   │   │   ├── event_sink.cpython-311.pyc
+│   │   │   ├── event_sink.cpython-312.pyc
+│   │   │   ├── mailbox.cpython-311.pyc
+│   │   │   ├── mailbox.cpython-312.pyc
+│   │   │   ├── null_event_sink.cpython-311.pyc
+│   │   │   ├── null_event_sink.cpython-312.pyc
+│   │   │   ├── serializer.cpython-311.pyc
+│   │   │   ├── serializer.cpython-312.pyc
+│   │   │   ├── store.cpython-311.pyc
+│   │   │   └── store.cpython-312.pyc
+│   │   ├── attachment_store - Copia.py.backup
+│   │   ├── attachment_store.py
+│   │   ├── backend.py
+│   │   ├── composite_event_sink.py
+│   │   ├── delivery_stage.py
+│   │   ├── entry.py
+│   │   ├── entry_serializer.py
+│   │   ├── event_sink.py
+│   │   ├── filesystem/
+│   │   │   └── __init__.py
+│   │   ├── mailbox.py
+│   │   ├── memory/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── backend.cpython-311.pyc
+│   │   │   │   └── backend.cpython-312.pyc
+│   │   │   └── backend.py
+│   │   ├── null_event_sink.py
+│   │   ├── serializer.py
+│   │   ├── sqlite/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── backend.cpython-311.pyc
+│   │   │   │   └── backend.cpython-312.pyc
+│   │   │   └── backend.py
+│   │   └── store.py
+│   ├── tor/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── onion_service_factory.cpython-311.pyc
+│   │   │   ├── onion_service_factory.cpython-312.pyc
+│   │   │   ├── onion_service_manager.cpython-311.pyc
+│   │   │   └── onion_service_manager.cpython-312.pyc
+│   │   ├── control/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── auth_challenge.cpython-311.pyc
+│   │   │   │   ├── auth_challenge.cpython-312.pyc
+│   │   │   │   ├── authenticator.cpython-311.pyc
+│   │   │   │   ├── authenticator.cpython-312.pyc
+│   │   │   │   ├── client.cpython-311.pyc
+│   │   │   │   ├── client.cpython-312.pyc
+│   │   │   │   ├── connection.cpython-311.pyc
+│   │   │   │   ├── connection.cpython-312.pyc
+│   │   │   │   ├── cookie_reader.cpython-311.pyc
+│   │   │   │   ├── cookie_reader.cpython-312.pyc
+│   │   │   │   ├── exceptions.cpython-311.pyc
+│   │   │   │   ├── exceptions.cpython-312.pyc
+│   │   │   │   ├── parser.cpython-311.pyc
+│   │   │   │   ├── parser.cpython-312.pyc
+│   │   │   │   ├── protocol_info.cpython-311.pyc
+│   │   │   │   ├── protocol_info.cpython-312.pyc
+│   │   │   │   ├── reply.cpython-311.pyc
+│   │   │   │   ├── reply.cpython-312.pyc
+│   │   │   │   ├── safecookie.cpython-311.pyc
+│   │   │   │   └── safecookie.cpython-312.pyc
+│   │   │   ├── auth_challenge.py
+│   │   │   ├── authenticator.py
+│   │   │   ├── client.py
+│   │   │   ├── connection.py
+│   │   │   ├── cookie_reader.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── parser.py
+│   │   │   ├── protocol_info.py
+│   │   │   ├── reply.py
+│   │   │   └── safecookie.py
+│   │   ├── onion_service_factory.py
+│   │   └── onion_service_manager.py
+│   ├── transport/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-311.pyc
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   ├── base.cpython-311.pyc
+│   │   │   ├── base.cpython-312.pyc
+│   │   │   ├── dummy.cpython-312.pyc
+│   │   │   ├── manager.cpython-311.pyc
+│   │   │   └── manager.cpython-312.pyc
+│   │   ├── base.py
+│   │   ├── dns/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── exceptions.cpython-312.pyc
+│   │   │   │   ├── records.cpython-312.pyc
+│   │   │   │   └── resolver.cpython-312.pyc
+│   │   │   ├── exceptions.py
+│   │   │   ├── records.py
+│   │   │   └── resolver.py
+│   │   ├── dummy.py
+│   │   ├── lmtp/
+│   │   │   └── __init__.py
+│   │   ├── local/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   └── transport.cpython-312.pyc
+│   │   │   └── transport.py
+│   │   ├── manager.py
+│   │   ├── onion/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── dummy.cpython-311.pyc
+│   │   │   │   ├── dummy.cpython-312.pyc
+│   │   │   │   ├── transport.cpython-311.pyc
+│   │   │   │   ├── transport.cpython-312.pyc
+│   │   │   │   ├── validator.cpython-311.pyc
+│   │   │   │   └── validator.cpython-312.pyc
+│   │   │   ├── dummy.py
+│   │   │   ├── transport.py
+│   │   │   └── validator.py
+│   │   ├── smtp/
+│   │   │   ├── __init__.py
+│   │   │   ├── __pycache__/
+│   │   │   │   ├── __init__.cpython-311.pyc
+│   │   │   │   ├── __init__.cpython-312.pyc
+│   │   │   │   ├── client.cpython-311.pyc
+│   │   │   │   ├── client.cpython-312.pyc
+│   │   │   │   ├── connection.cpython-311.pyc
+│   │   │   │   ├── connection.cpython-312.pyc
+│   │   │   │   ├── exceptions.cpython-311.pyc
+│   │   │   │   ├── exceptions.cpython-312.pyc
+│   │   │   │   ├── protocol.cpython-311.pyc
+│   │   │   │   ├── protocol.cpython-312.pyc
+│   │   │   │   ├── reply.cpython-311.pyc
+│   │   │   │   ├── reply.cpython-312.pyc
+│   │   │   │   └── transport.cpython-312.pyc
+│   │   │   ├── client.py
+│   │   │   ├── connection.py
+│   │   │   ├── exceptions.py
+│   │   │   ├── protocol.py
+│   │   │   ├── reply.py
+│   │   │   └── transport.py
+│   │   ├── socks5/
+│   │   │   └── __init__.py
+│   │   └── tls/
+│   │       └── __init__.py
+│   ├── utils/
+│   │   └── __init__.py
+│   └── version.py
+├── garlicsmtp-architecture-snapshot.zip
+├── install/
+│   ├── __pycache__/
+│   │   ├── desktop.cpython-312.pyc
+│   │   ├── environment.cpython-312.pyc
+│   │   ├── first_run.cpython-312.pyc
+│   │   ├── generator.cpython-312.pyc
+│   │   ├── installer.cpython-312.pyc
+│   │   ├── platform.cpython-312.pyc
+│   │   ├── prerequisites.cpython-312.pyc
+│   │   ├── runtime_config.cpython-312.pyc
+│   │   ├── system.cpython-312.pyc
+│   │   ├── tor_config.cpython-312.pyc
+│   │   ├── tor_runtime.cpython-312.pyc
+│   │   ├── uninstaller.cpython-312.pyc
+│   │   └── validator.cpython-312.pyc
+│   ├── assets/
+│   │   └── garlicsmtp.png
+│   ├── desktop.py
+│   ├── environment.py
+│   ├── generator.py
+│   ├── installer.py
+│   ├── manifest.toml
+│   ├── platform.py
+│   ├── prerequisites.py
+│   ├── runtime_config.py
+│   ├── system.py
+│   ├── tor_config.py
+│   ├── tor_runtime.py
+│   ├── uninstaller.py
+│   └── validator.py
+├── install.sh
+├── logs/
+│   └── garlicsmtp.log
+├── mailboxes.db
+├── mypy.ini
+├── pyproject.toml
+├── pytest.ini
+├── python
+├── receiver-mailboxes.db
+├── receiver-queue.db
+├── requirements.txt
+├── spool/
+│   ├── active/
+│   ├── bounce/
+│   ├── deferred/
+│   ├── failed/
+│   ├── incoming/
+│   ├── sent/
+│   └── tmp/
+├── tests/
+│   ├── __init__.py
+│   ├── __pycache__/
+│   │   ├── __init__.cpython-312.pyc
+│   │   ├── conftest.cpython-312-pytest-7.4.4.pyc
+│   │   ├── conftest.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_account_credentials.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_account_credentials.cpython-312.pyc
+│   │   ├── test_application_activity.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_builder.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_context.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_controller.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_event_hub.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_event_log.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_paths.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_settings.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_status.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_application_view_model.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_at_rest_cipher.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_at_rest_key_manager.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_attachment_limit.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_attachment_limit_admin.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_attachment_migration.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_attachment_policy.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_attachment_policy_stage.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_attachment_store.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_authenticator.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_bootstrap.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_bootstrap_factories.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_cli.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_cli_mailbox.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_compose_view_model.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_configuration_loader.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_database_migration.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_datareceiver.cpython-312-pytest-7.4.4.pyc
+│   │   ├── test_datareceiver.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_delivery_exceptions.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_delivery_stage.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_delivery_stage_integration.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_dispatcher.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_dns_lookup.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_dns_resolver.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_ehlo_handler.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_encrypted_sqlite_backends.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_encrypted_sqlite_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_encryption_capability.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_encryption_identity.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_encryption_key_store.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_end_to_end.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_engine.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_engine_config.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_events.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_file_trust_store.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_first_run.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_fsm.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_activity_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_application.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_application_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_compose_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_folder_opener.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_mail_metrics_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_mailbox_list_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_main.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_main_window.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_message_list_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_message_preview_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_services_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_activity_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_application_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_authentication.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_compose_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_dashboard_widgets.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_mail_metrics_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_mailbox_list_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_main_window.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_main_window.cpython-312.pyc
+│   │   ├── test_gui_tk_message_list_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_message_preview_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_services_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_theme.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tk_tor_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_gui_tor_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_headerparser.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_append.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_command_result.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_credentials.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_fetch.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_idle.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_message_parser.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_notification_factory.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_notification_sink.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_parser.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_protocol.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_reply.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_response.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_search.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_server.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_server_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_session.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_imap_store_event_adapter.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_desktop.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_environment.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_first_run.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_first_run_entrypoint.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_generator.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_installer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_manifest.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_platform.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_prerequisites.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_runtime_config.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_runtime_config_entrypoint.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_system.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_tor_config.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_tor_runtime.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_install_uninstaller.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_legacy_database_migration.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_local_transport.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_logger.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_mail_composer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_mail_flow.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_mail_headers.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_mailbox_view.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_canonicalizer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_encryptor.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_entry.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_entry_serializer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_explorer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_formatter.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_list_view_model.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_preview_view_model.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_serializer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_signer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_store.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_store_memory.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_store_sqlite.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_summary.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_message_verifier.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_mime_decoder.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_address.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_end_to_end_local.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_end_to_end_local.cpython-312.pyc
+│   │   ├── test_onion_page_configuration_writer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_page_gui_factory.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_page_preferences.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_presence_http_service.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_service_manager.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_transport.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_onion_validator.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_packaging.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_parser.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_password_hasher.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_persistent_imap_authenticator.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_pipeline.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_protocol.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_backend.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_factory.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_item.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_manager_sqlite.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_persistence.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_serializer.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_sqlite_backend.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_stage.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_storage.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_queue_worker.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_receiver_mailbox_pipeline.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_reply.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_retry_policy.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_rfc5322.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_runtime.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_runtime_config.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_runtime_state.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_service.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_session.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_signature_header.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_signature_roundtrip.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_signing_identity.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_smtp_client_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_smtp_real_client.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_smtp_server.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_smtp_server_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_socks5_client.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_socks5_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_socks5_reply.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_socks5_request.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_store_event_sink.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tcp_server.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_text_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tickable.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tk_onion_page_integration.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tk_onion_page_section.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_auth_challenge.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_authenticator.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_client.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_connection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_cookie_reader.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_protocol_info.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_reply_parser.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_control_safecookie.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_monitor_service.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_onion_service_factory.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_status.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_tor_status_provider_authenticated.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_transport_manager.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_transport_manager_onion_real.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_transport_selection.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_transport_smtp_client.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_transport_smtp_protocol.cpython-312-pytest-9.1.1.pyc
+│   │   ├── test_transport_smtp_transport.cpython-312-pytest-9.1.1.pyc
+│   │   └── test_trust_store.cpython-312-pytest-9.1.1.pyc
+│   ├── conftest.py
+│   ├── support/
+│   │   ├── __init__.py
+│   │   ├── __pycache__/
+│   │   │   ├── __init__.cpython-312.pyc
+│   │   │   └── application.cpython-312.pyc
+│   │   └── application.py
+│   ├── test_account_credentials.py
+│   ├── test_application_activity.py
+│   ├── test_application_builder.py
+│   ├── test_application_context.py
+│   ├── test_application_controller.py
+│   ├── test_application_event_hub.py
+│   ├── test_application_event_log.py
+│   ├── test_application_paths.py
+│   ├── test_application_settings.py
+│   ├── test_application_status.py
+│   ├── test_application_view_model.py
+│   ├── test_at_rest_cipher.py
+│   ├── test_at_rest_key_manager.py
+│   ├── test_attachment_limit.py
+│   ├── test_attachment_limit_admin.py
+│   ├── test_attachment_policy.py
+│   ├── test_attachment_policy_stage.py
+│   ├── test_attachment_store.py
+│   ├── test_authenticator.py
+│   ├── test_bootstrap.py
+│   ├── test_bootstrap_factories.py
+│   ├── test_cli.py
+│   ├── test_cli_mailbox.py
+│   ├── test_compose_view_model.py
+│   ├── test_configuration_loader.py
+│   ├── test_connection.py
+│   ├── test_datareceiver.py
+│   ├── test_delivery_exceptions.py
+│   ├── test_delivery_stage.py
+│   ├── test_delivery_stage_integration.py
+│   ├── test_dispatcher.py
+│   ├── test_dns_lookup.py
+│   ├── test_dns_resolver.py
+│   ├── test_ehlo_handler.py
+│   ├── test_encrypted_sqlite_backends.py
+│   ├── test_encrypted_sqlite_connection.py
+│   ├── test_encryption_capability.py
+│   ├── test_encryption_identity.py
+│   ├── test_encryption_key_store.py
+│   ├── test_end_to_end.py
+│   ├── test_engine.py
+│   ├── test_engine_config.py
+│   ├── test_events.py
+│   ├── test_file_trust_store.py
+│   ├── test_first_run.py
+│   ├── test_fsm.py
+│   ├── test_gui_application.py
+│   ├── test_gui_folder_opener.py
+│   ├── test_gui_main.py
+│   ├── test_gui_tk_activity_section.py
+│   ├── test_gui_tk_application_section.py
+│   ├── test_gui_tk_authentication.py
+│   ├── test_gui_tk_compose_section.py
+│   ├── test_gui_tk_dashboard_widgets.py
+│   ├── test_gui_tk_mail_metrics_section.py
+│   ├── test_gui_tk_mailbox_list_section.py
+│   ├── test_gui_tk_main_window.py
+│   ├── test_gui_tk_message_list_section.py
+│   ├── test_gui_tk_message_preview_section.py
+│   ├── test_gui_tk_services_section.py
+│   ├── test_gui_tk_theme.py
+│   ├── test_gui_tk_tor_section.py
+│   ├── test_headerparser.py
+│   ├── test_imap_append.py
+│   ├── test_imap_command_result.py
+│   ├── test_imap_credentials.py
+│   ├── test_imap_fetch.py
+│   ├── test_imap_idle.py
+│   ├── test_imap_message_parser.py
+│   ├── test_imap_notification_factory.py
+│   ├── test_imap_notification_sink.py
+│   ├── test_imap_parser.py
+│   ├── test_imap_protocol.py
+│   ├── test_imap_reply.py
+│   ├── test_imap_response.py
+│   ├── test_imap_search.py
+│   ├── test_imap_server.py
+│   ├── test_imap_server_connection.py
+│   ├── test_imap_session.py
+│   ├── test_imap_store_event_adapter.py
+│   ├── test_install_desktop.py
+│   ├── test_install_environment.py
+│   ├── test_install_first_run.py
+│   ├── test_install_first_run_entrypoint.py
+│   ├── test_install_generator.py
+│   ├── test_install_installer.py
+│   ├── test_install_manifest.py
+│   ├── test_install_platform.py
+│   ├── test_install_prerequisites.py
+│   ├── test_install_runtime_config.py
+│   ├── test_install_runtime_config_entrypoint.py
+│   ├── test_install_system.py
+│   ├── test_install_tor_config.py
+│   ├── test_install_tor_runtime.py
+│   ├── test_install_uninstaller.py
+│   ├── test_local_transport.py
+│   ├── test_logger.py
+│   ├── test_mail_composer.py
+│   ├── test_mail_flow.py
+│   ├── test_mail_headers.py
+│   ├── test_mailbox_view.py
+│   ├── test_message_canonicalizer.py
+│   ├── test_message_encryptor.py
+│   ├── test_message_entry.py
+│   ├── test_message_entry_serializer.py
+│   ├── test_message_explorer.py
+│   ├── test_message_formatter.py
+│   ├── test_message_list_view_model.py
+│   ├── test_message_preview_view_model.py
+│   ├── test_message_serializer.py
+│   ├── test_message_signer.py
+│   ├── test_message_store.py
+│   ├── test_message_store_memory.py
+│   ├── test_message_store_sqlite.py
+│   ├── test_message_summary.py
+│   ├── test_message_verifier.py
+│   ├── test_mime_decoder.py
+│   ├── test_onion_address.py
+│   ├── test_onion_end_to_end_local.py
+│   ├── test_onion_page_configuration_writer.py
+│   ├── test_onion_page_gui_factory.py
+│   ├── test_onion_page_preferences.py
+│   ├── test_onion_presence_http_service.py
+│   ├── test_onion_service_manager.py
+│   ├── test_onion_transport.py
+│   ├── test_onion_validator.py
+│   ├── test_packaging.py
+│   ├── test_parser.py
+│   ├── test_password_hasher.py
+│   ├── test_persistent_imap_authenticator.py
+│   ├── test_pipeline.py
+│   ├── test_protocol.py
+│   ├── test_queue.py
+│   ├── test_queue_backend.py
+│   ├── test_queue_factory.py
+│   ├── test_queue_item.py
+│   ├── test_queue_manager_sqlite.py
+│   ├── test_queue_persistence.py
+│   ├── test_queue_serializer.py
+│   ├── test_queue_sqlite_backend.py
+│   ├── test_queue_stage.py
+│   ├── test_queue_storage.py
+│   ├── test_queue_worker.py
+│   ├── test_receiver_mailbox_pipeline.py
+│   ├── test_reply.py
+│   ├── test_retry_policy.py
+│   ├── test_rfc5322.py
+│   ├── test_runtime.py
+│   ├── test_runtime_config.py
+│   ├── test_runtime_state.py
+│   ├── test_service.py
+│   ├── test_session.py
+│   ├── test_signature_header.py
+│   ├── test_signature_roundtrip.py
+│   ├── test_signing_identity.py
+│   ├── test_smtp_client_connection.py
+│   ├── test_smtp_real_client.py
+│   ├── test_smtp_server.py
+│   ├── test_smtp_server_connection.py
+│   ├── test_socks5_client.py
+│   ├── test_socks5_connection.py
+│   ├── test_socks5_reply.py
+│   ├── test_socks5_request.py
+│   ├── test_store_event_sink.py
+│   ├── test_tcp_server.py
+│   ├── test_text_connection.py
+│   ├── test_tickable.py
+│   ├── test_tk_onion_page_integration.py
+│   ├── test_tk_onion_page_section.py
+│   ├── test_tor_control_auth_challenge.py
+│   ├── test_tor_control_authenticator.py
+│   ├── test_tor_control_client.py
+│   ├── test_tor_control_connection.py
+│   ├── test_tor_control_cookie_reader.py
+│   ├── test_tor_control_protocol_info.py
+│   ├── test_tor_control_reply_parser.py
+│   ├── test_tor_control_safecookie.py
+│   ├── test_tor_monitor_service.py
+│   ├── test_tor_onion_service_factory.py
+│   ├── test_tor_status.py
+│   ├── test_tor_status_provider_authenticated.py
+│   ├── test_transport_manager.py
+│   ├── test_transport_manager_onion_real.py
+│   ├── test_transport_selection.py
+│   ├── test_transport_smtp_client.py
+│   ├── test_transport_smtp_protocol.py
+│   ├── test_transport_smtp_transport.py
+│   └── test_trust_store.py
+└── tools/
+    ├── __init__.py
+    ├── check_onion_smtp.py
+    ├── inspect_receiver_queue.py
+    ├── run_onion_receiver.py
+    ├── send_onion_mail.py
+    └── verify_tor_delivery.py
+
+SNAPSHOT TOTALS
+Directories (including root): 151
+Files: 1,509
+Source: uploaded `tree -J` terminal output dated 5 November 2026.
+
+SPECIAL ENTRIES — VERIFY BEFORE ANY SOURCE-CONTROL OR RELEASE DECISION
+- None (root-level entry; purpose or release status not verified)
+- python (root-level entry; purpose or release status not verified)
+- garlicsmtp-architecture-snapshot.zip (root-level entry; purpose or release status not verified)
+- mailboxes.db (root-level entry; purpose or release status not verified)
+- receiver-mailboxes.db (root-level entry; purpose or release status not verified)
+- receiver-queue.db (root-level entry; purpose or release status not verified)
+- garlicsmtp/storage/attachment_store - Copia.py.backup (backup by filename; retain in inventory, not automatically a release asset)
+
+The inventory intentionally retains `build/`, `dist/`, `GarlicSMTP.egg-info/`,
+`logs/`, `spool/`, archive copies and local data. Their inclusion is descriptive,
+not an endorsement to publish, upload, commit, package, delete or clean them.
+No source-code, repository or local project-directory modifications were made.

@@ -1,0 +1,361 @@
+GarlicSMTP - ripresa 8 - snapshot
+
+Data snapshot: 8 ottobre 2026 Stato: documento di continuità tecnica.
+Non costituisce prova di esecuzione dei test o di implementazione delle
+funzionalità non ancora sviluppate.
+
+====================================================================== 1.
+SCOPO E PERIMETRO
+======================================================================
+
+Questo snapshot riassume il lavoro e le conclusioni della presente chat
+(ripresa 8), includendo il contesto operativo e i risultati precedenti
+riportati e utilizzati durante la conversazione. Serve a permettere a
+una nuova chat di riprendere lo sviluppo senza confondere fatti
+verificati, requisiti, proposte e attività future.
+
+Obiettivo principale: cifratura e decifratura reale dei dati persistenti
+di GarlicSMTP, integrata con password di accesso e chiave di recupero
+offline. Deve funzionare sull’account developer già esistente e nelle
+installazioni distribuite, senza perdere messaggi, allegati, identità
+crittografiche o identità Onion.
+
+STATO ALLA CHIUSURA: SOLO ANALISI ARCHITETTURALE NELLA PRESENTE CHAT.
+Non sono stati generati nuovi test RED, non è stato generato codice
+applicativo, non è stata implementata cifratura a riposo, non è stata
+implementata la recovery key, non è stata effettuata alcuna migrazione e
+non è stato eseguito pytest in questa chat.
+
+======================================================================
+2. AMBIENTE, METODO DI LAVORO E VINCOLI
+======================================================================
+
+-   Repository: /mnt/c/garlicsmtp, su WSL Ubuntu in ambiente Windows.
+-   I comandi Python, pytest e ispezione sorgenti sono eseguiti in WSL
+    Ubuntu; comandi Git secondo il workflow utente su Windows.
+-   Ambiente di validazione distribuzione: VM Ubuntu 24.04.
+-   L’utente esegue le modifiche e i comandi; non attribuire mai test o
+    commit non effettivamente confermati.
+-   REGOLA ESPLICITA: «PRIMA DI GENERARE CODICE DEVI VEDERE SORGENTE E
+    TEST REALI». Leggere contenuto reale dei file sorgente E dei test
+    correlati, non solo output rg o supposizioni. Se la visione è
+    parziale, chiedere le sezioni mancanti.
+-   Procedura TDD: analisi sorgenti/test -> RED mirato -> l’utente
+    conferma il fallimento -> GREEN minimo -> test mirati -> regressioni
+    correlate -> suite completa -> VM Ubuntu 24.04 per i confini di
+    sistema.
+-   Fermarsi e investigare fallimenti inattesi; non introdurre bypass,
+    escalation di privilegi nei test o refactoring cosmetici.
+-   Dare percorsi precisi, punti di inserimento, nomi dei test e file da
+    non toccare.
+-   Core esecutivo considerato congelato: SMTP, IMAP, store/queue,
+    crypto E2EE, Tor runtime, semantica della consegna. Modifiche solo
+    quando giustificate da una necessità riproducibile, con regressioni.
+-   La disinstallazione deve preservare ~/GarlicSMTP (directory
+    sorgente), anche se elimina i dati persistenti di proprietà
+    dell’applicazione, inclusa eventualmente l’identità Onion.
+-   GUI: login/setup prima dell’avvio della ricezione; finestra nascosta
+    fino all’autenticazione; chiusura GUI deve interrompere la
+    ricezione, mentre il servizio Tor può restare attivo; nessuna
+    ricezione unattended.
+
+======================================================================
+3. FUNZIONALITÀ E TEST GIÀ RIFERITI DALLE FASI PRECEDENTI
+======================================================================
+
+Questi risultati sono stati riportati nel contesto precedente e NON
+rieseguiti in questa chat.
+
+3.1 PasswordHasher File: garlicsmtp/security/auth/password_hasher.py -
+Hash password con Scrypt, N=2**14, r=8, p=1, salt casuale di 16 byte,
+output di 32 byte. - Verifica con hmac.compare_digest. - In una fase
+precedente: RED 1 fallito / 4 passati; GREEN 5 passati; suite completa
+1711 passati.
+
+3.2 AccountCredentialStore File:
+garlicsmtp/security/auth/account_credentials.py - Credenziali
+persistenti in state/account-credentials.json. - create valida e salva
+hash; creazione con os.open e O_EXCL, permessi 0600. - validate rifiuta
+symlink, permessi non 0600, JSON/schema/hash non validi. - authenticate
+verifica username e password. - Test tests/test_account_credentials.py:
+18 test, RED 1 fallito / 17 passati, GREEN 18 passati; suite completa
+precedentemente 1712 passati. - Password: requisito minimo di 8
+caratteri, almeno una maiuscola, una cifra e un carattere speciale.
+
+3.3 GUI - garlicsmtp/gui/tk_authentication.py: LoginForm, SetupForm,
+LoginDialog, SetupDialog, prompt_login, prompt_setup; nessuna UI
+recovery confermata. - garlicsmtp/gui/application.py,
+authenticate_application: setup se credenziali assenti, login se
+presenti; nessun recupero password implementato. - run_gui: root
+inizialmente nascosta; autenticazione prima della visualizzazione. -
+tests/test_gui_application.py contiene test di autenticazione, ma i
+corpi dei test specifici non sono stati tutti letti nella presente chat.
+
+3.4 Disinstallazione - Precedente validazione su VM Ubuntu 24.04; commit
+riferito come ‘First attempt uninstall’, hash non disponibile. -
+Preservazione dei sorgenti richiesta.
+
+======================================================================
+4. REQUISITI DI SICUREZZA CONFERMATI
+======================================================================
+
+4.1 Recupero password - Recovery key offline generata con casualità
+crittografica, mostrata esattamente una volta, con conferma esplicita
+del salvataggio. - Mai conservare la recovery key in chiaro. - Account
+developer già esistente: attivazione recovery dopo login valido, senza
+reset account o Onion. - Recupero password con recovery key anche senza
+vecchia password: impostare nuova password, invalidare la recovery key
+precedente e generarne una nuova. - Conservare messaggi, allegati,
+identità di firma/cifratura e identità Onion. - Recovery key non deve
+diventare un metodo di login ordinario. - Rotazione della recovery key
+anche dopo login valido, per sostituire una chiave smarrita. - Stesse
+garanzie di sicurezza in developer e distribuzione; nessuna scorciatoia.
+
+4.2 Gerarchia chiavi - DEK (Data Encryption Key) indipendente da
+password e recovery key. - KEK derivata dalla password e KEK derivata
+dalla recovery key proteggono la medesima DEK. - Reset password non
+ricifra necessariamente tutti i messaggi: deve consentire il recupero
+della stessa DEK. - Non usare hash di verifica password come se fosse
+direttamente la chiave persistente. - Evitare di salvare DEK o recovery
+key in chiaro. - Aggiornamenti delle protezioni della DEK atomici o
+recuperabili dopo crash.
+
+4.3 Cifratura a riposo - Proteggere mailboxes.db, sent.db, queue.db,
+contenuti, metadati, allegati, eventuali WAL/SHM/journal/temp e backup
+pertinenti. - Una copia del solo database non deve rivelare i
+contenuti. - La sola cifratura della colonna payload NON soddisfa la
+protezione integrale richiesta. - Nessun file temporaneo in chiaro non
+controllato. - Le esportazioni esplicite di allegati in chiaro sono una
+distinta operazione utente e vanno trattate come tali. - Validazione E2E
+reale: ricezione -> chiusura GUI -> copia e verifica del database ->
+riavvio -> recupero tramite chiave offline senza vecchia password ->
+lettura dello stesso messaggio, con identità invariate. - Non simulare
+con mock la cifratura nel test di accettazione.
+
+======================================================================
+5. RISULTATI DELLE ISPEZIONI NELLA PRESENTE CHAT
+======================================================================
+
+5.1 ApplicationBuilder e percorsi File:
+garlicsmtp/application/builder.py - Costruisce MessageStore con
+SQLiteMessageStoreBackend(paths.mailbox_database) e
+AttachmentStore(paths.attachments_dir). - Costruisce QueueManager con
+SQLiteQueueBackend(paths.queue_database). - Costruisce
+FileEncryptionKeyStore(root_dir/‘encryption_keys.json’). - Costruisce
+SigningIdentity(root_dir/‘signing.key’) e
+EncryptionIdentity(root_dir/‘encryption.key’). - Il builder non riceve
+attualmente una password per sbloccare gli archivi. File:
+garlicsmtp/configuration/paths.py - DB ricevuti: data/mailboxes.db. - DB
+inviati: data/sent.db. - DB coda: state/queue.db. File:
+garlicsmtp/gui/application.py - Costruisce separatamente il MessageStore
+dei messaggi inviati con
+SQLiteMessageStoreBackend(context.paths.sent_mailbox_database) e
+AttachmentStore. Altri accessi diretti a SQLiteMessageStoreBackend
+identificati in: - garlicsmtp/cli/mailbox.py -
+garlicsmtp/core/engine/bootstrap.py - garlicsmtp/gui/application.py -
+garlicsmtp/application/builder.py Rischio: una modifica limitata al
+builder non coprirebbe tutti i percorsi di apertura.
+
+5.2 FileEncryptionKeyStore File:
+garlicsmtp/security/encryption_key_store.py - MemoryEncryptionKeyStore e
+FileEncryptionKeyStore conservano mappature hostname -> chiave pubblica
+del corrispondente. - Persistenza JSON con chiavi pubbliche codificate
+Base64. - Rifiuta la sostituzione silenziosa di una chiave pubblica
+diversa per lo stesso hostname. - Salvataggio atomico via file
+temporaneo, fsync e os.replace, permessi 0600; rifiuto di symlink. - NON
+è il deposito della DEK e NON è un sistema di cifratura a riposo.
+
+5.3 Database messaggi File: garlicsmtp/storage/sqlite/backend.py -
+SQLiteMessageStoreBackend apre con sqlite3.connect(path,
+check_same_thread=False), senza chiave di cifratura. - Schema messages:
+id, mailbox, uid, payload TEXT NOT NULL, internal_date, flags,
+verification_status, created. - Tabelle aggiuntive mailboxes,
+mailbox_subscriptions e storage_metadata. - Migrazioni dello schema e
+molte operazioni SQL dirette. - Attualmente non è dimostrata cifratura
+integrale; i dati SQLite sono gestiti dal driver standard.
+
+5.4 Coda File: garlicsmtp/queue/sqlite.py (letto integralmente) -
+SQLiteQueueBackend apre con sqlite3.connect(self.path,
+check_same_thread=False). - Tabella queue_items(id TEXT PRIMARY KEY,
+payload TEXT NOT NULL). - enqueue/update/retry_pending serializzano
+QueueSerializer.to_json(item) nel campo payload. - peek/retry_pending
+deserializzano con QueueSerializer.from_json(). - ack cancella, close
+chiude la connessione. - Nessuna chiave di cifratura all’apertura del
+database.
+
+5.5 Allegati File: garlicsmtp/storage/attachment_store.py (letto
+integralmente) - save scrive content_path.write_bytes(content) in file
+UUID.bin. - Scrive metadata_path.write_text(json.dumps({‘filename’,
+‘declared_mime’})) in UUID.json. - list_for_message rilegge JSON e
+bytes. - materialize_for_message crea file con il nome originale in una
+directory di destinazione; verifica nomi non sicuri e duplicati. -
+Contenuti e metadati attualmente scritti senza cifratura a riposo. - I
+nomi delle directory sono derivati dal message_id, validato contro path
+traversal. - Necessaria progettazione per cifratura autenticata,
+migrazione e trattamento dell’esportazione in chiaro.
+
+5.6 Dipendenze - requirements.txt e pyproject.toml dichiarano
+cryptography>=46,<47. - SQLCipher/pysqlcipher non compare nei file
+controllati con rg. - Non è stata verificata la
+disponibilità/installabilità o compatibilità SQLCipher sulla VM Ubuntu
+24.04. - La libreria cryptography da sola non rende cifrato un file
+SQLite.
+
+5.7 Cifratura E2EE attuale File: garlicsmtp/security/encryptor.py (letto
+integralmente) - MessageEncryptor genera chiave X25519 effimera, scambia
+segreto con chiave pubblica destinatario. - HKDF SHA-256, length=32,
+salt=None, info=b’GarlicSMTP E2EE v1’. - Cifra JSON di headers e body
+con ChaCha20Poly1305, nonce os.urandom(12). - AAD canonico JSON di
+sender e recipients, per autenticarne il valore e l’ordine. - Messaggio
+risultante contiene header X-GarlicSMTP-Encryption e corpo ciphertext
+Base64. File: garlicsmtp/security/decryptor.py (letto integralmente) -
+Controlla presenza, campi, versione, algoritmo, lunghezze chiavi e
+nonce. - Ricostruisce segreto X25519 e chiave HKDF, decifra con AAD
+envelope. - Verifica struttura JSON del payload decifrato. - Nessuna
+necessità dimostrata di modificare E2EE per implementare at-rest.
+
+5.8 PasswordHasher reale File:
+garlicsmtp/security/auth/password_hasher.py (letto integralmente) -
+Parametri Scrypt riportati in 3.1. - Serializza hash come campi separati
+da ‘$’ con algoritmo, parametri, salt e hash Base64. - Verifica mediante
+Scrypt e compare_digest; restituisce False per alcuni input non
+validi. - Non produce né conserva una DEK.
+
+======================================================================
+6. TEST REALI ESAMINATI E COPERTURA
+======================================================================
+
+tests/test_message_store_sqlite.py, prime 185 righe: -
+test_sqlite_message_store_persists_message salva un messaggio, chiude
+backend, riapre stesso DB e verifica ID, sender, recipients, Subject e
+body. - Test di elenco mailbox e conteggio messaggi. - Il file è molto
+più lungo; NON esaminati tutti i test.
+
+tests/test_application_builder.py, prime 165 righe: -
+test_application_builder_creates_context verifica creazione di database
+mailbox e coda, presenza di store, attachment store e altri
+componenti. - test_application_builder_uses_persistent_backends inizia a
+verificare persistenza fra due build; corpo completo non visualizzato. -
+NON esaminato tutto il file.
+
+tests/test_attachment_store.py: - Identificati tramite rg test per
+cancellazione, message ID non sicuro, salvataggio, lettura dopo riavvio,
+directory, materializzazione, filename non sicuro e duplicati. - NON
+sono stati letti i corpi dei test: prima di scrivere codice che li
+riguarda occorre leggerli.
+
+tests/test_message_encryptor.py, prime 240 righe: -
+test_message_encryptor_hides_plaintext -
+test_message_encryptor_round_trip -
+test_message_encryptor_hides_headers_and_body -
+test_message_decryptor_rejects_wrong_private_key -
+test_message_decryptor_rejects_tampered_ciphertext -
+test_message_decryptor_rejects_tampered_envelope - Inizio test sul
+cambiamento dell’ordine dei destinatari. - Verifica
+pytest.raises(cryptography.exceptions.InvalidTag) per chiave errata e
+manomissioni. - NON è stato letto tutto il file; non attribuire
+copertura integrale.
+
+Altri test identificati tramite rg: -
+tests/test_encryption_key_store.py - tests/test_cli_mailbox.py -
+tests/test_cli.py - tests/test_mailbox_view.py -
+tests/test_application_paths.py - tests/test_install_uninstaller.py -
+tests/test_encryption_capability.py -
+tests/test_encryption_identity.py - tests/test_gui_application.py -
+tests/test_account_credentials.py Non tutti i relativi corpi sono stati
+ispezionati in questa chat.
+
+======================================================================
+7. CONCLUSIONI TECNICHE E DECISIONI ANCORA APERTE
+======================================================================
+
+CONCLUSIONI SUPPORTATE: - E2EE e cifratura a riposo sono problemi
+separati. - Non riutilizzare chiavi private X25519, chiavi di sessione
+E2EE o HKDF_INFO E2EE per at-rest. - ChaCha20Poly1305 e HKDF sono
+primitive già usate e disponibili tramite cryptography. - Una DEK
+indipendente dalla password è necessaria per recuperare gli archivi dopo
+reset password. - I tre DB SQLite e gli allegati hanno attualmente vie
+di persistenza non cifrate integralmente. - La cifratura per-record del
+solo payload non coprirebbe struttura e metadati del database. - La
+gestione di accessi diretti ai DB da GUI, CLI e bootstrap è un confine
+progettuale fondamentale. - Il recupero deve preservare identità e dati,
+non soltanto consentire nuovo login.
+
+PROPOSTE, NON APPROVATE COME IMPLEMENTAZIONE: - Valutare SQLCipher come
+candidato alla cifratura integrale di tutti i DB SQLite. - Usare
+cifratura autenticata per allegati e metadati, con separazione
+crittografica dei contesti. - Un possibile modulo separato
+garlicsmtp/security/at_rest_cipher.py con test
+tests/test_at_rest_cipher.py. - Primo gruppo di verifiche primitive:
+round-trip, chiave errata, ciphertext manomesso, nonce fresco; test
+successivi di persistenza e recovery. - NON partire con un RED
+dipendente da SQLCipher prima di validare disponibilità e packaging
+Ubuntu 24.04.
+
+DECISIONI ANCORA DA PRENDERE: - Motore cifratura DB e dipendenze
+installabili/distribuibili. - Formato versionato della DEK avvolta da
+KEK password/recovery, KDF e gestione AAD. - Protezione di chiavi
+private e identità Onion senza alterare la loro continuità. - Migrazione
+atomica/crash-safe dei dati developer in chiaro verso archivi cifrati. -
+Politica di file temporanei, journal, WAL, backup, esportazioni e
+residui di plaintext. - Sblocco solo dopo login, gestione ciclo di vita
+chiavi e accesso CLI/bootstrap. - Gestione credenziali e recovery UI
+(mostra una volta, conferma salvataggio, reset, rotazione). - Strategia
+per impedire lettura di dati preesistenti in chiaro dopo migrazione. -
+Test E2E realistici su developer e Ubuntu 24.04.
+
+======================================================================
+8. PUNTO ESATTO DI ARRESTO
+======================================================================
+
+L’utente ha richiesto espressamente di analizzare encryptor.py,
+decryptor.py, test_message_encryptor.py (prime 240 righe) e
+password_hasher.py, fermandosi prima di generare codice o test. La
+richiesta è stata rispettata.
+
+L’ultimo giudizio tecnico è: - Non riscrivere MessageEncryptor o
+MessageDecryptor. - Creare in futuro un dominio crittografico separato
+per i dati a riposo. - Non confondere PasswordHasher con una chiave per
+decifrare i dati. - Valutare cifratura integrale SQLite, senza scegliere
+prematuramente SQLCipher. - Prima di qualunque codice/test, leggere
+sorgenti e test reali specifici dell’intervento. - Nessun nuovo
+RED/GREEN è stato scritto o eseguito in questa chat.
+
+======================================================================
+9. ISTRUZIONI PER LA CHAT SUCCESSIVA
+======================================================================
+
+1.  Trattare questo snapshot come contesto storico, non come sostituto
+    dei sorgenti correnti.
+2.  L’utente fornirà altri documenti di sviluppo: leggerli integralmente
+    per le parti pertinenti, confrontare cronologia e decisioni,
+    segnalare discrepanze senza inventare risoluzioni.
+3.  L’utente intende istituire documenti permanenti di accompagnamento
+    del progetto, aggiornati a ogni nuova chat: struttura e contenuto
+    definitivo verranno stabiliti DOPO aver ricevuto gli altri
+    documenti.
+4.  Non generare ancora codice né test senza una richiesta esplicita e
+    senza la previa ispezione di sorgenti e test reali.
+5.  Quando si riprenderà l’implementazione, definire un primo RED
+    circoscritto, farlo eseguire all’utente, attendere il risultato e
+    solo dopo procedere al GREEN.
+6.  Distinguere in ogni aggiornamento: requisiti, decisioni confermate,
+    proposte, codice implementato, test eseguiti con esito, problemi
+    aperti e prossimo passo.
+7.  Non dichiarare cifratura a riposo, recovery key o migrazione
+    completate prima di prove reali.
+8.  Non alterare il core congelato senza motivazione riproducibile e
+    approvazione del percorso di test.
+
+======================================================================
+10. RIFERIMENTI AGLI ALLEGATI ESAMINATI
+======================================================================
+
+-   Output builder, encryption_key_store, backend SQLite e ricerche
+    test: allegato della chat delle ore ~14:22 del 08/10/2026.
+-   Output queue/sqlite.py, estratti test SQLite e builder, elenco test
+    allegati: allegato ~14:39.
+-   Output encryptor.py, decryptor.py, estratto
+    test_message_encryptor.py e password_hasher.py: allegato ~14:41.
+
+FINE SNAPSHOT - RIPRESA 8

@@ -1,0 +1,232 @@
+AGGIORNAMENTO DOCUMENTALE — 13/10/2026 (da leggere prima della baseline 08/10)
+Fonte: checkpoint e test comunicati dall’utente nel ramo di sviluppo, NON nuova verifica del repository o VM. Il ramo successivo all’08/10 implementa DEK obbligatoria di 32 byte, SQLCipher per SQLiteMessageStoreBackend e SQLiteQueueBackend, wrapping DEK con password e recovery offline, dialogo di recovery e fail-closed GUI. Ultima regressione correlata 129 passed; full pytest locale comunicato: 1797 passed. La baseline sottostante dell’08/10, quando dice «SQLCipher/recovery non implementati», resta storicamente corretta per l’08/10 ma NON descrive lo stato del 13/10. Non sono invece attestati protezione integrale allegati/metadata/backup/temp/chiavi private, migrazione crash-safe di archivi plaintext, collaudo SQLCipher end-to-end e packaging su Ubuntu 24.04 VM. Il repository reale resta autoritativo.
+
+Per l’utente: la recovery key ora risulta implementata nel ramo di sviluppo, ma la procedura completa non è stata collaudata su una nuova installazione VM; non dare per scontata la protezione di allegati o backup. Non cancellare vecchi dati né tentare migrazioni senza una procedura verificata.
+
+
+GARLICSMTP — HANDBOOK
+Manuale utente e guida ai limiti attuali
+Edizione documentale: 08 ottobre 2026
+
+Questo manuale incrocia gli snapshot con i file ufficiali del repository GitHub (cartella docs/ esclusa); nessun nuovo test runtime. Dove una funzione è progettata ma non ancora realizzata viene indicato chiaramente.
+
+===============================================================================
+1. CHE COS'È GARLICSMTP
+===============================================================================
+
+GarlicSMTP è un programma di messaggistica basato su protocolli SMTP e IMAP, progettato per comunicare in un ambiente orientato alla privacy utilizzando Tor Onion Services. Ogni installazione può disporre di una propria identità Onion, distinta dalle chiavi usate per firmare e cifrare i messaggi. L'interfaccia grafica attuale è realizzata con Tkinter (non con PySide6, presente nelle fasi iniziali).
+
+Il progetto implementa invio, ricezione, memorizzazione dei messaggi, consultazione delle mailbox, coda persistente e gestione dei tentativi di consegna. La comunicazione tra nodi GarlicSMTP supporta cifratura end-to-end tramite X25519 e ChaCha20-Poly1305 e autenticità/integrità tramite firma Ed25519.
+
+La licenza documentata è source-available: PolyForm Noncommercial 1.0.0 per uso non commerciale e separata possibilità di licenza commerciale. Non è una licenza open source OSI. Per diritti e limitazioni legali consultare i file LICENSE e documentazione di licenza del repository corrente.
+
+===============================================================================
+2. CHE COSA NON È
+===============================================================================
+
+- Non è semplicemente un client di posta per un account Gmail, Outlook o un provider IMAP/SMTP pubblico. Possiede componenti server SMTP/IMAP e un proprio trasporto Onion; l'interoperabilità con servizi esterni non va presunta.
+- Non è una garanzia di anonimato assoluto: sicurezza operativa, identità del dispositivo, Tor, destinatari, configurazione e contenuti possono influire sulla privacy.
+- Non è una prova che un messaggio sia stato consegnato quando compare in Sent: l'accettazione applicativa e la consegna remota sono eventi diversi.
+- Non è un sistema di backup automatico documentato. La perdita di identità/chiavi/database può compromettere la continuità.
+- Non è, allo stato attuale, una cassaforte locale con database e allegati integralmente cifrati: **la cifratura a riposo completa non è ancora implementata**.
+- Non offre ancora il recupero password tramite chiave offline: è un requisito futuro, non una funzione da cercare nell'interfaccia attuale.
+- Non è documentato come prodotto nativo Windows o macOS pronto all'installazione.
+
+===============================================================================
+3. SISTEMI OPERATIVI E AMBIENTI
+===============================================================================
+
+VALIDATO SU INSTALLAZIONE REALE:
+- Ubuntu 24.04 Desktop: installazione da macchina vergine, first-run, Tor, GUI/CLI e invio/ricezione reali; launcher Desktop validato.
+
+AMBIENTE DI SVILUPPO DOCUMENTATO:
+- Windows con WSL Ubuntu: repository in /mnt/c/garlicsmtp, virtualenv e comandi Python eseguiti dentro WSL. Non significa che GarlicSMTP sia stato validato come applicazione Windows nativa.
+
+NON ATTESTATI COME SUPPORTATI:
+- macOS, Windows nativo e altre distribuzioni Linux. Il codice Python potrebbe essere portabile, ma il profilo installer e i prerequisiti Tor di sistema sono stati validati specificamente per Ubuntu 24.04. Non confondere portabilità potenziale con supporto ufficiale.
+
+Requisito Python storico: >=3.12. L'installer crea una venv dedicata. L'utente non deve eseguire GarlicSMTP come root.
+
+===============================================================================
+4. COME FUNZIONA: DAL MESSAGGIO ALLA CONSEGNA
+===============================================================================
+
+Invio:
+1) L'utente compone il messaggio nella GUI.
+2) Il servizio applicativo prepara il messaggio e applica la firma Ed25519.
+3) La pipeline determina se la destinazione è locale o remota.
+4) Per il percorso E2EE remoto, GarlicSMTP verifica la capability del peer, recupera/pinna la sua chiave X25519 e cifra il messaggio PRIMA dell'accodamento.
+5) Il messaggio remoto cifrato entra nella coda persistente.
+6) QueueWorker tenta la consegna attraverso TransportManager, OnionTransport e Tor SOCKS5 verso il server SMTP del destinatario.
+7) Errori temporanei possono attivare retry con attese crescenti; gli errori permanenti sono trattati diversamente.
+
+Ricezione:
+1) Il server SMTP locale riceve il messaggio.
+2) Se E2EE, la decifratura avviene prima della verifica della firma.
+3) La pipeline valida, classifica e salva il messaggio nello store.
+4) Il messaggio è consultabile nell'interfaccia e tramite il sottosistema IMAP locale, secondo la configurazione.
+
+Identità e fiducia:
+- L'identità Onion individua il nodo.
+- Ed25519 verifica integrità/autenticità della firma; il trust del mittente è separato dalla semplice validità matematica.
+- X25519 e ChaCha20-Poly1305 proteggono il contenuto E2EE in transito.
+- Il primo contatto può registrare una chiave remota (TOFU/pinning). Un cambio inatteso non sostituisce automaticamente il pin: la consegna viene bloccata o rimandata secondo il percorso previsto.
+
+===============================================================================
+5. INTERFACCIA GRAFICA
+===============================================================================
+
+L'interfaccia corrente è Tkinter. Gli snapshot descrivono:
+
+- Configurazione iniziale dell'account e schermata login prima dell'avvio dei servizi di ricezione.
+- Sezioni Received e Sent contemporaneamente visibili, con liste e anteprime indipendenti.
+- Composizione e invio dei messaggi.
+- Indicatori del runtime/Tor e metriche della coda.
+- Pulsante Retry pending per anticipare un nuovo tentativo sui messaggi sospesi.
+- Supporto allegati, verificato anche in self-send manuale.
+
+Received contiene i messaggi ricevuti. Sent contiene i messaggi che la pipeline ha accettato per l'invio e che il servizio ha salvato nella loro forma applicativa leggibile. **Sent non è una ricevuta di consegna remota.** Le due sezioni utilizzano database distinti.
+
+Il pulsante Retry pending NON spedisce direttamente: azzera l'attesa `next_retry` per gli elementi pending e il QueueWorker riprova al tick successivo, conservando i contatori e gli errori precedenti. Non corregge automaticamente un peer Onion irraggiungibile.
+
+La GUI deve rimanere nascosta fino all'autenticazione; la chiusura della GUI deve fermare la ricezione. Il processo Tor di sistema può restare attivo. Se il comportamento osservato differisce, raccogliere un caso riproducibile prima di modificare il core.
+
+===============================================================================
+6. INSTALLAZIONE E PRIMO AVVIO
+===============================================================================
+
+Il percorso documentato e validato è Ubuntu 24.04. Per i comandi da copiare utilizzare `quicklaunch.md`.
+
+Sintesi:
+1) Procurarsi l'URL Git effettivo del repository; non è riportato con certezza nei documenti ricevuti.
+2) Clonare il progetto sul computer Ubuntu.
+3) Dalla directory del repository eseguire `./install.sh` come utente normale, senza sudo davanti al comando.
+4) Attendere il completamento; l'installer gestisce i prerequisiti e crea la venv isolata.
+5) Se è stata aggiornata la membership `debian-tor`, uscire e rientrare dalla sessione grafica Ubuntu.
+6) Aprire l'icona GarlicSMTP sul Desktop o avviare `~/.local/share/garlicsmtp/venv/bin/garlicsmtp-gui`.
+7) Completare la configurazione account senza usare password predefinite; poi avviare i servizi dall'interfaccia.
+
+In sviluppo WSL con repository e venv già preparati: `cd /mnt/c/garlicsmtp`, `source .venv/bin/activate`, `python -m garlicsmtp.gui`. L'entrypoint di produzione e il launcher di sviluppo selezionano percorsi di configurazione differenti: non sono intercambiabili.
+
+===============================================================================
+7. PASSWORD, CHIAVI E PRIVACY LOCALE
+===============================================================================
+
+Password dell'account GUI:
+- La password non viene salvata in chiaro; viene verificata tramite hash Scrypt con salt casuale.
+- Il file di credenziali documentato è `state/account-credentials.json`, con protezione permessi 0600 e controlli contro symlink/struttura invalida.
+- La policy documentata richiede almeno otto caratteri, una maiuscola, una cifra e un carattere speciale.
+- L'account GUI non coincide automaticamente con l'identità Onion né con le chiavi Ed25519/X25519.
+
+Limite di sicurezza essenziale:
+- `data/mailboxes.db` e `data/sent.db` usano SQLite standard; `state/queue.db` usa SQLite standard; AttachmentStore salva file `.bin` e `.json` senza cifratura locale completa. La presenza di E2EE durante il trasporto NON impedisce a chi ha accesso ai file locali di leggere dati che non siano già ciphertext.
+- Il recupero password tramite recovery key offline, la DEK e il wrapping tramite password/recovery sono requisiti in progettazione, non disponibili al momento descritto.
+- Proteggere fisicamente il dispositivo e le copie di backup; non considerare la password GUI equivalente alla cifratura del disco.
+
+===============================================================================
+8. TOR, ONION E CONNETTIVITÀ
+===============================================================================
+
+GarlicSMTP usa Tor come prerequisito di sistema. Il Tor Control endpoint previsto nel profilo validato è locale (`127.0.0.1:9051`) e richiede SAFECOOKIE. Il programma gestisce dinamicamente il proprio Onion Service e conserva l'identità persistente, invece di richiedere un secondo HiddenService statico in torrc.
+
+Se invio o ricezione sembrano bloccati:
+- Controllare lo stato Tor e del runtime nella GUI.
+- Eseguire prima il refresh dei servizi Tor dall'interfaccia, se disponibile.
+- In presenza di timeout Onion, attendere e riprovare; se il problema persiste valutare un'altra connessione Internet.
+- Verificare gli elementi pending e, quando appropriato, usare Retry pending.
+- Ricordare che «Tor ready» significa disponibilità locale del Tor Control/SOCKS, non raggiungibilità garantita del destinatario `.onion`.
+- Non cancellare o rigenerare identità Onion per risolvere un timeout temporaneo.
+
+Se l'avvio fallisce subito dopo l'installazione per accesso al cookie Tor, un logout/login grafico completo può aggiornare i gruppi di sistema. Non rendere il cookie leggibile a tutti e non avviare GarlicSMTP come root.
+
+===============================================================================
+9. DATI, ALLEGATI, BACKUP E DISINSTALLAZIONE
+===============================================================================
+
+La radice persistente dell'installazione documentata è `~/.local/share/garlicsmtp/`, distinta dalla directory dei sorgenti `~/GarlicSMTP`. Tra i dati persistenti: configurazione, ricevuti, inviati, coda, credenziali, chiavi e identità. I percorsi esatti e la proprietà dei singoli file devono essere verificati nel repository corrente prima di operazioni distruttive.
+
+Gli allegati sono memorizzati separatamente dal database dei messaggi. Quando si esporta/materializza un allegato, viene creato un file leggibile nella cartella scelta. Chi può leggere quella cartella può leggere il file esportato.
+
+Per backup, conservare insieme i dati necessari e le identità senza pubblicare chiavi private. Non è documentata una procedura di backup/ripristino end-to-end certificata: prima di qualsiasi ripristino verificare il comportamento del codice e dell'installer corrente.
+
+La disinstallazione è stata testata storicamente su Ubuntu 24.04, ma può rimuovere stato persistente e identità Onion. **La directory sorgente `~/GarlicSMTP` deve restare intatta.** Non cancellare manualmente le directory per simulare la disinstallazione e non inventare comandi uninstall non confermati dal repository.
+
+===============================================================================
+10. LIMITI ATTUALI E FUNZIONI FUTURE
+===============================================================================
+
+LIMITI ATTUALI CONFERMATI:
+- Solo Ubuntu 24.04 è stato validato per installazione e funzionamento desktop completi.
+- Cifratura integrale a riposo assente.
+- Recupero password tramite recovery key offline assente.
+- Invio su Tor soggetto a disponibilità/congestione della rete e dei peer.
+- Nessuna garanzia di consegna remota implicita in Sent o Retry pending.
+- Nessun URL pubblico Git verificato nella documentazione ricevuta.
+
+FUNZIONI IN PROGETTAZIONE (NON DISPONIBILI):
+- DEK indipendente dalla password; due percorsi di sblocco, password e recovery key offline.
+- Recovery key mostrata una sola volta, reset password e rotazione senza perdita dati.
+- Cifratura integrale database, allegati, metadati, file temporanei e backup pertinenti.
+- Migrazione sicura degli archivi già esistenti e validazione su VM Ubuntu 24.04.
+
+===============================================================================
+11. GLOSSARIO MINIMO
+===============================================================================
+
+SMTP: protocollo usato per trasmettere i messaggi.
+IMAP: protocollo per consultare e gestire mailbox.
+Tor: rete e software usati per raggiungere servizi Onion.
+Onion Service: endpoint `.onion` del nodo GarlicSMTP.
+E2EE: cifratura end-to-end del contenuto durante lo scambio tra nodi.
+Ed25519: algoritmo di firma digitale.
+X25519: algoritmo per stabilire un segreto condiviso.
+ChaCha20-Poly1305: cifratura autenticata (riservatezza e integrità).
+TOFU/pinning: memorizzazione della chiave remota osservata al primo contatto e controllo dei cambi successivi.
+Queue: coda persistente dei messaggi in attesa di consegna.
+Retry pending: comando manuale che rende riprovabili gli item in attesa.
+DEK: chiave di cifratura dei dati locali, futura funzione.
+KEK: chiave che protegge la DEK, futura funzione.
+Recovery key: chiave offline di recupero password, futura funzione.
+
+===============================================================================
+12. FONTI E VALIDITÀ DEL MANUALE
+===============================================================================
+
+Fonti principali: recap 31/07; architettura/metodologia/riepilogo 03/09 e 06/09; installation-architecture.md; snapshot 09/09, 15/09, validazione alpha 17/09, handoff 27/09, ripresa 7 del 02/10 e ripresa 8 dell'08/10. Per il dettaglio tecnico e i checkpoint test consultare `GarlicSMTP-development-book-8.txt`; per i comandi `quicklaunch.md`.
+
+Questo manuale deve essere aggiornato dopo ogni modifica di comportamento confermata da test e, quando rilevante, da una verifica reale Ubuntu 24.04. Le funzionalità future non vanno presentate come già disponibili.
+
+FINE HANDBOOK
+
+
+===============================================================================
+APPENDICE BIS — RISCONTRO CON FILE UFFICIALI GITHUB
+===============================================================================
+Repository: https://github.com/giulsign/GarlicSMTP.git (main).
+Versione 0.0.1-alpha, Python >=3.12. Installazione supportata: Ubuntu 24.04.
+Licenza PolyForm Noncommercial 1.0.0, licenza commerciale separata.
+Nessun audit professionale indipendente; Tor non garantisce anonimato assoluto.
+
+Installazione:
+  sudo apt-get update
+  sudo apt-get install -y git
+  cd ~
+  git clone https://github.com/giulsign/GarlicSMTP.git GarlicSMTP
+  cd ~/GarlicSMTP
+  ./install.sh
+Alla richiesta 'IMAP password:' digitare la password IMAP. NON usare sudo
+per eseguire install.sh. Poi effettuare logout/login nella sessione Ubuntu.
+Avvio: ~/.local/share/garlicsmtp/venv/bin/garlicsmtp-gui
+Al primo accesso GUI creare un account separato dalle credenziali IMAP.
+
+Disinstallazione distruttiva:
+  cd ~/GarlicSMTP
+  python3 -m install.uninstaller
+Digitare DELETE solo per cancellare dati, messaggi, chiavi e identità Onion.
+La directory sorgente Git non è rimossa.
+
+Limiti: il codice GitHub usa SQLite standard e scrive allegati e metadati
+in chiaro; cifratura integrale a riposo e recovery key offline NON disponibili.
+Fonti: README.md, SECURITY.md, pyproject.toml, install/manifest.toml,
+install/installer.py, install/uninstaller.py, garlicsmtp/gui/application.py,
+garlicsmtp/storage/sqlite/backend.py, garlicsmtp/storage/attachment_store.py.
