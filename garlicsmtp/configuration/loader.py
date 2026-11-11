@@ -65,6 +65,24 @@ class ConfigurationLoader:
 
             custom_page_path = str(html_path)
 
+        
+        website_enabled = tor_data.get(
+            "onion_website_enabled",
+            False,
+        )
+        
+        website_index_path = (
+            tor_data.get("onion_website_index_path") or None
+        )
+
+        if website_enabled and website_index_path is not None:
+            index_path = Path(website_index_path).expanduser()
+
+            if not index_path.is_absolute():
+                index_path = path.absolute().parent / index_path
+
+            website_index_path = str(index_path)
+
         cookie_file_value = tor_data.get(
             "cookie_file"
         )
@@ -137,6 +155,10 @@ class ConfigurationLoader:
                 ),
                 onion_custom_page_enabled=custom_page_enabled,
                 onion_custom_page_path=custom_page_path,
+                
+                onion_website_enabled=website_enabled,
+                onion_website_index_path=website_index_path,
+
                 control_enabled=tor_data.get(
                     "control_enabled",
                     False,

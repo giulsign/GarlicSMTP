@@ -45,3 +45,11 @@ def test_tor_settings_custom_onion_page_disabled_by_default():
 
     assert settings.onion_custom_page_enabled is False
     assert settings.onion_custom_page_path is None
+
+
+
+def test_tor_settings_website_disabled_by_default():
+    settings = TorSettings()
+
+    assert settings.onion_website_enabled is False
+    assert settings.onion_website_index_path is None

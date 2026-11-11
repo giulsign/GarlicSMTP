@@ -334,3 +334,88 @@ def test_save_onion_page_settings_handles_missing_final_newline(
     )
 
     assert "allow_new_circuits = false\n" in content
+
+
+
+def test_save_onion_website_settings_preserves_custom_page(
+    tmp_path,
+):
+    path = tmp_path / "settings.toml"
+
+    path.write_text(
+        '# Keep this comment\n'
+        'hostname = "garlicsmtp.local"\n'
+        '\n'
+        '[tor]\n'
+        'enabled = true\n'
+        'onion_custom_page_enabled = true\n'
+        'onion_custom_page_path = "pages/personal.html"\n'
+        'onion_website_enabled = false\n'
+        'onion_website_index_path = ""\n',
+        encoding="utf-8",
+    )
+
+    writer.save_onion_website_settings(
+        path,
+        enabled=True,
+        html_path="website/index.html",
+    )
+
+    content = path.read_text(encoding="utf-8")
+    data = tomllib.loads(content)
+
+    assert "# Keep this comment" in content
+    assert data["hostname"] == "garlicsmtp.local"
+
+    assert data["tor"]["onion_custom_page_enabled"] is True
+    assert (
+        data["tor"]["onion_custom_page_path"]
+        == "pages/personal.html"
+    )
+
+    assert data["tor"]["onion_website_enabled"] is True
+    assert (
+        data["tor"]["onion_website_index_path"]
+        == "website/index.html"
+    )
+
+    assert content.count("onion_website_enabled =") == 1
+    assert content.count("onion_website_index_path =") == 1
+
+
+
+def test_combined_settings_replaces_config_once(
+    tmp_path,
+    monkeypatch,
+):
+    import garlicsmtp.configuration.onion_page_writer as writer
+
+    config_path = tmp_path / "config.toml"
+    config_path.write_text(
+        "[tor]\n",
+        encoding="utf-8",
+    )
+
+    real_replace = writer.os.replace
+    replacements = []
+
+    def tracked_replace(source, destination):
+        replacements.append((source, destination))
+        return real_replace(source, destination)
+
+    monkeypatch.setattr(
+        writer.os,
+        "replace",
+        tracked_replace,
+    )
+
+    writer.save_onion_combined_settings(
+        config_path,
+        custom_enabled=True,
+        custom_html_path="custom.html",
+        website_enabled=True,
+        website_index_path="website/index.html",
+    )
+
+    assert len(replacements) == 1
+    assert replacements[0][1] == config_path

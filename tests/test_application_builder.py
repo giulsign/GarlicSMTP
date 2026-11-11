@@ -2272,6 +2272,89 @@ def test_application_builder_loads_enabled_custom_page(
         context.store.backend.close()
 
 
+
+def test_application_builder_configures_enabled_onion_website(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+
+    website_index = tmp_path / "website" / "index.html"
+    website_index.parent.mkdir()
+    website_index.write_text(
+        "<html><body><h1>GarlicSMTP Website</h1></body></html>",
+        encoding="utf-8",
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.onion_website_enabled = True
+    settings.tor.onion_website_index_path = str(website_index)
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        http_service = next(
+            service
+            for service in context.runtime.services
+            if isinstance(service, OnionPresenceHttpService)
+        )
+
+        assert http_service.website_enabled is True
+        assert http_service.website_index_path == str(website_index)
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+
+def test_application_builder_website_overrides_missing_custom_page(
+    tmp_path,
+    dek,
+):
+    paths = ApplicationPaths(root_dir=tmp_path / "garlicsmtp")
+
+    website_index = tmp_path / "website" / "index.html"
+    website_index.parent.mkdir()
+    website_index.write_text(
+        "<html><body><h1>Website</h1></body></html>",
+        encoding="utf-8",
+    )
+
+    settings = ApplicationSettings()
+    settings.tor.onion_website_enabled = True
+    settings.tor.onion_website_index_path = str(website_index)
+
+    settings.tor.onion_custom_page_enabled = True
+    settings.tor.onion_custom_page_path = str(
+        tmp_path / "missing-custom.html"
+    )
+
+    context = ApplicationBuilder(
+        paths=paths,
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        http_service = next(
+            service
+            for service in context.runtime.services
+            if isinstance(service, OnionPresenceHttpService)
+        )
+
+        assert http_service.website_enabled is True
+        assert http_service.website_index_path == str(website_index)
+        assert http_service.custom_html is None
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()
+
+
+
 def test_application_builder_rejects_missing_enabled_custom_page(
     tmp_path,
     dek,

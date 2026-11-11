@@ -198,12 +198,17 @@ class ApplicationBuilder:
         )
 
         onion_presence_http_service = None
-
+        
         if settings.tor.enabled:
-            custom_page_enabled = settings.tor.onion_custom_page_enabled
+            website_enabled = settings.tor.onion_website_enabled
+            custom_page_enabled = (
+                settings.tor.onion_custom_page_enabled
+                and not website_enabled
+            )
             custom_html = None
 
             if custom_page_enabled:
+
                 custom_page_path = settings.tor.onion_custom_page_path
 
                 if not custom_page_path:
@@ -226,6 +231,8 @@ class ApplicationBuilder:
                 port=settings.tor.onion_http_target_port,
                 custom_html=custom_html,
                 custom_page_enabled=custom_page_enabled,
+                website_enabled=settings.tor.onion_website_enabled,
+                website_index_path=settings.tor.onion_website_index_path,
             )
 
         local_domains = {

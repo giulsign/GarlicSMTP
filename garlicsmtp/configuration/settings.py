@@ -73,6 +73,10 @@ class TorSettings:
 
     onion_custom_page_enabled: bool = False
     onion_custom_page_path: str | None = None
+    
+    onion_website_enabled: bool = False
+    onion_website_index_path: str | None = None
+
 
 
 @dataclass(slots=True)

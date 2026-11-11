@@ -22,5 +22,9 @@ control_port = 9051
 require_safecookie = true
 cookie_file = "/run/tor/control.authcookie"
 allow_new_circuits = false
+
 onion_custom_page_enabled = false
 onion_custom_page_path = ""
+
+onion_website_enabled = false
+onion_website_index_path = "/mnt/c/Users/User/Documents/Sito_4STL/index.html"

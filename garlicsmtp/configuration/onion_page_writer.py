@@ -12,16 +12,24 @@ import tempfile
 import stat
 
 
-_KEYS = (
+_CUSTOM_KEYS = (
     "onion_custom_page_enabled",
     "onion_custom_page_path",
 )
 
+_WEBSITE_KEYS = (
+    "onion_website_enabled",
+    "onion_website_index_path",
+)
+
 _SECTION = re.compile(r"^\s*\[([^\]]+)\]\s*(?:#.*)?$")
 _KEY = re.compile(
-    r"^(\s*)(onion_custom_page_enabled|onion_custom_page_path)"
-    r"(\s*=\s*)(.*)$"
+    r"^(\s*)("
+    r"onion_custom_page_enabled|onion_custom_page_path|"
+    r"onion_website_enabled|onion_website_index_path"
+    r")(\s*=\s*)(.*)$"
 )
+
 
 def _split_inline_comment(value: str) -> tuple[str, str]:
     in_string = False
@@ -52,13 +60,66 @@ def save_onion_page_settings(
     enabled: bool,
     html_path: str,
 ) -> None:
+    _save_onion_settings(
+        path,
+        values={
+            _CUSTOM_KEYS[0]: enabled,
+            _CUSTOM_KEYS[1]: html_path,
+        },
+    )
+
+
+def save_onion_website_settings(
+    path: Path,
+    *,
+    enabled: bool,
+    html_path: str,
+) -> None:
+    _save_onion_settings(
+        path,
+        values={
+            _WEBSITE_KEYS[0]: enabled,
+            _WEBSITE_KEYS[1]: html_path,
+        },
+    )
+
+
+def save_onion_combined_settings(
+    path: Path,
+    *,
+    custom_enabled: bool,
+    custom_html_path: str,
+    website_enabled: bool,
+    website_index_path: str,
+) -> None:
+    _save_onion_settings(
+        path,
+        values={
+            _CUSTOM_KEYS[0]: custom_enabled,
+            _CUSTOM_KEYS[1]: custom_html_path,
+            _WEBSITE_KEYS[0]: website_enabled,
+            _WEBSITE_KEYS[1]: website_index_path,
+        },
+    )
+
+
+def _save_onion_settings(
+    path: Path,
+    *,
+    values: dict[str, bool | str],
+) -> None:
     path = Path(path)
 
-    if not isinstance(enabled, bool):
-        raise TypeError("enabled must be a bool")
+    allowed_keys = set(_CUSTOM_KEYS + _WEBSITE_KEYS)
+    if not values or not set(values).issubset(allowed_keys):
+        raise ValueError("Invalid Onion settings keys")
 
-    if not isinstance(html_path, str):
-        raise TypeError("html_path must be a string")
+    for key, value in values.items():
+        if key.endswith("_enabled"):
+            if not isinstance(value, bool):
+                raise TypeError(f"{key} must be a bool")
+        elif not isinstance(value, str):
+            raise TypeError(f"{key} must be a string")
 
     original = path.read_text(encoding="utf-8")
 
@@ -66,15 +127,16 @@ def save_onion_page_settings(
     # overwriting unrelated configuration.
     tomllib.loads(original)
 
-    values = {
-        "onion_custom_page_enabled": (
-            "true" if enabled else "false"
-        ),
-        "onion_custom_page_path": json.dumps(
-            html_path,
+    serialized_values = {
+        key: (
+            "true" if value else "false"
+        ) if isinstance(value, bool) else json.dumps(
+            value,
             ensure_ascii=True,
-        ),
+        )
+        for key, value in values.items()
     }
+    keys = tuple(values)
 
     lines = original.splitlines(keepends=True)
     result = []
@@ -86,9 +148,9 @@ def save_onion_page_settings(
         if result and not result[-1].endswith(("\n", "\r")):
             result.append("\n")
 
-        for key in _KEYS:
+        for key in keys:
             if key not in written:
-                result.append(f"{key} = {values[key]}\n")
+                result.append(f"{key} = {serialized_values[key]}\n")
                 written.add(key)
 
     for line in lines:
@@ -109,6 +171,10 @@ def save_onion_page_settings(
             if match:
                 key = match.group(2)
 
+                if key not in keys:
+                    result.append(line)
+                    continue
+
                 if key in written:
                     raise ValueError(
                         f"Duplicate Onion page setting: {key}"
@@ -121,12 +187,11 @@ def save_onion_page_settings(
                 )
 
                 _, comment = _split_inline_comment(match.group(4))
-
                 separator = " " if comment else ""
 
                 result.append(
                     f"{match.group(1)}{key}"
-                    f"{match.group(3)}{values[key]}"
+                    f"{match.group(3)}{serialized_values[key]}"
                     f"{separator}{comment}{newline}"
                 )
                 written.add(key)
@@ -148,17 +213,14 @@ def save_onion_page_settings(
 
     # Verify the resulting TOML before replacing the file.
     parsed = tomllib.loads(updated)
-
-    if (
-        parsed["tor"]["onion_custom_page_enabled"]
-        is not enabled
-        or parsed["tor"]["onion_custom_page_path"]
-        != html_path
-    ):
-        raise ValueError("Failed to update Onion page settings")
+    for key, expected_value in values.items():
+        actual_value = parsed["tor"][key]
+        if type(actual_value) is not type(expected_value):
+            raise ValueError(f"Invalid type for Onion setting: {key}")
+        if actual_value != expected_value:
+            raise ValueError(f"Failed to update Onion setting: {key}")
 
     original_mode = stat.S_IMODE(path.stat().st_mode)
-
     temporary_path = None
 
     try:
@@ -177,7 +239,6 @@ def save_onion_page_settings(
             os.fsync(temporary_file.fileno())
 
         os.chmod(temporary_path, original_mode)
-
         os.replace(temporary_path, path)
 
     finally:

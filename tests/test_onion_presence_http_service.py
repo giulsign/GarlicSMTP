@@ -848,3 +848,337 @@ def test_onion_presence_http_service_custom_html_size_boundaries(
             custom_html=custom_html,
             custom_page_enabled=True,
         )
+
+
+
+def test_onion_presence_http_service_website_overrides_custom_page(
+    tmp_path,
+):
+    website_index = tmp_path / "index.html"
+    website_html = (
+        "<!DOCTYPE html>"
+        "<html><body>"
+        "<script src='app.js'></script>"
+        "<h1>My Website</h1>"
+        "</body></html>"
+    )
+    website_index.write_text(
+        website_html,
+        encoding="utf-8",
+    )
+
+    custom_html = (
+        "<html><body>"
+        "<h1>My Custom Presence</h1>"
+        "</body></html>"
+    )
+
+    service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+        custom_html=custom_html,
+        custom_page_enabled=True,
+        website_enabled=True,
+        website_index_path=str(website_index),
+    )
+
+    try:
+        service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            service.port,
+            timeout=2,
+        )
+
+        try:
+            connection.request("GET", "/")
+            response = connection.getresponse()
+            body = response.read()
+        finally:
+            connection.close()
+
+        assert response.status == 200
+        assert body == website_html.encode("utf-8")
+        assert b"My Custom Presence" not in body
+        assert b"Onion Service Online" not in body
+    finally:
+        service.stop()
+
+
+
+def test_onion_presence_http_service_serves_website_css(
+    tmp_path,
+):
+    website_index = tmp_path / "index.html"
+    website_index.write_text(
+        '<html><head><link rel="stylesheet" href="css/style.css">'
+        '</head><body><h1>Website</h1></body></html>',
+        encoding="utf-8",
+    )
+
+    css_dir = tmp_path / "css"
+    css_dir.mkdir()
+
+    css_content = b"body { color: red; }\n"
+    (css_dir / "style.css").write_bytes(css_content)
+
+    service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+        website_enabled=True,
+        website_index_path=str(website_index),
+    )
+
+    try:
+        service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            service.port,
+            timeout=2,
+        )
+
+        try:
+            connection.request("GET", "/css/style.css")
+            response = connection.getresponse()
+            body = response.read()
+        finally:
+            connection.close()
+
+        assert response.status == 200
+        assert response.getheader("Content-Type") == "text/css"
+        assert body == css_content
+    finally:
+        service.stop()
+
+
+
+def test_onion_presence_http_service_blocks_website_path_traversal(
+    tmp_path,
+):
+    website_root = tmp_path / "website"
+    website_root.mkdir()
+
+    website_index = website_root / "index.html"
+    website_index.write_text(
+        "<html><body>Website</body></html>",
+        encoding="utf-8",
+    )
+
+    secret_content = b"PRIVATE_DATA_DO_NOT_EXPOSE"
+    (tmp_path / "secret.txt").write_bytes(secret_content)
+
+    service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+        website_enabled=True,
+        website_index_path=str(website_index),
+    )
+
+    try:
+        service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            service.port,
+            timeout=2,
+        )
+
+        try:
+            connection.request(
+                "GET",
+                "/%2e%2e/secret.txt",
+            )
+            response = connection.getresponse()
+            body = response.read()
+        finally:
+            connection.close()
+
+        assert response.status == 404
+        assert secret_content not in body
+    finally:
+        service.stop()
+
+
+
+def test_onion_presence_http_service_blocks_website_symlink_escape(
+    tmp_path,
+):
+    website_root = tmp_path / "website"
+    website_root.mkdir()
+
+    website_index = website_root / "index.html"
+    website_index.write_text(
+        "<html><body>Website</body></html>",
+        encoding="utf-8",
+    )
+
+    secret_content = b"PRIVATE_SYMLINK_TARGET"
+    secret_file = tmp_path / "secret.txt"
+    secret_file.write_bytes(secret_content)
+
+    symlink_path = website_root / "public.txt"
+    symlink_path.symlink_to(secret_file)
+
+    service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+        website_enabled=True,
+        website_index_path=str(website_index),
+    )
+
+    try:
+        service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            service.port,
+            timeout=2,
+        )
+
+        try:
+            connection.request("GET", "/public.txt")
+            response = connection.getresponse()
+            body = response.read()
+        finally:
+            connection.close()
+
+        assert response.status == 404
+        assert secret_content not in body
+    finally:
+        service.stop()
+
+
+
+def test_onion_presence_http_service_website_uses_local_assets_csp(
+    tmp_path,
+):
+    website_index = tmp_path / "index.html"
+    website_index.write_text(
+        "<html><body><h1>Website</h1></body></html>",
+        encoding="utf-8",
+    )
+
+    service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+        website_enabled=True,
+        website_index_path=str(website_index),
+    )
+
+    try:
+        service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            service.port,
+            timeout=2,
+        )
+
+        try:
+            connection.request("GET", "/")
+            response = connection.getresponse()
+            response.read()
+
+            csp = response.getheader(
+                "Content-Security-Policy"
+            )
+        finally:
+            connection.close()
+
+        assert response.status == 200
+        assert csp == (
+            "default-src 'none'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self'; "
+            "connect-src 'none'; "
+            "font-src 'self'; "
+            "object-src 'none'; "
+            "frame-src 'none'; "
+            "form-action 'none'; "
+            "base-uri 'none'"
+        )
+    finally:
+        service.stop()
+
+
+
+def test_onion_presence_http_service_serves_website_javascript(
+    tmp_path,
+):
+    website_index = tmp_path / "index.html"
+    website_index.write_text(
+        '<html><body><script src="js/app.js"></script></body></html>',
+        encoding="utf-8",
+    )
+
+    js_dir = tmp_path / "js"
+    js_dir.mkdir()
+
+    javascript_content = b"console.log('GarlicSMTP website');\n"
+    (js_dir / "app.js").write_bytes(javascript_content)
+
+    service = OnionPresenceHttpService(
+        host="127.0.0.1",
+        port=0,
+        website_enabled=True,
+        website_index_path=str(website_index),
+    )
+
+    try:
+        service.start()
+
+        connection = http.client.HTTPConnection(
+            "127.0.0.1",
+            service.port,
+            timeout=2,
+        )
+
+        try:
+            connection.request("GET", "/js/app.js")
+            response = connection.getresponse()
+            body = response.read()
+        finally:
+            connection.close()
+
+        assert response.status == 200
+        assert response.getheader("Content-Type") in (
+            "text/javascript",
+            "application/javascript",
+        )
+        assert body == javascript_content
+    finally:
+        service.stop()
+
+
+
+def test_onion_presence_http_service_rejects_missing_website_index(
+    tmp_path,
+):
+    missing_index = tmp_path / "missing" / "index.html"
+
+    with pytest.raises(ValueError, match="Website index"):
+        OnionPresenceHttpService(
+            host="127.0.0.1",
+            port=0,
+            website_enabled=True,
+            website_index_path=str(missing_index),
+        )
+
+
+
+def test_onion_presence_http_service_rejects_website_directory_as_index(
+    tmp_path,
+):
+    website_directory = tmp_path / "website"
+    website_directory.mkdir()
+
+    with pytest.raises(ValueError, match="Website index"):
+        OnionPresenceHttpService(
+            host="127.0.0.1",
+            port=0,
+            website_enabled=True,
+            website_index_path=str(website_directory),
+        )

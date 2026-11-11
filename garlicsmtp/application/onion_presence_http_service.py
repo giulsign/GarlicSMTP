@@ -9,6 +9,10 @@ from http.server import (
     ThreadingHTTPServer,
 )
 from html.parser import HTMLParser
+from xmlrpc import server
+import mimetypes
+from pathlib import Path
+from urllib.parse import unquote, urlsplit
 
 from garlicsmtp.core.service import Service
 
@@ -232,7 +236,11 @@ class _PresenceRequestHandler(
         elif self.path == "/":
             service = self.server
 
-            if (
+            
+            if service.website_enabled:
+                with open(service.website_index_path, "rb") as website_file:
+                    body = website_file.read()
+            elif (
                 service.custom_page_enabled
                 and service.custom_html is not None
             ):
@@ -252,13 +260,54 @@ class _PresenceRequestHandler(
                     b"</html>\n"
                 )
 
+
             content_type = "text/html; charset=utf-8"
+
+        
+        elif getattr(self.server, "website_enabled", False):
+            website_index_path = self.server.website_index_path
+
+            if website_index_path is None:
+                self.send_error(404)
+                return
+
+            website_root = Path(website_index_path).resolve().parent
+
+            request_path = unquote(urlsplit(self.path).path)
+
+            if (
+                "\x00" in request_path
+                or "\\" in request_path
+                or any(
+                    part in (".", "..")
+                    for part in request_path.split("/")
+                )
+            ):
+                self.send_error(404)
+                return
+
+            relative_path = request_path.lstrip("/")
+            requested_file = (website_root / relative_path).resolve()
+
+            if (
+                not requested_file.is_relative_to(website_root)
+                or not requested_file.is_file()
+            ):
+                self.send_error(404)
+                return
+
+            body = requested_file.read_bytes()
+            content_type = (
+                mimetypes.guess_type(requested_file.name)[0]
+                or "application/octet-stream"
+            )
 
         else:
             self.send_error(404)
             return
 
         self.send_response(200)
+
         self.send_header(
             "Content-Type",
             content_type,
@@ -267,19 +316,39 @@ class _PresenceRequestHandler(
             "Content-Length",
             str(len(body)),
         )
+        
+        if getattr(self.server, "website_enabled", False):
+            content_security_policy = (
+                "default-src 'none'; "
+                "script-src 'self' 'unsafe-inline'; "
+                "style-src 'self' 'unsafe-inline'; "
+                "img-src 'self'; "
+                "connect-src 'none'; "
+                "font-src 'self'; "
+                "object-src 'none'; "
+                "frame-src 'none'; "
+                "form-action 'none'; "
+                "base-uri 'none'"
+            )
+        else:
+            content_security_policy = (
+                "default-src 'none'; "
+                "script-src 'none'; "
+                "style-src 'none'; "
+                "img-src 'none'; "
+                "connect-src 'none'; "
+                "font-src 'none'; "
+                "object-src 'none'; "
+                "frame-src 'none'; "
+                "form-action 'none'; "
+                "base-uri 'none'"
+            )
+
         self.send_header(
             "Content-Security-Policy",
-            "default-src 'none'; "
-            "script-src 'none'; "
-            "style-src 'none'; "
-            "img-src 'none'; "
-            "connect-src 'none'; "
-            "font-src 'none'; "
-            "object-src 'none'; "
-            "frame-src 'none'; "
-            "form-action 'none'; "
-            "base-uri 'none'",
+            content_security_policy,
         )
+
         self.end_headers()
         self.wfile.write(body)
 
@@ -301,6 +370,8 @@ class OnionPresenceHttpService(Service):
         port: int = 8080,
         custom_html: str | None = None,
         custom_page_enabled: bool = False,
+        website_enabled: bool = False,
+        website_index_path: str | None = None,
     ) -> None:
         if host != "127.0.0.1":
             raise ValueError(
@@ -311,6 +382,19 @@ class OnionPresenceHttpService(Service):
         self.host = host
         self.port = port
         self.running = False
+        
+        if website_enabled:
+            if (
+                not website_index_path
+                or not Path(website_index_path).is_file()
+            ):
+                raise ValueError(
+                    "Website index must be an existing file"
+                )
+
+        self.website_enabled = website_enabled
+        self.website_index_path = website_index_path
+
         if custom_page_enabled and custom_html is not None:
             if len(custom_html.encode("utf-8")) > _MAX_CUSTOM_HTML_BYTES:
                 raise ValueError(
@@ -346,6 +430,8 @@ class OnionPresenceHttpService(Service):
         )
         server.custom_html = self.custom_html
         server.custom_page_enabled = self.custom_page_enabled
+        server.website_enabled = self.website_enabled
+        server.website_index_path = self.website_index_path
 
         server.daemon_threads = True
 

@@ -266,3 +266,47 @@ def test_configuration_rejects_non_loopback_imap_host(
         match="IMAP.*loopback",
     ):
         ConfigurationLoader().load(config_path)
+
+
+
+def test_configuration_loader_reads_onion_website_settings(
+    tmp_path,
+):
+    path = tmp_path / "settings.toml"
+
+    path.write_text(
+        """
+[tor]
+onion_website_enabled = true
+onion_website_index_path = "website/index.html"
+""".strip(),
+        encoding="utf-8",
+    )
+
+    settings = ConfigurationLoader().load(path)
+
+    assert settings.tor.onion_website_enabled is True
+    assert settings.tor.onion_website_index_path == str(
+        tmp_path / "website" / "index.html"
+    )
+
+
+
+def test_configuration_loader_normalizes_empty_website_index_path(
+    tmp_path,
+):
+    path = tmp_path / "settings.toml"
+
+    path.write_text(
+        """
+[tor]
+onion_website_enabled = false
+onion_website_index_path = ""
+""".strip(),
+        encoding="utf-8",
+    )
+
+    settings = ConfigurationLoader().load(path)
+
+    assert settings.tor.onion_website_enabled is False
+    assert settings.tor.onion_website_index_path is None
