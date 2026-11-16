@@ -968,3 +968,508 @@ def test_compose_section_destroy_cancels_pending_send_poll():
     finally:
         allow_completion.set()
         root.destroy()
+
+
+def test_compose_section_sets_recipient_from_contact():
+    import tkinter as tk
+    from tkinter import ttk
+
+    from garlicsmtp.gui.tk_compose_section import (
+        ComposeSection,
+    )
+
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        section = ComposeSection.__new__(ComposeSection)
+        ttk.Frame.__init__(section, root)
+
+        section._send_poll_id = None
+
+        section.recipient_input = ttk.Entry(section)
+
+        section.recipient_input.insert(
+            0,
+            "old@example.com",
+        )
+
+        section.set_recipient_from_contact(
+            "alice@example.com",
+        )
+
+        assert (
+            section.recipient_input.get()
+            == "alice@example.com"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_has_select_contact_button():
+    import inspect
+
+    from garlicsmtp.gui.tk_compose_section import (
+        ComposeSection,
+    )
+
+    source = inspect.getsource(ComposeSection.__init__)
+
+    assert "self.select_contact_button = ttk.Button(" in source
+    assert 'text="Select Contact"' in source
+    assert "command=self._select_contact" in source
+    assert "self.select_contact_button.grid(" in source
+
+
+def test_compose_section_accepts_contacts_view_model():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Alice",
+                    "onion_address": "alice@example.onion",
+                },
+            ]
+
+        contacts_view_model = FakeContactsViewModel()
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=contacts_view_model,
+        )
+
+        assert (
+            section.contacts_view_model
+            is contacts_view_model
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_opens_toplevel(monkeypatch):
+    from tkinter import ttk
+
+    created_windows = []
+
+    class FakeContactWindow:
+        def __init__(self, master):
+            self.master = master
+            created_windows.append(self)
+
+        def title(self, value):
+            self.window_title = value
+
+        def geometry(self, value):
+            self.window_geometry = value
+
+        def columnconfigure(self, index, weight):
+            pass
+
+        def rowconfigure(self, index, weight):
+            pass
+
+    monkeypatch.setattr(
+        compose_module.tk,
+        "Toplevel",
+        FakeContactWindow,
+    )
+
+    class FakeTreeview:
+        def __init__(self, master, **kwargs):
+            pass
+
+        def heading(self, column, text):
+            pass
+
+        def column(self, column, width):
+            pass
+
+        def grid(self, **kwargs):
+            pass
+
+        def insert(self, *args, **kwargs):
+            pass
+
+        def bind(self, sequence, callback):
+            pass
+
+    monkeypatch.setattr(
+        compose_module.ttk,
+        "Treeview",
+        FakeTreeview,
+    )
+
+    class FakeButton:
+        def __init__(self, master, **kwargs):
+            pass
+
+        def grid(self, **kwargs):
+            pass
+
+    monkeypatch.setattr(
+        compose_module.ttk,
+        "Button",
+        FakeButton,
+    )
+
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        section = ComposeSection.__new__(ComposeSection)
+        ttk.Frame.__init__(section, root)
+
+        section._send_poll_id = None
+        class FakeContactsViewModel:
+            def refresh(self):
+                pass
+
+            contacts = []
+
+        section.contacts_view_model = FakeContactsViewModel()
+
+        section._select_contact()
+
+        assert len(created_windows) == 1
+        assert (
+            created_windows[0].window_title
+            == "Select Contact"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_displays_saved_contacts():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def refresh(self):
+                pass
+
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Alice",
+                    "onion_address": "alice@example.onion",
+                },
+                {
+                    "id": 2,
+                    "name": "Bob",
+                    "onion_address": "bob@example.onion",
+                },
+            ]
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section._select_contact()
+
+        tree = section.contact_selector_tree
+
+        assert len(tree.get_children()) == 2
+
+        assert tree.item(
+            "1",
+            "values",
+        ) == (
+            "Alice",
+            "alice@example.onion",
+        )
+
+        assert tree.item(
+            "2",
+            "values",
+        ) == (
+            "Bob",
+            "bob@example.onion",
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_applies_selected_address():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def refresh(self):
+                pass
+
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Alice",
+                    "onion_address": "alice@example.onion",
+                },
+            ]
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.recipient_input.insert(
+            0,
+            "previous@example.onion",
+        )
+
+        section._select_contact()
+
+        selector_window = (
+            section.contact_selector_tree.winfo_toplevel()
+        )
+
+        section.contact_selector_tree.selection_set("1")
+
+        section._apply_selected_contact()
+
+        assert (
+            section.recipient_input.get()
+            == "alice@example.onion"
+        )
+
+        assert not selector_window.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_without_selection_preserves_recipient():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def refresh(self):
+                pass
+
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Alice",
+                    "onion_address": "alice@example.onion",
+                },
+            ]
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.recipient_input.insert(
+            0,
+            "previous@example.onion",
+        )
+
+        section._select_contact()
+
+        selector_window = (
+            section.contact_selector_tree.winfo_toplevel()
+        )
+
+        section.contact_selector_tree.selection_remove(
+            section.contact_selector_tree.selection()
+        )
+
+        section._apply_selected_contact()
+
+        assert (
+            section.recipient_input.get()
+            == "previous@example.onion"
+        )
+
+        assert selector_window.winfo_exists()
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_double_click_applies_address():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def refresh(self):
+                pass
+
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Alice",
+                    "onion_address": "alice@example.onion",
+                },
+            ]
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section._select_contact()
+
+        tree = section.contact_selector_tree
+        selector_window = tree.winfo_toplevel()
+
+        tree.selection_set("1")
+
+        binding = tree.bind("<Double-1>")
+
+        assert binding
+        assert "_apply_selected_contact" in binding or "lambda" in binding
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_refreshes_contacts_before_display():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def __init__(self):
+                self.contacts = []
+                self.refresh_called = False
+
+            def refresh(self):
+                self.refresh_called = True
+                self.contacts = [
+                    {
+                        "id": 1,
+                        "name": "Alice",
+                        "onion_address": "alice@example.onion",
+                    },
+                ]
+
+        contacts_view_model = FakeContactsViewModel()
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=contacts_view_model,
+        )
+
+        section._select_contact()
+
+        assert contacts_view_model.refresh_called
+
+        assert section.contact_selector_tree.item(
+            "1",
+            "values",
+        ) == (
+            "Alice",
+            "alice@example.onion",
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_with_empty_address_book():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def __init__(self):
+                self.contacts = []
+
+            def refresh(self):
+                pass
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.recipient_input.insert(
+            0,
+            "previous@example.onion",
+        )
+
+        section._select_contact()
+
+        assert section.contact_selector_tree.get_children() == ()
+
+        section._apply_selected_contact()
+
+        assert (
+            section.recipient_input.get()
+            == "previous@example.onion"
+        )
+
+        assert (
+            section.contact_selector_tree
+            .winfo_toplevel()
+            .winfo_exists()
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_without_contacts_view_model_does_nothing():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+        )
+
+        section.recipient_input.insert(
+            0,
+            "previous@example.onion",
+        )
+
+        section._select_contact()
+
+        assert (
+            section.recipient_input.get()
+            == "previous@example.onion"
+        )
+
+        assert not hasattr(
+            section,
+            "contact_selector_tree",
+        )
+
+    finally:
+        root.destroy()

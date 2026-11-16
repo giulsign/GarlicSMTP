@@ -42,8 +42,8 @@ from garlicsmtp.gui.tk_services_section import (
 from garlicsmtp.gui.tk_tor_section import (
     TorSection,
 )
-from garlicsmtp.gui.tk_compose_section import (
-    ComposeSection,
+from garlicsmtp.gui.tk_contacts_section import (
+    ContactsSection,
 )
 from garlicsmtp.gui.tk_dashboard_widgets import (
     StatusBadge,
@@ -54,6 +54,10 @@ from garlicsmtp.gui.onion_page_gui_factory import (
 from garlicsmtp.gui.tk_onion_page_section import (
     OnionPageSection,
 )
+from garlicsmtp.gui.tk_compose_section import (
+    ComposeSection,
+)
+
 
 
 class MainWindow(ttk.Frame):
@@ -66,6 +70,7 @@ class MainWindow(ttk.Frame):
         folder_opener,
         attachment_directory_factory,
         onion_settings_path: Path,
+        contacts_view_model=None,
     ) -> None:
         super().__init__(
             master,
@@ -79,6 +84,7 @@ class MainWindow(ttk.Frame):
         )
 
         self.onion_settings_path = Path(onion_settings_path)
+        self.contacts_view_model = contacts_view_model
 
         self.view_model = view_model
 
@@ -173,12 +179,16 @@ class MainWindow(ttk.Frame):
             self._on_mouse_wheel_down,
         )
 
+        self.contacts_section = None
+        self._contacts_window = None
+
         self.compose_section = None
 
         if self.view_model.compose is not None:
             self.compose_section = ComposeSection(
                 self.content_frame,
                 view_model=self.view_model.compose,
+                contacts_view_model=self.contacts_view_model,
             )
 
         self.application_section = ApplicationSection(
@@ -297,6 +307,12 @@ class MainWindow(ttk.Frame):
             self.action_frame,
             text="Refresh",
             command=lambda: self._refresh(),
+        )
+
+        self.contacts_button = ttk.Button(
+            self.action_frame,
+            text="Contacts",
+            command=self._open_contacts_window,
         )
 
         self.start_button = ttk.Button(
@@ -520,6 +536,11 @@ class MainWindow(ttk.Frame):
             column=4,
         )
 
+        self.contacts_button.grid(
+            row=0,
+            column=5,
+        )
+
         self.action_frame.columnconfigure(
             3,
             weight=1,
@@ -539,6 +560,62 @@ class MainWindow(ttk.Frame):
         self.refresh_view()
 
         self._schedule_refresh_poll()
+
+    def _open_contacts_window(self) -> None:
+        """Open or focus the Contacts window."""
+
+        if self.contacts_view_model is None:
+            return
+
+        contacts_window = getattr(
+            self,
+            "_contacts_window",
+            None,
+        )
+
+        if (
+            contacts_window is not None
+            and contacts_window.winfo_exists()
+        ):
+            contacts_window.lift()
+            contacts_window.focus_set()
+            return
+
+        contacts_window = tk.Toplevel(
+            self.winfo_toplevel()
+        )
+
+        contacts_window.title("Contacts")
+        contacts_window.geometry("750x500")
+
+        contacts_window.columnconfigure(
+            0,
+            weight=1,
+        )
+
+        contacts_window.rowconfigure(
+            0,
+            weight=1,
+        )
+
+        contacts_section = ContactsSection(
+            contacts_window,
+            view_model=self.contacts_view_model,
+        )
+
+        contacts_section.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+        )
+
+        contacts_window.protocol(
+            "WM_DELETE_WINDOW",
+            contacts_window.destroy,
+        )
+
+        self._contacts_window = contacts_window
+        self.contacts_section = contacts_section
 
     def _update_content_scrollregion(
         self,
@@ -618,6 +695,13 @@ class MainWindow(ttk.Frame):
 
         if self.compose_section is not None:
             self.compose_section.refresh_view()
+
+        if (
+            self._contacts_window is not None
+            and self._contacts_window.winfo_exists()
+            and self.contacts_section is not None
+        ):
+            self.contacts_section.refresh_view()
 
     def _select_mailbox(
         self,
@@ -872,6 +956,14 @@ class MainWindow(ttk.Frame):
             )
 
             self._refresh_poll_after_id = None
+
+        if (
+            self._contacts_window is not None
+            and self._contacts_window.winfo_exists()
+        ):
+            self._contacts_window.destroy()
+            self._contacts_window = None
+            self.contacts_section = None
 
         self.view_model.unsubscribe(
             self._queue_refresh

@@ -136,6 +136,10 @@ class ApplicationPaths:
         return self.data_dir / "sent.db"
 
     @property
+    def contacts_file(self) -> Path:
+        return self.data_dir / "contacts.json"
+
+    @property
     def queue_database(self) -> Path:
         return self.state_dir / "queue.db"
 

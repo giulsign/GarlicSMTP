@@ -27,6 +27,7 @@ class ComposeSection(DashboardCard):
         master,
         *,
         view_model: ComposeViewModel,
+        contacts_view_model=None,
     ) -> None:
         super().__init__(
             master,
@@ -34,6 +35,7 @@ class ComposeSection(DashboardCard):
         )
 
         self.view_model = view_model
+        self.contacts_view_model = contacts_view_model
         self._send_results = queue.Queue()
         self._send_in_progress = False
         self._send_poll_id = None
@@ -95,6 +97,20 @@ class ComposeSection(DashboardCard):
             row=1,
             column=1,
             sticky="ew",
+            pady=3,
+        )
+
+        self.select_contact_button = ttk.Button(
+            form,
+            text="Select Contact",
+            command=self._select_contact,
+        )
+
+        self.select_contact_button.grid(
+            row=1,
+            column=2,
+            sticky="w",
+            padx=(8, 0),
             pady=3,
         )
 
@@ -197,6 +213,139 @@ class ComposeSection(DashboardCard):
         self.content.rowconfigure(
             1,
             weight=1,
+        )
+
+    def _select_contact(self) -> None:
+        """Open the contact selector window."""
+
+        if self.contacts_view_model is None:
+            return
+
+        self.contacts_view_model.refresh()
+
+        contact_window = tk.Toplevel(
+            self.winfo_toplevel()
+        )
+
+        contact_window.title(
+            "Select Contact"
+        )
+
+        contact_window.geometry(
+            "650x400"
+        )
+
+        contact_window.columnconfigure(
+            0,
+            weight=1,
+        )
+
+        contact_window.rowconfigure(
+            0,
+            weight=1,
+        )
+
+        self.contact_selector_tree = ttk.Treeview(
+            contact_window,
+            columns=(
+                "name",
+                "onion_address",
+            ),
+            show="headings",
+            selectmode="browse",
+        )
+
+        self.contact_selector_tree.heading(
+            "name",
+            text="Name",
+        )
+
+        self.contact_selector_tree.heading(
+            "onion_address",
+            text="Onion Address",
+        )
+
+        self.contact_selector_tree.column(
+            "name",
+            width=180,
+        )
+
+        self.contact_selector_tree.column(
+            "onion_address",
+            width=400,
+        )
+
+        self.contact_selector_tree.grid(
+            row=0,
+            column=0,
+            sticky="nsew",
+            padx=10,
+            pady=10,
+        )
+
+        self.contact_selector_tree.bind(
+            "<Double-1>",
+            lambda event: self._apply_selected_contact(),
+        )
+
+        for contact in self.contacts_view_model.contacts:
+            self.contact_selector_tree.insert(
+                "",
+                "end",
+                iid=str(contact["id"]),
+                values=(
+                    contact["name"],
+                    contact["onion_address"],
+                ),
+            )
+
+        self.use_contact_button = ttk.Button(
+            contact_window,
+            text="Use Contact",
+            command=self._apply_selected_contact,
+        )
+
+        self.use_contact_button.grid(
+            row=1,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=(0, 10),
+        )
+
+    def _apply_selected_contact(self) -> None:
+        """Apply the selected contact to the recipient field."""
+
+        selection = self.contact_selector_tree.selection()
+
+        if not selection:
+            return
+
+        contact_id = int(selection[0])
+
+        for contact in self.contacts_view_model.contacts:
+            if contact["id"] == contact_id:
+                self.set_recipient_from_contact(
+                    contact["onion_address"]
+                )
+
+                self.contact_selector_tree.winfo_toplevel().destroy()
+                return
+
+    def set_recipient_from_contact(
+        self,
+        email: str,
+    ) -> None:
+        """Set the recipient using a selected contact."""
+
+        self.recipient_input.delete(
+            0,
+            tk.END,
+        )
+
+        self.recipient_input.insert(
+            0,
+            email,
         )
 
     def refresh_view(

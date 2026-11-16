@@ -915,6 +915,7 @@ def test_run_gui_sets_application_icon(
             folder_opener,
             attachment_directory_factory,
             onion_settings_path,
+            contacts_view_model=None
         ):
             pass
 
@@ -970,6 +971,7 @@ def test_run_gui_sets_application_icon(
             "/application/garlicsmtp.png"
         )
         settings_file = Path("/application/config/settings.toml")
+        contacts_file = Path("/application/data/contacts.json")
 
     result = gui_application.run_gui(
         ["garlicsmtp-gui"],
@@ -1002,6 +1004,7 @@ def test_run_gui_hides_root_until_authentication_succeeds(
             "/application/garlicsmtp.png"
         )
         settings_file = Path("/application/config/settings.toml")
+        contacts_file = Path("/application/data/contacts.json")
 
     class FakeRoot:
 
@@ -1055,7 +1058,8 @@ def test_run_gui_hides_root_until_authentication_succeeds(
             *,
             folder_opener,
             attachment_directory_factory,
-            onion_settings_path
+            onion_settings_path,
+            contacts_view_model=None
         ):
             events.append("window")
 
@@ -1197,6 +1201,7 @@ def test_run_gui_uses_user_application_paths(
             folder_opener,
             attachment_directory_factory,
             onion_settings_path,
+            contacts_view_model=None
         ):
             received["onion_settings_path"] = onion_settings_path
             received["window"] = self
@@ -1477,6 +1482,7 @@ def test_run_gui_uses_provided_application_paths(
             folder_opener,
             attachment_directory_factory,
             onion_settings_path,
+            contacts_view_model=None
         ):
             pass
 
@@ -1610,6 +1616,7 @@ def test_run_gui_closes_window_before_destroying_root(
             "/application/garlicsmtp.png"
         )
         settings_file = Path("/application/config/settings.toml")
+        contacts_file = Path("/application/data/contacts.json")
 
     class FakeRoot:
 
@@ -1668,7 +1675,8 @@ def test_run_gui_closes_window_before_destroying_root(
             *,
             folder_opener,
             attachment_directory_factory,
-            onion_settings_path
+            onion_settings_path,
+            contacts_view_model=None
         ):
             pass
 
@@ -2079,6 +2087,7 @@ def test_run_gui_builds_view_model_after_successful_authentication(
             folder_opener,
             attachment_directory_factory,
             onion_settings_path,
+            contacts_view_model=None
         ):
             pass
 
@@ -3434,6 +3443,7 @@ def test_run_gui_default_login_unlocks_dek_before_build(
             folder_opener,
             attachment_directory_factory,
             onion_settings_path,
+            contacts_view_model=None
         ):
             events.append("window")
 
@@ -3538,6 +3548,7 @@ def test_run_gui_first_setup_creates_dek_and_confirms_recovery(
             onion_settings_path,
             folder_opener,
             attachment_directory_factory,
+            contacts_view_model=None
         ):
             events.append("window")
 
@@ -5292,3 +5303,376 @@ def test_run_gui_reports_invalid_onion_html_path(
     assert "Onion" in events[0][1]
     assert "HTML" in events[0][2]
     assert events[1] == "destroy"
+
+
+
+def test_run_gui_passes_contacts_view_model_to_window(
+    tmp_path,
+    monkeypatch,
+    dek,
+):
+    from garlicsmtp.gui.contacts_view_model import (
+        ContactsViewModel,
+    )
+
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    received = {}
+
+    class FakeRoot:
+
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def deiconify(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def protocol(self, name, callback):
+            pass
+
+        def mainloop(self):
+            pass
+
+        def destroy(self):
+            pass
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+            onion_settings_path,
+            contacts_view_model=None,
+        ):
+            received["contacts_view_model"] = (
+                contacts_view_model
+            )
+
+        def pack(self, **kwargs):
+            pass
+
+        def close(self):
+            return True
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: object(),
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=lambda **kwargs: dek,
+    )
+
+    assert result == 0
+
+    contacts_view_model = received[
+        "contacts_view_model"
+    ]
+
+    assert isinstance(
+        contacts_view_model,
+        ContactsViewModel,
+    )
+
+    assert (
+        contacts_view_model.repository.path
+        == paths.contacts_file
+    )
+
+
+
+def test_run_gui_survives_corrupted_contacts_file(
+    tmp_path,
+    monkeypatch,
+    dek,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    paths.contacts_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    invalid_contents = "{ invalid json"
+
+    paths.contacts_file.write_text(
+        invalid_contents,
+        encoding="utf-8",
+    )
+
+    received = {}
+
+    class FakeRoot:
+
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def deiconify(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def protocol(self, name, callback):
+            pass
+
+        def mainloop(self):
+            pass
+
+        def after_idle(self, callback):
+            callback()
+
+        def destroy(self):
+            pass
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+            onion_settings_path,
+            contacts_view_model=None,
+        ):
+            received["contacts_view_model"] = (
+                contacts_view_model
+            )
+            received["window_created"] = True
+
+        def pack(self, **kwargs):
+            pass
+
+        def close(self):
+            return True
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showwarning",
+        lambda *args, **kwargs: None,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=lambda **kwargs: dek,
+    )
+
+    assert result == 0
+
+    assert received["window_created"] is True
+
+    assert received["contacts_view_model"] is None
+
+    assert paths.contacts_file.read_text(
+        encoding="utf-8",
+    ) == invalid_contents
+
+
+
+def test_run_gui_warns_when_contacts_file_is_corrupted(
+    tmp_path,
+    monkeypatch,
+    dek,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path / "garlicsmtp",
+    )
+
+    paths.contacts_file.parent.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    invalid_contents = "{ invalid json"
+
+    paths.contacts_file.write_text(
+        invalid_contents,
+        encoding="utf-8",
+    )
+
+    events = []
+    warnings = []
+
+    class FakeRoot:
+
+        def title(self, value):
+            pass
+
+        def geometry(self, value):
+            pass
+
+        def withdraw(self):
+            pass
+
+        def deiconify(self):
+            pass
+
+        def iconphoto(self, default, image):
+            pass
+
+        def protocol(self, name, callback):
+            pass
+
+        def mainloop(self):
+            pass
+
+        def destroy(self):
+            pass
+
+        def after_idle(self, callback):
+            events.append("schedule_warning")
+            callback()
+
+    class FakeWindow:
+
+        def __init__(
+            self,
+            master,
+            view_model,
+            *,
+            folder_opener,
+            attachment_directory_factory,
+            onion_settings_path,
+            contacts_view_model=None,
+        ):
+            events.append("window_created")
+            assert contacts_view_model is None
+
+        def pack(self, **kwargs):
+            pass
+
+        def close(self):
+            return True
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "Tk",
+        FakeRoot,
+    )
+
+    monkeypatch.setattr(
+        gui_application.tk,
+        "PhotoImage",
+        lambda **kwargs: object(),
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "MainWindow",
+        FakeWindow,
+    )
+
+    monkeypatch.setattr(
+        gui_application,
+        "build_view_model",
+        lambda **kwargs: object(),
+    )
+
+    def fake_showwarning(title, message, **kwargs):
+        events.append("warning")
+        warnings.append((title, message))
+
+    monkeypatch.setattr(
+        gui_application.messagebox,
+        "showwarning",
+        fake_showwarning,
+    )
+
+    result = gui_application.run_gui(
+        ["garlicsmtp-gui"],
+        paths=paths,
+        authenticate=lambda **kwargs: dek,
+    )
+
+    assert result == 0
+
+    assert events == [
+        "window_created",
+        "schedule_warning",
+        "warning",
+    ]
+
+    assert len(warnings) == 1
+
+    title, message = warnings[0]
+
+    assert "Contacts" in title
+
+    assert "contacts.json" in message
+
+    assert invalid_contents not in message
+
+    assert paths.contacts_file.read_text(
+        encoding="utf-8",
+    ) == invalid_contents

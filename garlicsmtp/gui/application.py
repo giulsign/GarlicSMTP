@@ -8,7 +8,12 @@ import tkinter as tk
 from tkinter import font as tkfont
 from tkinter import messagebox
 
-
+from garlicsmtp.gui.contacts_repository import (
+    ContactsRepository,
+)
+from garlicsmtp.gui.contacts_view_model import (
+    ContactsViewModel,
+)
 from garlicsmtp.application import (
     ApplicationBuilder,
     ApplicationController,
@@ -554,6 +559,20 @@ def run_gui(
             paths=application_paths,
             dek=dek,
         )
+
+        contacts_view_model = None
+        contacts_load_failed = False
+
+        try:
+            contacts_repository = ContactsRepository(
+                application_paths.contacts_file
+            )
+            contacts_view_model = ContactsViewModel(
+                contacts_repository
+            )
+        except ValueError:
+            contacts_load_failed = True
+
     except IsADirectoryError as exc:
         messagebox.showerror(
             "Onion HTML configuration error",
@@ -590,6 +609,7 @@ def run_gui(
             )
         ),
         onion_settings_path=application_paths.settings_file,
+        contacts_view_model=contacts_view_model,
     )
 
     window.pack(
@@ -616,6 +636,19 @@ def run_gui(
         "WM_DELETE_WINDOW",
         close_window,
     )
+
+    if contacts_load_failed:
+        root.after_idle(
+            lambda: messagebox.showwarning(
+                "Contacts unavailable",
+                (
+                    "The contacts.json file is invalid. "
+                    "Contacts have been disabled for this session. "
+                    "The original file has not been modified."
+                ),
+                parent=root,
+            )
+        )
 
     root.mainloop()
 

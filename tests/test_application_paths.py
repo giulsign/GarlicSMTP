@@ -236,3 +236,55 @@ def test_application_paths_derives_attachment_limit_file(
         == paths.config_dir
         / "attachment-limit.json"
     )
+
+
+def test_contacts_file_is_inside_data_directory(
+    tmp_path,
+):
+    paths = ApplicationPaths(
+        root_dir=tmp_path
+    )
+
+    assert paths.contacts_file == (
+        tmp_path
+        / "data"
+        / "contacts.json"
+    )
+
+
+def test_contacts_file_does_not_create_directories(
+    tmp_path,
+):
+    root_dir = tmp_path / "garlicsmtp"
+
+    paths = ApplicationPaths(
+        root_dir=root_dir
+    )
+
+    contacts_file = paths.contacts_file
+
+    assert contacts_file == (
+        root_dir
+        / "data"
+        / "contacts.json"
+    )
+
+    assert not root_dir.exists()
+    assert not contacts_file.exists()
+
+
+def test_contacts_file_uses_user_data_directory(
+    tmp_path,
+):
+    paths = ApplicationPaths.for_user(
+        home=tmp_path
+    )
+
+    assert paths.contacts_file == (
+        tmp_path
+        / ".local"
+        / "share"
+        / "garlicsmtp"
+        / "data"
+        / "contacts.json"
+    )
