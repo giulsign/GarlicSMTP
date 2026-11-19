@@ -1102,6 +1102,12 @@ def test_select_contact_opens_toplevel(monkeypatch):
         def bind(self, sequence, callback):
             pass
 
+        def get_children(self):
+            return ()
+
+        def delete(self, item):
+            pass
+
     monkeypatch.setattr(
         compose_module.ttk,
         "Treeview",
@@ -1121,6 +1127,34 @@ def test_select_contact_opens_toplevel(monkeypatch):
         FakeButton,
     )
 
+    class FakeLabel:
+        def __init__(self, master, **kwargs):
+            pass
+
+        def grid(self, **kwargs):
+            pass
+
+
+    class FakeEntry:
+        def __init__(self, master, **kwargs):
+            pass
+
+        def grid(self, **kwargs):
+            pass
+
+
+    monkeypatch.setattr(
+        compose_module.ttk,
+        "Label",
+        FakeLabel,
+    )
+
+    monkeypatch.setattr(
+        compose_module.ttk,
+        "Entry",
+        FakeEntry,
+    )
+
     root = tk.Tk()
     root.withdraw()
 
@@ -1136,6 +1170,8 @@ def test_select_contact_opens_toplevel(monkeypatch):
             contacts = []
 
         section.contacts_view_model = FakeContactsViewModel()
+
+        created_windows.clear()
 
         section._select_contact()
 
@@ -1470,6 +1506,332 @@ def test_select_contact_without_contacts_view_model_does_nothing():
             section,
             "contact_selector_tree",
         )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_has_recipient_contact_label():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+        )
+
+        assert hasattr(
+            section,
+            "recipient_contact_label",
+        )
+
+        assert (
+            section.recipient_contact_label.cget("text")
+            == ""
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_displays_saved_recipient_name():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def get_contact_name(self, onion_address):
+                if onion_address == "mario@example.onion":
+                    return "Mario Rossi"
+
+                return None
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.recipient_input.insert(
+            0,
+            "mario@example.onion",
+        )
+
+        section._update_recipient_contact_label()
+
+        assert (
+            section.recipient_contact_label.cget("text")
+            == "Contatto: Mario Rossi"
+        )
+
+        assert (
+            section.recipient_input.get()
+            == "mario@example.onion"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_updates_contact_name_on_key_release():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def get_contact_name(self, onion_address):
+                if onion_address == "mario@example.onion":
+                    return "Mario Rossi"
+
+                return None
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.recipient_input.insert(
+            0,
+            "mario@example.onion",
+        )
+
+        binding = section.recipient_input.bind(
+            "<KeyRelease>"
+        )
+
+        assert binding
+
+        section._update_recipient_contact_label()
+
+        assert (
+            section.recipient_contact_label.cget("text")
+            == "Contatto: Mario Rossi"
+        )
+
+        assert (
+            section.recipient_input.get()
+            == "mario@example.onion"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_updates_contact_name_after_selection():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def get_contact_name(self, onion_address):
+                if onion_address == "mario@example.onion":
+                    return "Mario Rossi"
+                return None
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(FakeComposer()),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.set_recipient_from_contact(
+            "mario@example.onion"
+        )
+
+        assert (
+            section.recipient_input.get()
+            == "mario@example.onion"
+        )
+
+        assert (
+            section.recipient_contact_label.cget("text")
+            == "Contatto: Mario Rossi"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_compose_section_clear_removes_recipient_contact_name():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            def get_contact_name(self, onion_address):
+                if onion_address == "mario@example.onion":
+                    return "Mario Rossi"
+                return None
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(FakeComposer()),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section.set_recipient_from_contact(
+            "mario@example.onion"
+        )
+
+        assert (
+            section.recipient_contact_label.cget("text")
+            == "Contatto: Mario Rossi"
+        )
+
+        section._clear_fields()
+
+        assert section.recipient_input.get() == ""
+        assert section.recipient_contact_label.cget("text") == ""
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_filters_by_search_text():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Mario Rossi",
+                    "onion_address": "mario@example.onion",
+                },
+                {
+                    "id": 2,
+                    "name": "Luigi Verdi",
+                    "onion_address": "luigi@example.onion",
+                },
+            ]
+
+            def refresh(self):
+                pass
+
+            def filter_contacts(self, query):
+                normalized = query.casefold()
+                return [
+                    contact
+                    for contact in self.contacts
+                    if (
+                        normalized in contact["name"].casefold()
+                        or normalized
+                        in contact["onion_address"].casefold()
+                    )
+                ]
+
+        contacts_view_model = FakeContactsViewModel()
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(
+                FakeComposer()
+            ),
+            contacts_view_model=contacts_view_model,
+        )
+
+        section.recipient_input.insert(
+            0,
+            "previous@example.onion",
+        )
+
+        section._select_contact()
+
+        tree = section.contact_selector_tree
+
+        assert len(tree.get_children()) == 2
+
+        section.contact_search_var.set("mario")
+
+        rows = tree.get_children()
+
+        assert len(rows) == 1
+
+        assert tree.item(
+            rows[0],
+            "values",
+        ) == (
+            "Mario Rossi",
+            "mario@example.onion",
+        )
+
+        assert len(contacts_view_model.contacts) == 2
+
+        assert (
+            section.recipient_input.get()
+            == "previous@example.onion"
+        )
+
+    finally:
+        root.destroy()
+
+
+def test_select_contact_filters_by_onion_address():
+    root = tk.Tk()
+    root.withdraw()
+
+    try:
+        class FakeContactsViewModel:
+            contacts = [
+                {
+                    "id": 1,
+                    "name": "Mario Rossi",
+                    "onion_address": "mario@example.onion",
+                },
+                {
+                    "id": 2,
+                    "name": "Luigi Verdi",
+                    "onion_address": "luigi@example.onion",
+                },
+            ]
+
+            def refresh(self):
+                pass
+
+            def filter_contacts(self, query):
+                normalized = query.casefold()
+                return [
+                    contact
+                    for contact in self.contacts
+                    if (
+                        normalized in contact["name"].casefold()
+                        or normalized
+                        in contact["onion_address"].casefold()
+                    )
+                ]
+
+        section = ComposeSection(
+            root,
+            view_model=ComposeViewModel(FakeComposer()),
+            contacts_view_model=FakeContactsViewModel(),
+        )
+
+        section._select_contact()
+
+        tree = section.contact_selector_tree
+
+        section.contact_search_var.set("LUIGI@")
+
+        rows = tree.get_children()
+
+        assert len(rows) == 1
+        assert tree.item(rows[0], "values") == (
+            "Luigi Verdi",
+            "luigi@example.onion",
+        )
+
+        section.contact_search_var.set("")
+
+        assert len(tree.get_children()) == 2
 
     finally:
         root.destroy()

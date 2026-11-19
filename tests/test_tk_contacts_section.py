@@ -985,3 +985,136 @@ def test_main_window_passes_contacts_view_model_to_compose():
         "contacts_view_model=self.contacts_view_model,"
         in source
     )
+
+
+def test_contacts_section_filters_by_search_text(
+    root,
+    view_model,
+):
+    from garlicsmtp.gui.tk_contacts_section import (
+        ContactsSection,
+    )
+
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    view_model.add_contact(
+        name="Luigi Verdi",
+        onion_address="luigi@example.onion",
+    )
+
+    section = ContactsSection(
+        root,
+        view_model=view_model,
+    )
+
+    try:
+        assert len(
+            section.contacts_tree.get_children()
+        ) == 2
+
+        section.search_var.set("mario")
+
+        rows = section.contacts_tree.get_children()
+
+        assert len(rows) == 1
+
+        assert section.contacts_tree.item(
+            rows[0],
+            "values",
+        ) == (
+            "Mario Rossi",
+            "mario@example.onion",
+        )
+
+        assert len(view_model.contacts) == 2
+
+    finally:
+        section.destroy()
+
+
+def test_contacts_section_clearing_search_restores_all_contacts(
+    root,
+    view_model,
+):
+    from garlicsmtp.gui.tk_contacts_section import (
+        ContactsSection,
+    )
+
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    view_model.add_contact(
+        name="Luigi Verdi",
+        onion_address="luigi@example.onion",
+    )
+
+    section = ContactsSection(
+        root,
+        view_model=view_model,
+    )
+
+    try:
+        section.search_var.set("mario")
+
+        assert len(
+            section.contacts_tree.get_children()
+        ) == 1
+
+        section.search_var.set("")
+
+        rows = section.contacts_tree.get_children()
+
+        assert len(rows) == 2
+        assert len(view_model.contacts) == 2
+
+    finally:
+        section.destroy()
+
+
+def test_contacts_section_filters_by_onion_address(
+    root,
+    view_model,
+):
+    from garlicsmtp.gui.tk_contacts_section import (
+        ContactsSection,
+    )
+
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@alpha.onion",
+    )
+
+    view_model.add_contact(
+        name="Luigi Verdi",
+        onion_address="luigi@beta.onion",
+    )
+
+    section = ContactsSection(
+        root,
+        view_model=view_model,
+    )
+
+    try:
+        section.search_var.set("BETA.ONION")
+
+        rows = section.contacts_tree.get_children()
+
+        assert len(rows) == 1
+
+        assert section.contacts_tree.item(
+            rows[0],
+            "values",
+        ) == (
+            "Luigi Verdi",
+            "luigi@beta.onion",
+        )
+
+        assert len(view_model.contacts) == 2
+
+    finally:
+        section.destroy()

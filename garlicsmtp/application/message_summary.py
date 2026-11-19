@@ -23,6 +23,7 @@ class MessageSummary:
     size: int
 
     flags: tuple[str, ...]
+    recipient: str | None = None
 
     def __post_init__(
         self,

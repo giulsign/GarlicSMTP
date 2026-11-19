@@ -22,7 +22,6 @@ from garlicsmtp.storage.attachment_store import (
     AttachmentStore,
 )
 
-
 def make_message(
     *,
     sender="alice@test.onion",
@@ -54,6 +53,54 @@ def make_message(
         headers=headers,
         body=body,
     )
+
+def test_message_explorer_summary_preserves_recipient():
+    store = MessageStore()
+
+    message = MailMessage(
+        envelope=Envelope(
+            sender="alice@example.onion",
+            recipients=[
+                "mario@example.onion",
+            ],
+        ),
+        headers=MailHeaders(),
+        body="Hello",
+    )
+
+    store.append_entry(
+        "alice@example.onion",
+        message,
+        flags=set(),
+        internal_date=datetime(
+            2026,
+            8,
+            6,
+            10,
+            0,
+            tzinfo=UTC,
+        ),
+    )
+
+    explorer = MessageExplorerService(
+        store
+    )
+
+    summaries = explorer.list_messages(
+        "alice@example.onion"
+    )
+
+    assert len(summaries) == 1
+
+    summary = summaries[0]
+
+    assert summary.sender == "alice@example.onion"
+    assert summary.recipient == "mario@example.onion"
+
+    assert message.envelope.sender == "alice@example.onion"
+    assert message.envelope.recipients == [
+        "mario@example.onion",
+    ]
 
 
 def test_message_explorer_lists_messages():

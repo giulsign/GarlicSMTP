@@ -100,6 +100,11 @@ class ComposeSection(DashboardCard):
             pady=3,
         )
 
+        self.recipient_input.bind(
+            "<KeyRelease>",
+            lambda event: self._update_recipient_contact_label(),
+        )
+
         self.select_contact_button = ttk.Button(
             form,
             text="Select Contact",
@@ -114,12 +119,24 @@ class ComposeSection(DashboardCard):
             pady=3,
         )
 
+        self.recipient_contact_label = ttk.Label(
+            form,
+            text="",
+            style="Garlic.TLabel",
+        )
+        self.recipient_contact_label.grid(
+            row=2,
+            column=1,
+            sticky="w",
+            pady=(0, 3),
+        )
+
         ttk.Label(
             form,
             text="Subject",
             style="Garlic.TLabel",
         ).grid(
-            row=2,
+            row=3,
             column=0,
             sticky="w",
             padx=(0, 12),
@@ -131,7 +148,7 @@ class ComposeSection(DashboardCard):
             style="Garlic.TEntry",
         )
         self.subject_input.grid(
-            row=2,
+            row=3,
             column=1,
             sticky="ew",
             pady=3,
@@ -215,6 +232,36 @@ class ComposeSection(DashboardCard):
             weight=1,
         )
 
+    def _update_recipient_contact_label(
+        self,
+    ) -> None:
+        """Display the saved contact name for the recipient."""
+
+        recipient = self.recipient_input.get()
+
+        name = None
+
+        if self.contacts_view_model is not None:
+            get_contact_name = getattr(
+                self.contacts_view_model,
+                "get_contact_name",
+                None,
+            )
+
+            if callable(get_contact_name):
+                name = get_contact_name(
+                    recipient
+                )
+
+        if name is None:
+            text = ""
+        else:
+            text = f"Contatto: {name}"
+
+        self.recipient_contact_label.configure(
+            text=text
+        )
+
     def _select_contact(self) -> None:
         """Open the contact selector window."""
 
@@ -225,6 +272,10 @@ class ComposeSection(DashboardCard):
 
         contact_window = tk.Toplevel(
             self.winfo_toplevel()
+        )
+
+        self.contact_search_var = tk.StringVar(
+            master=self,
         )
 
         contact_window.title(
@@ -241,8 +292,31 @@ class ComposeSection(DashboardCard):
         )
 
         contact_window.rowconfigure(
-            0,
+            2,
             weight=1,
+        )
+        ttk.Label(
+            contact_window,
+            text="Search",
+        ).grid(
+            row=0,
+            column=0,
+            sticky="w",
+            padx=10,
+            pady=(10, 0),
+        )
+
+        self.contact_search_entry = ttk.Entry(
+            contact_window,
+            textvariable=self.contact_search_var,
+        )
+
+        self.contact_search_entry.grid(
+            row=1,
+            column=0,
+            sticky="ew",
+            padx=10,
+            pady=(0, 5),
         )
 
         self.contact_selector_tree = ttk.Treeview(
@@ -276,7 +350,7 @@ class ComposeSection(DashboardCard):
         )
 
         self.contact_selector_tree.grid(
-            row=0,
+            row=2,
             column=0,
             sticky="nsew",
             padx=10,
@@ -288,7 +362,45 @@ class ComposeSection(DashboardCard):
             lambda event: self._apply_selected_contact(),
         )
 
-        for contact in self.contacts_view_model.contacts:
+        self.contact_search_var.trace_add(
+            "write",
+            lambda *_args: self._refresh_contact_selector(),
+        )
+
+        self._refresh_contact_selector()
+
+        self.use_contact_button = ttk.Button(
+            contact_window,
+            text="Use Contact",
+            command=self._apply_selected_contact,
+        )
+
+        self.use_contact_button.grid(
+            row=3,
+            column=0,
+            sticky="e",
+            padx=10,
+            pady=(0, 10),
+        )
+
+    def _refresh_contact_selector(self) -> None:
+        for item in self.contact_selector_tree.get_children():
+            self.contact_selector_tree.delete(item)
+
+        filter_contacts = getattr(
+            self.contacts_view_model,
+            "filter_contacts",
+            None,
+        )
+
+        if callable(filter_contacts):
+            contacts = filter_contacts(
+                self.contact_search_var.get()
+            )
+        else:
+            contacts = self.contacts_view_model.contacts
+
+        for contact in contacts:
             self.contact_selector_tree.insert(
                 "",
                 "end",
@@ -298,20 +410,6 @@ class ComposeSection(DashboardCard):
                     contact["onion_address"],
                 ),
             )
-
-        self.use_contact_button = ttk.Button(
-            contact_window,
-            text="Use Contact",
-            command=self._apply_selected_contact,
-        )
-
-        self.use_contact_button.grid(
-            row=1,
-            column=0,
-            sticky="e",
-            padx=10,
-            pady=(0, 10),
-        )
 
     def _apply_selected_contact(self) -> None:
         """Apply the selected contact to the recipient field."""
@@ -347,6 +445,9 @@ class ComposeSection(DashboardCard):
             0,
             email,
         )
+
+        if hasattr(self, "recipient_contact_label"):
+            self._update_recipient_contact_label()
 
     def refresh_view(
         self,
@@ -449,6 +550,9 @@ class ComposeSection(DashboardCard):
         self.recipient_input.delete(
             0,
             tk.END,
+        )
+        self.recipient_contact_label.configure(
+            text="",
         )
         self.subject_input.delete(
             0,

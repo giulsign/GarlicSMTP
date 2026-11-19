@@ -236,6 +236,7 @@ class MainWindow(ttk.Frame):
                 view_model=(
                     self.view_model.received_message_list
                 ),
+                contacts_view_model=self.contacts_view_model,
             )
         )
 
@@ -258,6 +259,7 @@ class MainWindow(ttk.Frame):
                 view_model=(
                     self.view_model.sent_message_list
                 ),
+                contacts_view_model=self.contacts_view_model,
             )
         )
 

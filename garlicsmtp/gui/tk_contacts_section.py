@@ -26,6 +26,9 @@ class ContactsSection(DashboardCard):
         )
 
         self.view_model = view_model
+        self.search_var = tk.StringVar(
+            master=self,
+        )
 
         self.name_var = tk.StringVar(
             master=self,
@@ -33,6 +36,30 @@ class ContactsSection(DashboardCard):
 
         self.address_var = tk.StringVar(
             master=self,
+        )
+
+        ttk.Label(
+            self.content,
+            text="Search",
+            style="Garlic.TLabel",
+        ).grid(
+            row=0,
+            column=0,
+            sticky="w",
+            pady=(0, 6),
+        )
+
+        self.search_entry = ttk.Entry(
+            self.content,
+            textvariable=self.search_var,
+        )
+
+        self.search_entry.grid(
+            row=0,
+            column=1,
+            columnspan=3,
+            sticky="ew",
+            pady=(0, 6),
         )
 
         self.contacts_tree = ttk.Treeview(
@@ -176,8 +203,13 @@ class ContactsSection(DashboardCard):
             )
 
         self.content.rowconfigure(
-            0,
+            1,
             weight=1,
+        )
+
+        self.search_var.trace_add(
+            "write",
+            lambda *_args: self.refresh_view(),
         )
 
         self.refresh_view()
@@ -188,7 +220,9 @@ class ContactsSection(DashboardCard):
         for item in self.contacts_tree.get_children():
             self.contacts_tree.delete(item)
 
-        for contact in self.view_model.contacts:
+        for contact in self.view_model.filter_contacts(
+                self.search_var.get()
+            ):
             self.contacts_tree.insert(
                 "",
                 "end",

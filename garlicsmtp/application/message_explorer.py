@@ -182,6 +182,11 @@ class MessageExplorerService:
             sender=cls._resolve_sender(
                 message
             ),
+            recipient=(
+                message.envelope.recipients[0]
+                if message.envelope.recipients
+                else None
+            ),
             subject=cls._resolve_subject(
                 message
             ),

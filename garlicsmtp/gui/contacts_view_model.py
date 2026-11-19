@@ -27,6 +27,45 @@ class ContactsViewModel:
             self.repository.list_contacts()
         )
 
+    def filter_contacts(
+        self,
+        query: str,
+    ) -> list[dict]:
+        normalized_query = query.casefold()
+
+        return [
+            contact
+            for contact in self.contacts
+            if (
+                normalized_query in contact["name"].casefold()
+                or normalized_query
+                in contact["onion_address"].casefold()
+            )
+        ]
+
+    def get_contact_name(
+        self,
+        onion_address: str,
+    ) -> str | None:
+        for contact in self.contacts:
+            if contact["onion_address"] == onion_address:
+                return contact["name"]
+
+        return None
+
+    def format_contact_address(
+        self,
+        onion_address: str,
+    ) -> str:
+        name = self.get_contact_name(
+            onion_address
+        )
+
+        if name is None:
+            return onion_address
+
+        return f"{name} — {onion_address}"
+
     def add_contact(
         self,
         name: str,

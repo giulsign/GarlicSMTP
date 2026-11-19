@@ -125,3 +125,149 @@ def test_failed_update_preserves_contacts(
     assert view_model.contacts[0]["name"] == (
         "Mario"
     )
+
+
+def test_get_contact_name_by_onion_address(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    name = view_model.get_contact_name(
+        "mario@example.onion"
+    )
+
+    assert name == "Mario Rossi"
+
+
+def test_get_contact_name_returns_none_for_unknown_address(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    name = view_model.get_contact_name(
+        "unknown@example.onion"
+    )
+
+    assert name is None
+
+
+def test_format_contact_address_includes_saved_name(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    formatted = view_model.format_contact_address(
+        "mario@example.onion"
+    )
+
+    assert formatted == (
+        "Mario Rossi — mario@example.onion"
+    )
+
+
+def test_format_contact_address_preserves_unknown_address(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    formatted = view_model.format_contact_address(
+        "unknown@example.onion"
+    )
+
+    assert formatted == "unknown@example.onion"
+
+
+def test_filter_contacts_by_name_case_insensitive(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    view_model.add_contact(
+        name="Luigi Verdi",
+        onion_address="luigi@example.onion",
+    )
+
+    results = view_model.filter_contacts(
+        "MARIO"
+    )
+
+    assert len(results) == 1
+    assert results[0]["name"] == "Mario Rossi"
+
+    assert len(view_model.contacts) == 2
+
+
+def test_filter_contacts_by_onion_address(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@alpha.onion",
+    )
+
+    view_model.add_contact(
+        name="Luigi Verdi",
+        onion_address="luigi@beta.onion",
+    )
+
+    results = view_model.filter_contacts(
+        "BETA.ONION"
+    )
+
+    assert len(results) == 1
+    assert results[0]["name"] == "Luigi Verdi"
+    assert results[0]["onion_address"] == (
+        "luigi@beta.onion"
+    )
+
+    assert len(view_model.contacts) == 2
+
+
+def test_filter_contacts_empty_query_returns_all_contacts(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    view_model.add_contact(
+        name="Luigi Verdi",
+        onion_address="luigi@example.onion",
+    )
+
+    results = view_model.filter_contacts("")
+
+    assert results == view_model.contacts
+    assert len(results) == 2
+
+
+def test_filter_contacts_unknown_query_returns_empty_list(
+    view_model,
+):
+    view_model.add_contact(
+        name="Mario Rossi",
+        onion_address="mario@example.onion",
+    )
+
+    results = view_model.filter_contacts(
+        "inesistente"
+    )
+
+    assert results == []
+    assert len(view_model.contacts) == 1

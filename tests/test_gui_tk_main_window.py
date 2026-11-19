@@ -246,17 +246,28 @@ def test_tk_main_window_binds_received_and_sent_sections(tmp_path):
             FakeController()
         )
 
+        class FakeContactsViewModel:
+            pass
+
+        contacts_view_model = FakeContactsViewModel()
+
         window = MainWindow(
             root,
             view_model,
             folder_opener=FakeFolderOpener(),
             attachment_directory_factory=(attachment_directory_factory),
             onion_settings_path=tmp_path / "settings.toml",
+            contacts_view_model=contacts_view_model,
             )
 
         assert (
             window.received_message_list_section.view_model
             is view_model.received_message_list
+        )
+        assert window.contacts_view_model is not None
+        assert (
+            window.received_message_list_section.contacts_view_model
+            is window.contacts_view_model
         )
         assert (
             window.received_message_preview_section.view_model
@@ -265,6 +276,10 @@ def test_tk_main_window_binds_received_and_sent_sections(tmp_path):
         assert (
             window.sent_message_list_section.view_model
             is view_model.sent_message_list
+        )
+        assert (
+            window.sent_message_list_section.contacts_view_model
+            is window.contacts_view_model
         )
         assert (
             window.sent_message_preview_section.view_model

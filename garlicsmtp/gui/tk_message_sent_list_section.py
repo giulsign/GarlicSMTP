@@ -22,7 +22,7 @@ class MessageSentListSection(DashboardCard):
 
     COLUMN_STATUS = 0
     COLUMN_UID = 1
-    COLUMN_SENDER = 2
+    COLUMN_RECIPIENT = 2
     COLUMN_SUBJECT = 3
     COLUMN_DATE = 4
     COLUMN_SIZE = 5
@@ -30,7 +30,7 @@ class MessageSentListSection(DashboardCard):
     COLUMNS = (
         "status",
         "uid",
-        "sender",
+        "recipient",
         "subject",
         "date",
         "size",
@@ -42,6 +42,7 @@ class MessageSentListSection(DashboardCard):
         *,
         view_model: MessageListViewModel,
         formatter: MessageFormatter | None = None,
+        contacts_view_model=None,
     ) -> None:
         super().__init__(
             master,
@@ -53,6 +54,7 @@ class MessageSentListSection(DashboardCard):
             formatter
             or MessageFormatter()
         )
+        self.contacts_view_model = contacts_view_model
         self._selection_listeners: list[
             Callable[[str], None]
         ] = []
@@ -172,7 +174,7 @@ class MessageSentListSection(DashboardCard):
         headings = (
             "Status",
             "UID",
-            "From",
+            "To",
             "Subject",
             "Date",
             "Size",
@@ -200,7 +202,7 @@ class MessageSentListSection(DashboardCard):
             anchor="e",
         )
         self.table.column(
-            "sender",
+            "recipient",
             width=110,
             stretch=True,
         )
@@ -383,6 +385,20 @@ class MessageSentListSection(DashboardCard):
         self,
         message: MessageSummary,
     ) -> None:
+        recipient_display = (
+            message.recipient
+            or "(Unknown recipient)"
+        )
+
+        if (
+            message.recipient
+            and self.contacts_view_model is not None
+        ):
+            recipient_display = (
+                self.contacts_view_model.format_contact_address(
+                    message.recipient
+                )
+            )
         tags = ()
 
         if "\\Seen" not in message.flags:
@@ -397,9 +413,7 @@ class MessageSentListSection(DashboardCard):
                     message
                 ),
                 str(message.uid),
-                self.formatter.format_sender(
-                    message
-                ),
+                recipient_display,
                 self.formatter.format_subject(
                     message
                 ),

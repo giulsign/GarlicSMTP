@@ -42,6 +42,7 @@ class MessageReceivedListSection(DashboardCard):
         *,
         view_model: MessageListViewModel,
         formatter: MessageFormatter | None = None,
+        contacts_view_model=None,
     ) -> None:
         super().__init__(
             master,
@@ -53,6 +54,7 @@ class MessageReceivedListSection(DashboardCard):
             formatter
             or MessageFormatter()
         )
+        self.contacts_view_model = contacts_view_model
         self._selection_listeners: list[
             Callable[[str], None]
         ] = []
@@ -383,6 +385,16 @@ class MessageReceivedListSection(DashboardCard):
         self,
         message: MessageSummary,
     ) -> None:
+        sender_display = self.formatter.format_sender(
+            message
+        )
+
+        if self.contacts_view_model is not None:
+            sender_display = (
+                self.contacts_view_model.format_contact_address(
+                    sender_display
+                )
+            )
         tags = ()
 
         if "\\Seen" not in message.flags:
@@ -397,9 +409,7 @@ class MessageReceivedListSection(DashboardCard):
                     message
                 ),
                 str(message.uid),
-                self.formatter.format_sender(
-                    message
-                ),
+                sender_display,
                 self.formatter.format_subject(
                     message
                 ),
