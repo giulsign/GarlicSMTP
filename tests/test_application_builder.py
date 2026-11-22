@@ -9,6 +9,9 @@ from pathlib import Path
 from garlicsmtp.application import (
     ApplicationBuilder,
 )
+from garlicsmtp.application.address_policy import (
+    AddressPolicy,
+)
 from garlicsmtp.configuration import (
     ApplicationPaths,
     ApplicationSettings,
@@ -102,6 +105,8 @@ from garlicsmtp.security.encrypted_sqlite import (
 from garlicsmtp.application.onion_presence_http_service import (
     OnionPresenceHttpService,
 )
+from garlicsmtp.smtp.parser import SMTPParser
+from garlicsmtp.smtp.session import SMTPSession
 
 
 def test_application_builder_creates_context(
@@ -145,6 +150,46 @@ def test_application_builder_creates_context(
     assert context.transport is not None
     assert context.pipeline is not None
 
+
+def test_application_builder_creates_independent_address_policies(
+    tmp_path,
+    dek,
+):
+    first = ApplicationBuilder(
+        paths=ApplicationPaths(
+            root_dir=tmp_path / "first"
+        ),
+        settings=ApplicationSettings(),
+        dek=dek,
+    ).build()
+
+    second = ApplicationBuilder(
+        paths=ApplicationPaths(
+            root_dir=tmp_path / "second"
+        ),
+        settings=ApplicationSettings(),
+        dek=dek,
+    ).build()
+
+    assert isinstance(
+        first.address_policy,
+        AddressPolicy,
+    )
+    assert isinstance(
+        second.address_policy,
+        AddressPolicy,
+    )
+
+    assert first.address_policy is not second.address_policy
+    assert first.smtp_server.address_policy is first.address_policy
+    assert second.smtp_server.address_policy is second.address_policy
+
+    assert not first.address_policy.custom_addresses_enabled
+    assert not second.address_policy.custom_addresses_enabled
+    first.address_policy.set_custom_addresses_enabled(True)
+
+    assert first.address_policy.custom_addresses_enabled is True
+    assert second.address_policy.custom_addresses_enabled is False
 
 
 def test_application_builder_uses_persistent_backends(
@@ -566,6 +611,20 @@ def test_application_builder_trusts_local_onion_sender_key(
 
     onion_service.hostname_callback(
         hostname
+    )
+    assert context.address_policy is not None
+
+    assert (
+        context.address_policy.canonical_sender
+        == "garlicsmtp@" + hostname
+    )
+
+    assert context.address_policy.allows_sender(
+        "garlicsmtp@" + hostname
+    )
+
+    assert not context.address_policy.allows_sender(
+        "personalizzato@" + hostname
     )
 
     public_key = (
@@ -1426,18 +1485,22 @@ def test_application_builder_delivers_inbound_e2ee_plaintext_to_mailbox(
     )
 
     settings = ApplicationSettings()
-    settings.tor.enabled = False
+    settings.tor.enabled = True
 
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
         dek=dek,
     ).build()
+    local_hostname = "a" * 56 + ".onion"
+
+    assert context.onion_service is not None
+    assert context.onion_service.hostname_callback is not None
+
+    context.onion_service.hostname_callback(local_hostname)
 
     try:
-        recipient = (
-            f"bob@{settings.local_domain}"
-        )
+        recipient = f"garlicsmtp@{local_hostname}"
 
         plaintext = MailMessage(
             envelope=Envelope(
@@ -1572,19 +1635,23 @@ def test_application_builder_verifies_signed_inbound_e2ee_message(
     )
 
     settings = ApplicationSettings()
-    settings.tor.enabled = False
+    settings.tor.enabled = True
 
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
         dek=dek,
     ).build()
+    local_hostname = "a" * 56 + ".onion"
+
+    assert context.onion_service is not None
+    assert context.onion_service.hostname_callback is not None
+
+    context.onion_service.hostname_callback(local_hostname)
 
     try:
         sender = "alice@sender.onion"
-        recipient = (
-            f"bob@{settings.local_domain}"
-        )
+        recipient = f"garlicsmtp@{local_hostname}"
 
         signing_private_key = (
             Ed25519PrivateKey.generate()
@@ -1739,19 +1806,23 @@ def test_application_builder_preserves_plaintext_smtp_inbound_delivery(
     )
 
     settings = ApplicationSettings()
-    settings.tor.enabled = False
+    settings.tor.enabled = True
 
     context = ApplicationBuilder(
         paths=paths,
         settings=settings,
         dek=dek,
     ).build()
+    local_hostname = "a" * 56 + ".onion"
+
+    assert context.onion_service is not None
+    assert context.onion_service.hostname_callback is not None
+
+    context.onion_service.hostname_callback(local_hostname)
 
     try:
         sender = "alice@sender.onion"
-        recipient = (
-            f"bob@{settings.local_domain}"
-        )
+        recipient = f"garlicsmtp@{local_hostname}"
 
         plaintext = MailMessage(
             envelope=Envelope(
@@ -2535,3 +2606,109 @@ def test_application_builder_rejects_invalid_custom_page_before_backends(
             settings=settings,
             dek=dek,
         ).build()
+
+
+def test_application_builder_blocks_remote_rcpt_with_custom_addresses(
+    tmp_path,
+    dek,
+):
+    settings = ApplicationSettings()
+    settings.tor.enabled = True
+
+    context = ApplicationBuilder(
+        paths=ApplicationPaths(root_dir=tmp_path),
+        settings=settings,
+        dek=dek,
+    ).build()
+
+    try:
+        local_hostname = "a" * 56 + ".onion"
+        remote_hostname = "b" * 56 + ".onion"
+
+        assert context.onion_service is not None
+        assert context.onion_service.hostname_callback is not None
+
+        context.onion_service.hostname_callback(local_hostname)
+
+        policy = context.address_policy
+        assert policy is not None
+        assert context.smtp_server.address_policy is policy
+
+        policy.set_custom_addresses_enabled(True)
+
+        session = SMTPSession(client_ip="127.0.0.1")
+
+        dispatcher = context.smtp_server.address_policy
+        assert dispatcher is policy
+
+        from garlicsmtp.smtp.handlers.register import create_dispatcher
+
+        smtp_dispatcher = create_dispatcher(
+            address_policy=dispatcher,
+        )
+
+        smtp_dispatcher.dispatch(
+            session,
+            SMTPParser.parse("EHLO sender.onion"),
+        )
+
+        smtp_dispatcher.dispatch(
+            session,
+            SMTPParser.parse(
+                f"MAIL FROM:<garlicsmtp@{remote_hostname}>"
+            ),
+        )
+
+        local_recipient = f"personalizzato@{local_hostname}"
+        remote_recipient = f"garlicsmtp@{remote_hostname}"
+
+        accepted = smtp_dispatcher.dispatch(
+            session,
+            SMTPParser.parse(
+                f"RCPT TO:<{local_recipient}>"
+            ),
+        )
+
+        assert accepted.code == 250
+        assert session.message.envelope.recipients == [
+            local_recipient
+        ]
+
+        # Verifica il rifiuto del destinatario remoto
+        # in una transazione SMTP indipendente.
+        remote_session = SMTPSession(
+            client_ip="127.0.0.1"
+        )
+
+        smtp_dispatcher.dispatch(
+            remote_session,
+            SMTPParser.parse("EHLO sender.onion"),
+        )
+
+        smtp_dispatcher.dispatch(
+            remote_session,
+            SMTPParser.parse(
+                f"MAIL FROM:<garlicsmtp@{remote_hostname}>"
+            ),
+        )
+
+        rejected = smtp_dispatcher.dispatch(
+            remote_session,
+            SMTPParser.parse(
+                f"RCPT TO:<{remote_recipient}>"
+            ),
+        )
+
+        assert rejected.code == 550
+        assert (
+            remote_session.message.envelope.recipients
+            == []
+        )
+
+        assert session.message.envelope.recipients == [
+            local_recipient
+        ]
+
+    finally:
+        context.queue.backend.close()
+        context.store.backend.close()

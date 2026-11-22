@@ -29,6 +29,7 @@ from garlicsmtp.application.message_preview_view_model import (
 from garlicsmtp.application.compose_view_model import (
     ComposeViewModel,
 )
+from garlicsmtp.application.address_policy import AddressPolicy
 
 class EmptyMessagePreviewExplorer:
 
@@ -82,6 +83,17 @@ class EmptyMessageExplorer:
 
 class ApplicationViewModel:
 
+    @property
+    def custom_addresses_enabled(self) -> bool:
+        if self._address_policy is None:
+            return False
+        return self._address_policy.custom_addresses_enabled
+
+    def set_custom_addresses_enabled(self, enabled: bool) -> None:
+        if self._address_policy is None:
+            raise RuntimeError("Address policy is not configured")
+        self._address_policy.set_custom_addresses_enabled(enabled)
+
     def __init__(
         self,
         controller,
@@ -93,7 +105,9 @@ class ApplicationViewModel:
         sent_message_list=None,
         sent_message_preview=None,
         sent_store=None,
+        address_policy: AddressPolicy | None = None,
     ):
+        self._address_policy = address_policy
         self.compose = compose
         self.message_preview = (
             message_preview

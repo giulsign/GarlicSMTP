@@ -12,7 +12,9 @@ if TYPE_CHECKING:
         Runtime,
     )
 
-
+from garlicsmtp.application.address_policy import (
+    AddressPolicy,
+)
 from garlicsmtp.application.context import (
     ApplicationContext,
 )
@@ -307,12 +309,15 @@ class ApplicationBuilder:
             .public_bytes_raw()
         )
 
+        address_policy = AddressPolicy()
+
         def register_local_hostname(
             hostname: str,
         ) -> None:
             local_domains.add(
                 hostname
             )
+            address_policy.set_local_hostname(hostname)
 
             trust_store.trust(
                 "garlicsmtp@" + hostname,
@@ -328,6 +333,7 @@ class ApplicationBuilder:
             encryption_private_key=(
                 encryption_identity.private_key
             ),
+            address_policy=address_policy,
         )
 
         imap_authenticator = (
@@ -399,6 +405,7 @@ class ApplicationBuilder:
             onion_service=onion_service,
             tor_monitor=tor_monitor,
             runtime=runtime,
+            address_policy=address_policy,
         )
 
     def _build_store(
@@ -558,6 +565,7 @@ class ApplicationBuilder:
         verifier: Ed25519MessageVerifier,
         e2ee_capability: str,
         encryption_private_key,
+        address_policy: AddressPolicy,
     ) -> SMTPServer:
         return SMTPServer(
             pipeline=pipeline,
@@ -571,6 +579,7 @@ class ApplicationBuilder:
             encryption_private_key=(
                 encryption_private_key
             ),
+            address_policy=address_policy,
         )
 
     @staticmethod

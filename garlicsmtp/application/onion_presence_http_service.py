@@ -9,7 +9,6 @@ from http.server import (
     ThreadingHTTPServer,
 )
 from html.parser import HTMLParser
-from xmlrpc import server
 import mimetypes
 from pathlib import Path
 from urllib.parse import unquote, urlsplit

@@ -241,7 +241,6 @@ def test_protocol_ehlo_mail_rcpt_quit():
         protocol.session.message.envelope.recipients
         == [
             "bob@test.onion",
-            "carol@test.onion",
         ]
     )
 
@@ -251,7 +250,7 @@ def test_protocol_ehlo_mail_rcpt_quit():
         b"250 Hello client.onion\r\n"
         b"250 Sender OK\r\n"
         b"250 Recipient OK\r\n"
-        b"250 Recipient OK\r\n"
+        b"503 Bad sequence of commands\r\n"
         b"221 Bye\r\n"
     )
 

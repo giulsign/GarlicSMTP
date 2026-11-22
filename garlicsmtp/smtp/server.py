@@ -30,6 +30,7 @@ class SMTPServer(Service, Tickable):
         e2ee_capability: str | None = None,
         decryptor=None,
         encryption_private_key=None,
+        address_policy=None,
     ):
         self.server = TCPServer(
             host,
@@ -45,6 +46,7 @@ class SMTPServer(Service, Tickable):
         self.verifier = verifier
         self.e2ee_capability = e2ee_capability
         self.decryptor = decryptor
+        self.address_policy = address_policy
         self.encryption_private_key = (
             encryption_private_key
         )
@@ -113,6 +115,7 @@ class SMTPServer(Service, Tickable):
             encryption_private_key=(
                 self.encryption_private_key
             ),
+            address_policy=self.address_policy,
         )
 
         protocol.serve()

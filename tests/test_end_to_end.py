@@ -98,7 +98,13 @@ def test_smtp_delivery_is_visible_through_imap(
         root_dir=tmp_path / "garlicsmtp",
     )
 
+    onion_host = "b" * 56 + ".onion"
+    sender = f"garlicsmtp@{onion_host}"
+    recipient = f"garlicsmtp@{onion_host}"
+
     settings = ApplicationSettings()
+    settings.hostname = onion_host
+    settings.local_domain = onion_host
     settings.tor.enabled = False
     settings.smtp.port = 0
     settings.imap.port = 0
@@ -113,6 +119,7 @@ def test_smtp_delivery_is_visible_through_imap(
         ),
         dek=dek,
     ).build()
+    context.address_policy.set_local_hostname(onion_host)
 
     context.smtp_server.start()
     context.imap_server.start()
@@ -147,8 +154,8 @@ def test_smtp_delivery_is_visible_through_imap(
             timeout=5,
         ) as client:
             client.ehlo("client.local")
-            client.mail("alice@test.onion")
-            client.rcpt("bob@test.onion")
+            assert client.mail(sender)[0] == 250
+            assert client.rcpt(recipient)[0] == 250
             client.data(
                 "Subject: SMTP to IMAP\r\n"
                 "\r\n"
@@ -172,7 +179,7 @@ def test_smtp_delivery_is_visible_through_imap(
             )
 
             client.sendall(
-                b'A002 SELECT "bob@test.onion"\r\n'
+                f'A002 SELECT "{recipient}"\r\n'.encode("ascii")
             )
 
             select_lines = []

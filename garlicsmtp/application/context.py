@@ -22,6 +22,9 @@ from garlicsmtp.storage.store import MessageStore
 from garlicsmtp.transport.manager import (
     TransportManager,
 )
+from garlicsmtp.application.address_policy import (
+    AddressPolicy,
+)
 
 if TYPE_CHECKING:
     from garlicsmtp.core.engine.runtime import (
@@ -81,5 +84,6 @@ class ApplicationContext:
     tor_monitor: TorMonitorService
     onion_service: OnionServiceManager | None
     verifier: Ed25519MessageVerifier | None = None
+    address_policy: AddressPolicy | None = None
 
     

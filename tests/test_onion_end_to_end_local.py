@@ -239,6 +239,7 @@ def test_two_application_nodes_exchange_e2ee_message(
         settings=bob_settings,
         dek=node_deks["bob"],
     ).build()
+    bob.address_policy.set_local_hostname(bob_host)
 
     bob.smtp_server.start()
 
@@ -287,7 +288,7 @@ def test_two_application_nodes_exchange_e2ee_message(
         sender = (
             f"alice@{alice_settings.local_domain}"
         )
-        recipient = f"bob@{bob_host}"
+        recipient = f"garlicsmtp@{bob_host}"
 
         assert composer.send(
             sender=sender,
@@ -400,6 +401,7 @@ def test_two_application_nodes_verify_trusted_e2ee_message(
         settings=bob_settings,
         dek=node_deks["bob"],
     ).build()
+    bob.address_policy.set_local_hostname(bob_host)
 
     bob.smtp_server.start()
 
@@ -443,7 +445,7 @@ def test_two_application_nodes_verify_trusted_e2ee_message(
         sender = (
             f"alice@{alice_settings.local_domain}"
         )
-        recipient = f"bob@{bob_host}"
+        recipient = f"garlicsmtp@{bob_host}"
 
         # Bob trusts the actual persistent Ed25519
         # signing identity used by Alice's builder.
@@ -590,6 +592,7 @@ def test_two_application_nodes_reject_changed_e2ee_key(
         settings=bob_settings,
         dek=node_deks["bob"],
     ).build()
+    bob.address_policy.set_local_hostname(bob_host)
 
     bob.smtp_server.start()
 
@@ -643,7 +646,7 @@ def test_two_application_nodes_reject_changed_e2ee_key(
         sender = (
             f"alice@{alice_settings.local_domain}"
         )
-        recipient = f"bob@{bob_host}"
+        recipient = f"garlicsmtp@{bob_host}"
 
         #
         # First contact.
@@ -711,6 +714,7 @@ def test_two_application_nodes_reject_changed_e2ee_key(
             settings=bob_settings,
             dek=node_deks["bob"],
         ).build()
+        second_bob.address_policy.set_local_hostname(bob_host)
 
         new_bob_key = (
             second_bob.smtp_server

@@ -37,6 +37,7 @@ class SMTPProtocol:
         e2ee_capability: str | None = None,
         decryptor=None,
         encryption_private_key=None,
+        address_policy=None,
     ):
         if pipeline is None:
             raise ValueError(
@@ -48,7 +49,7 @@ class SMTPProtocol:
         self.session = SMTPSession(
             connection.ip
         )
-        self.dispatcher = create_dispatcher(e2ee_capability=e2ee_capability)
+        self.dispatcher = create_dispatcher(e2ee_capability=e2ee_capability, address_policy=address_policy,)
         self.engine = SMTPEngine()
         self.pipeline = pipeline
         self.verifier = verifier

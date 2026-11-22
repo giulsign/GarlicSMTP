@@ -8,6 +8,7 @@ import threading
 
 from garlicsmtp.core.pipeline import Pipeline
 from garlicsmtp.smtp.server import SMTPServer
+from garlicsmtp.application.address_policy import AddressPolicy
 
 
 def build_pipeline() -> Pipeline:
@@ -357,6 +358,7 @@ def test_smtp_server_passes_verifier_to_protocol(
             e2ee_capability,
             decryptor,
             encryption_private_key,
+            address_policy,
         ):
             captured["connection"] = connection
             captured["hostname"] = hostname
@@ -369,6 +371,7 @@ def test_smtp_server_passes_verifier_to_protocol(
             captured["encryption_private_key"] = (
                 encryption_private_key
             )
+            captured["address_policy"] = address_policy
 
         def serve(self):
             captured["served"] = True
@@ -412,6 +415,7 @@ def test_smtp_server_passes_verifier_to_protocol(
         captured["encryption_private_key"]
         is encryption_private_key
     )
+    assert captured["address_policy"] is None
 
 
 def test_smtp_tick_cleans_up_when_thread_start_fails(

@@ -5,6 +5,8 @@
 
 import pytest
 
+
+from garlicsmtp.application.address_policy import AddressPolicy
 from garlicsmtp.application.mail_composer import (
     MailComposerService,
 )
@@ -1281,3 +1283,51 @@ def test_mail_composer_first_contact_discovery_error_does_not_persist(
     finally:
         queue_backend.connection.close()
         sent_backend.close()
+
+
+def test_mail_composer_rejects_unauthorized_sender_before_pipeline():
+    pipeline = FakePipeline()
+    policy = AddressPolicy()
+
+    hostname = "a" * 56 + ".onion"
+    policy.set_local_hostname(hostname)
+
+    composer = MailComposerService(
+        pipeline,
+        address_policy=policy,
+    )
+
+    with pytest.raises(ValueError):
+        composer.send(
+            sender=f"mario@{hostname}",
+            recipient=f"garlicsmtp@{'b' * 56}.onion",
+            subject="Test",
+            body="Test",
+        )
+
+    assert pipeline.contexts == []
+
+
+def test_mail_composer_rejects_unauthorized_recipient_before_pipeline():
+    pipeline = FakePipeline()
+    policy = AddressPolicy()
+
+    hostname = "a" * 56 + ".onion"
+    remote_hostname = "b" * 56 + ".onion"
+
+    policy.set_local_hostname(hostname)
+
+    composer = MailComposerService(
+        pipeline,
+        address_policy=policy,
+    )
+
+    with pytest.raises(ValueError):
+        composer.send(
+            sender=f"garlicsmtp@{hostname}",
+            recipient=f"mario@{remote_hostname}",
+            subject="Test",
+            body="Test",
+        )
+
+    assert pipeline.contexts == []

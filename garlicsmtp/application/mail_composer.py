@@ -24,11 +24,13 @@ class MailComposerService:
         signer=None,
         verifier=None,
         sent_store=None,
+        address_policy=None,
     ) -> None:
         self.pipeline = pipeline
         self.signer = signer
         self.verifier = verifier
         self.sent_store = sent_store
+        self.address_policy = address_policy
 
     def send(
         self,
@@ -51,6 +53,19 @@ class MailComposerService:
             raise ValueError(
                 "recipient cannot be empty"
             )
+
+        if self.address_policy is not None:
+            if not self.address_policy.allows_sender(sender):
+                raise ValueError(
+                    "sender not allowed by address policy"
+                )
+
+            if not self.address_policy.allows_outgoing_recipient(
+                recipient
+            ):
+                raise ValueError(
+                    "recipient not allowed by address policy"
+                )
 
         headers = MailHeaders()
 

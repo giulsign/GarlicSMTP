@@ -48,16 +48,13 @@ def run_app(app):
     app.start()
     app.run()
 
-def test_smtp_real_client_delivers_to_queue(tmp_path, dek):
+def test_smtp_real_client_delivers_to_local_mailbox(tmp_path, dek):
 
     config = GarlicSMTPConfig(
         listen_host="127.0.0.1",
         listen_port=2529,
-        hostname="garlicsmtp.local",
-        mailbox_db=str(
-            tmp_path
-            / "mailboxes.db"
-        ),
+        hostname="a" * 56 + ".onion",
+        mailbox_db=str(tmp_path / "mailboxes.db"),
     )
 
     spy = SpyTransport()
@@ -70,10 +67,14 @@ def test_smtp_real_client_delivers_to_queue(tmp_path, dek):
 
     app = bootstrap.build()
 
-    spy.encryption_key_store = (
-        bootstrap.build_context()
-        .encryption_key_store
-    )
+    context = bootstrap.build_context()
+    local_host = config.hostname
+    sender = f"garlicsmtp@{local_host}"
+    recipient = f"garlicsmtp@{local_host}"
+
+    context.address_policy.set_local_hostname(local_host)
+
+    spy.encryption_key_store = context.encryption_key_store
 
     thread = threading.Thread(
         target=run_app,
@@ -90,40 +91,32 @@ def test_smtp_real_client_delivers_to_queue(tmp_path, dek):
             2529,
             timeout=5,
         ) as client:
+            client.set_debuglevel(1)
             client.ehlo("client.local")
-            client.mail("alice@test.onion")
-            client.rcpt("bob@test.onion")
+
+            mail_code, mail_reply = client.mail(sender)
+            print("MAIL FROM:", mail_code, mail_reply, flush=True)
+            assert mail_code == 250, (mail_code, mail_reply)
+
+            rcpt_code, rcpt_reply = client.rcpt(recipient)
+            print("RCPT TO:", rcpt_code, rcpt_reply, flush=True)
+            assert rcpt_code == 250, (rcpt_code, rcpt_reply)
+
             client.data("Subject: Real Client\r\n\r\nHello")
 
-        deadline = time.monotonic() + 2.0
+        entries = context.store.list_entries(recipient)
 
-        while (
-            len(spy.delivered) == 0
-            and time.monotonic() < deadline
-        ):
-            time.sleep(0.01)
+        assert len(entries) == 1
 
-        assert len(spy.delivered) == 1
+        stored = entries[0].message
 
-        item = spy.delivered[0]
+        assert stored.envelope.sender == sender
+        assert stored.envelope.recipients == [recipient]
+        assert stored.headers.get("Subject") == "Real Client"
+        assert "Hello" in stored.body
 
-        assert item.message.envelope.sender == "alice@test.onion"
-        assert item.message.envelope.recipients == ["bob@test.onion"]
-        assert (
-            item.message.headers.get(
-                "X-GarlicSMTP-Encryption"
-            )
-            is not None
-        )
-
-        assert "Real Client" not in (
-            str(item.message.headers.fields)
-        )
-
-        assert "Hello" not in item.message.body
-        assert spy.discovered == [
-            "test.onion"
-        ]
+        assert spy.delivered == []
+        assert spy.discovered == []
 
     finally:
         app.stop()

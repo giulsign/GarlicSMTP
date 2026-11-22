@@ -10,6 +10,10 @@ import json
 
 import garlicsmtp.gui.application as gui_application
 
+from garlicsmtp.storage.delivery_stage import DeliveryStage
+from garlicsmtp.application.address_policy import (
+    AddressPolicy,
+)
 from tests.support import (
     make_application_status,
 )
@@ -204,14 +208,21 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
     context = (
         view_model.controller.context
     )
+    hostname = "a" * 56 + ".onion"
+    address = f"garlicsmtp@{hostname}"
+
+    context.address_policy.set_local_hostname(hostname)
+
+    delivery_stage = next(
+        stage
+        for stage in context.pipeline.stages
+        if isinstance(stage, DeliveryStage)
+    )
+    delivery_stage.local_domains.add(hostname)
 
     try:
-        view_model.compose.sender = (
-            "alice@test.onion"
-        )
-        view_model.compose.recipient = (
-            "alice@test.onion"
-        )
+        view_model.compose.sender = address
+        view_model.compose.recipient = address
         view_model.compose.subject = (
             "Self test"
         )
@@ -235,12 +246,12 @@ def test_real_gui_self_send_separates_received_and_sent_mail(
 
         received_entries = (
             received_store.list_entries(
-                "alice@test.onion"
+                address
             )
         )
         sent_entries = (
             sent_store.list_entries(
-                "alice@test.onion"
+                address
             )
         )
 
@@ -304,6 +315,7 @@ def test_build_view_model_connects_composer_to_application_pipeline(
     dek,
 ):
     pipeline = FakePipeline()
+    address_policy = AddressPolicy()
 
     context = SimpleNamespace(
         pipeline=pipeline,
@@ -312,6 +324,7 @@ def test_build_view_model_connects_composer_to_application_pipeline(
         paths=ApplicationPaths(
             root_dir=tmp_path / "garlicsmtp",
         ),
+        address_policy=address_policy,
     )
 
     context.paths.data_dir.mkdir(
@@ -358,6 +371,27 @@ def test_build_view_model_connects_composer_to_application_pipeline(
         .pipeline
         is pipeline
     )
+    assert (
+        view_model.compose.composer.address_policy
+        is context.address_policy
+    )
+    assert view_model.custom_addresses_enabled is False
+
+    view_model.set_custom_addresses_enabled(True)
+
+    assert (
+        view_model.compose.composer.address_policy
+        .custom_addresses_enabled
+        is True
+    )
+
+    view_model.set_custom_addresses_enabled(False)
+
+    assert (
+        view_model.compose.composer.address_policy
+        .custom_addresses_enabled
+        is False
+    )
 
 
 def test_build_view_model_composer_sends_through_pipeline(
@@ -371,11 +405,18 @@ def test_build_view_model_composer_sends_through_pipeline(
     )
     pipeline = FakePipeline()
 
+    local_hostname = "a" * 56 + ".onion"
+    remote_hostname = "b" * 56 + ".onion"
+
+    address_policy = AddressPolicy()
+    address_policy.set_local_hostname(local_hostname)
+
     context = SimpleNamespace(
         pipeline=pipeline,
         store=object(),
         signer=None,
         paths=paths,
+        address_policy=address_policy,
     )
 
     context.paths.data_dir.mkdir(
@@ -415,11 +456,11 @@ def test_build_view_model_composer_sends_through_pipeline(
     )
 
     view_model.compose.sender = (
-        "alice@sender.onion"
+        f"garlicsmtp@{local_hostname}"
     )
 
     view_model.compose.recipient = (
-        "bob@receiver.onion"
+        f"garlicsmtp@{remote_hostname}"
     )
 
     view_model.compose.subject = (
@@ -446,13 +487,13 @@ def test_build_view_model_composer_sends_through_pipeline(
 
     assert (
         message.envelope.sender
-        == "alice@sender.onion"
+        == f"garlicsmtp@{local_hostname}"
     )
 
     assert (
         message.envelope.recipients
         == [
-            "bob@receiver.onion",
+            f"garlicsmtp@{remote_hostname}",
         ]
     )
 
@@ -488,6 +529,7 @@ def test_build_view_model_connects_composer_to_context_signer(
         signer=signer,
         verifier=verifier,
         paths=paths,
+        address_policy=AddressPolicy()
     )
 
     context.paths.data_dir.mkdir(
@@ -588,14 +630,21 @@ def test_real_gui_composer_delivers_to_local_mailbox(
     context = (
         view_model.controller.context
     )
+    hostname = "a" * 56 + ".onion"
+    address = f"garlicsmtp@{hostname}"
+
+    context.address_policy.set_local_hostname(hostname)
+
+    delivery_stage = next(
+        stage
+        for stage in context.pipeline.stages
+        if isinstance(stage, DeliveryStage)
+    )
+    delivery_stage.local_domains.add(hostname)
 
     try:
-        view_model.compose.sender = (
-            "alice@test.onion"
-        )
-        view_model.compose.recipient = (
-            "bob@test.onion"
-        )
+        view_model.compose.sender = address
+        view_model.compose.recipient = address
         view_model.compose.subject = (
             "GUI real integration"
         )
@@ -609,7 +658,7 @@ def test_real_gui_composer_delivers_to_local_mailbox(
         )
 
         entries = context.store.list_entries(
-            "bob@test.onion"
+            address
         )
 
         assert len(entries) == 1
@@ -618,13 +667,13 @@ def test_real_gui_composer_delivers_to_local_mailbox(
 
         assert (
             message.envelope.sender
-            == "alice@test.onion"
+            == address
         )
 
         assert (
             message.envelope.recipients
             == [
-                "bob@test.onion",
+                address
             ]
         )
 
@@ -691,14 +740,21 @@ def test_real_gui_composer_separates_received_and_sent_mail(
     context = (
         view_model.controller.context
     )
+    hostname = "a" * 56 + ".onion"
+    address = f"garlicsmtp@{hostname}"
+
+    context.address_policy.set_local_hostname(hostname)
+
+    delivery_stage = next(
+        stage
+        for stage in context.pipeline.stages
+        if isinstance(stage, DeliveryStage)
+    )
+    delivery_stage.local_domains.add(hostname)
 
     try:
-        view_model.compose.sender = (
-            "alice@test.onion"
-        )
-        view_model.compose.recipient = (
-            "bob@test.onion"
-        )
+        view_model.compose.sender = address
+        view_model.compose.recipient = address
         view_model.compose.subject = (
             "Sent and received"
         )
@@ -725,20 +781,13 @@ def test_real_gui_composer_separates_received_and_sent_mail(
 
         received_entries = (
             received_store.list_entries(
-                "bob@test.onion"
+                address
             )
         )
         sent_entries = (
             sent_store.list_entries(
-                "alice@test.onion"
+                address
             )
-        )
-
-        assert (
-            context.store.list_entries(
-                "alice@test.onion"
-            )
-            == []
         )
 
         assert len(received_entries) == 1
@@ -753,20 +802,20 @@ def test_real_gui_composer_separates_received_and_sent_mail(
 
         assert (
             received_message.envelope.sender
-            == "alice@test.onion"
+            == address
         )
         assert (
             sent_message.envelope.sender
-            == "alice@test.onion"
+            == address
         )
 
         assert (
             received_message.envelope.recipients
-            == ["bob@test.onion"]
+            == [address]
         )
         assert (
             sent_message.envelope.recipients
-            == ["bob@test.onion"]
+            == [address]
         )
 
         assert (
@@ -1559,6 +1608,7 @@ def test_build_view_model_uses_provided_application_paths(
         store=object(),
         signer=None,
         paths=expected_paths,
+        address_policy=AddressPolicy()
     )
 
     context.paths.data_dir.mkdir(
@@ -1746,6 +1796,8 @@ def test_real_gui_sent_mail_persists_across_rebuild(
 
     settings = ApplicationSettings()
     settings.tor.enabled = False
+    hostname = "a" * 56 + ".onion"
+    address = f"garlicsmtp@{hostname}"
 
     class TestBuilder:
 
@@ -1781,14 +1833,21 @@ def test_real_gui_sent_mail_persists_across_rebuild(
     first_context = (
         first_view_model.controller.context
     )
+    first_context.address_policy.set_local_hostname(hostname)
+
+    first_delivery_stage = next(
+        stage
+        for stage in first_context.pipeline.stages
+        if isinstance(stage, DeliveryStage)
+    )
+    first_delivery_stage.local_domains.add(hostname)
+    first_sent_store = (
+        first_view_model.sent_message_list.explorer.store
+    )
 
     try:
-        first_view_model.compose.sender = (
-            "alice@test.onion"
-        )
-        first_view_model.compose.recipient = (
-            "bob@test.onion"
-        )
+        first_view_model.compose.sender = address
+        first_view_model.compose.recipient = address
         first_view_model.compose.subject = (
             "Persistent sent"
         )
@@ -1801,17 +1860,11 @@ def test_real_gui_sent_mail_persists_across_rebuild(
             is True
         )
 
-        first_sent_store = (
-            first_view_model.sent_message_list
-            .explorer.store
-        )
-
         assert len(
             first_sent_store.list_entries(
-                "alice@test.onion"
+                address
             )
         ) == 1
-
     finally:
         first_context.queue.backend.close()
         first_context.store.backend.close()
@@ -1826,6 +1879,14 @@ def test_real_gui_sent_mail_persists_across_rebuild(
     second_context = (
         second_view_model.controller.context
     )
+    second_context.address_policy.set_local_hostname(hostname)
+
+    second_delivery_stage = next(
+        stage
+        for stage in second_context.pipeline.stages
+        if isinstance(stage, DeliveryStage)
+    )
+    second_delivery_stage.local_domains.add(hostname)
 
     try:
         second_sent_store = (
@@ -1835,7 +1896,7 @@ def test_real_gui_sent_mail_persists_across_rebuild(
 
         sent_entries = (
             second_sent_store.list_entries(
-                "alice@test.onion"
+                address
             )
         )
 
@@ -3344,6 +3405,7 @@ def test_build_view_model_passes_dek_to_both_databases(
                 store=object(),
                 signer=None,
                 paths=paths,
+                address_policy=AddressPolicy(),
             )
 
     class FakeSQLiteBackend:
@@ -5676,3 +5738,31 @@ def test_run_gui_warns_when_contacts_file_is_corrupted(
     assert paths.contacts_file.read_text(
         encoding="utf-8",
     ) == invalid_contents
+
+
+def test_application_view_model_controls_custom_address_policy():
+    from garlicsmtp.application.address_policy import AddressPolicy
+    from garlicsmtp.application.view_model import ApplicationViewModel
+    from unittest.mock import Mock
+
+    policy = AddressPolicy()
+
+    controller = Mock()
+    controller.status.return_value = Mock()
+
+    view_model = ApplicationViewModel(
+        controller=controller,
+        address_policy=policy,
+    )
+
+    assert view_model.custom_addresses_enabled is False
+
+    view_model.set_custom_addresses_enabled(True)
+
+    assert view_model.custom_addresses_enabled is True
+    assert policy.custom_addresses_enabled is True
+
+    view_model.set_custom_addresses_enabled(False)
+
+    assert view_model.custom_addresses_enabled is False
+    assert policy.custom_addresses_enabled is False

@@ -134,6 +134,7 @@ def build_view_model(
             None,
         ),
         sent_store=sent_store,
+        address_policy=context.address_policy,
     )
 
     compose = ComposeViewModel(
@@ -148,6 +149,7 @@ def build_view_model(
         sent_message_preview=sent_message_preview,
         compose=compose,
         sent_store=sent_store,
+        address_policy=context.address_policy,
     )
 
 def setup_application_dek(

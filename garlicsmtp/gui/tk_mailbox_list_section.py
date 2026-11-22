@@ -5,7 +5,7 @@
 
 import tkinter as tk
 from collections.abc import Callable
-from tkinter import ttk
+from tkinter import messagebox, ttk
 
 from garlicsmtp.application import (
     ApplicationViewModel,
@@ -29,6 +29,33 @@ class MailboxListSection(DashboardCard):
         )
 
         self.view_model = view_model
+        self.custom_addresses_var = tk.BooleanVar(
+            master=self,
+            value=self.view_model.custom_addresses_enabled,
+        )
+
+        self.custom_addresses_checkbox = ttk.Checkbutton(
+            self,
+            text="Indirizzi personalizzati",
+            variable=self.custom_addresses_var,
+            command=self._on_custom_addresses_changed,
+        )
+
+        self.custom_addresses_checkbox.grid(
+            row=0,
+            column=1,
+            sticky="e",
+            padx=(12, 0),
+        )
+
+        self.content.grid_configure(
+            columnspan=2,
+        )
+
+        self.columnconfigure(
+            1,
+            weight=0,
+        )
         self._addresses: list[str] = []
         self._selection_listeners: list[
             Callable[[str], None]
@@ -95,6 +122,36 @@ class MailboxListSection(DashboardCard):
             1,
             weight=1,
         )
+
+    def _on_custom_addresses_changed(self) -> None:
+        requested = self.custom_addresses_var.get()
+
+        if requested:
+            confirmed = messagebox.askyesno(
+                "Abilitare indirizzi personalizzati?",
+                (
+                    "Vuoi consentire indirizzi email personalizzati "
+                    "per questa sessione?\n\n"
+                    "Per impostazione predefinita è consentito "
+                    "soltanto garlicsmtp@<tuo-onion>.onion.\n\n"
+                    "Questa opzione non modifica le mailbox esistenti "
+                    "e verrà disattivata al prossimo avvio."
+                ),
+                parent=self.winfo_toplevel(),
+            )
+
+            if not confirmed:
+                self.custom_addresses_var.set(
+                    self.view_model.custom_addresses_enabled
+                )
+                return
+
+        try:
+            self.view_model.set_custom_addresses_enabled(requested)
+        finally:
+            self.custom_addresses_var.set(
+                self.view_model.custom_addresses_enabled
+            )
 
     @property
     def selected_mailbox(

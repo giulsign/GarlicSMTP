@@ -26,6 +26,7 @@ from garlicsmtp.transport.smtp.client import (
     SMTPClient,
 )
 from garlicsmtp.security.encryptor import MessageEncryptor
+from garlicsmtp.application.address_policy import AddressPolicy
 
 class FakeSocket:
     def __init__(self):
@@ -62,6 +63,129 @@ def test_smtp_server_handles_connection():
         b"220 garlicsmtp.onion ready\r\n"
         b"221 Bye\r\n"
     )
+
+
+def test_smtp_server_rejects_remote_onion_rcpt_with_custom_addresses():
+    local_hostname = "a" * 56 + ".onion"
+    remote_hostname = "b" * 56 + ".onion"
+
+    policy = AddressPolicy()
+    policy.set_local_hostname(local_hostname)
+    policy.set_custom_addresses_enabled(True)
+
+    class RelayAttemptSocket:
+        def __init__(self):
+            self.sent = b""
+            self.buffer = [
+                b"EHLO client\r\n",
+                f"MAIL FROM:<alice@{local_hostname}>\r\n".encode(),
+                f"RCPT TO:<bob@{remote_hostname}>\r\n".encode(),
+                b"QUIT\r\n",
+            ]
+
+        def sendall(self, data: bytes):
+            self.sent += data
+
+        def recv(self, size):
+            if self.buffer:
+                return self.buffer.pop(0)
+            return b""
+
+        def close(self):
+            pass
+
+    server = SMTPServer(
+        hostname=local_hostname,
+        pipeline=Pipeline(),
+        address_policy=policy,
+    )
+
+    client = RelayAttemptSocket()
+
+    server.handle_connection(
+        client,
+        ("127.0.0.1", 10000),
+    )
+
+    responses = [
+        response
+        for response in client.sent.split(b"\r\n")
+        if response
+    ]
+
+    assert responses[0].startswith(b"220 "), responses
+    assert responses[-1] == b"221 Bye", responses
+
+    # L'ultima risposta prima di QUIT appartiene a RCPT TO.
+    assert responses[-2].startswith(b"550 "), responses
+
+    # Non deve comparire un'accettazione del destinatario remoto.
+    assert not responses[-2].startswith(b"250 "), responses
+
+
+def test_smtp_protocol_remote_rcpt_does_not_mutate_transaction():
+    local_hostname = "a" * 56 + ".onion"
+    remote_hostname = "b" * 56 + ".onion"
+
+    policy = AddressPolicy()
+    policy.set_local_hostname(local_hostname)
+    policy.set_custom_addresses_enabled(True)
+
+    class RelayAttemptSocket:
+        def __init__(self):
+            self.sent = b""
+            self.buffer = [
+                b"EHLO client\r\n",
+                f"MAIL FROM:<alice@{local_hostname}>\r\n".encode(),
+                f"RCPT TO:<bob@{remote_hostname}>\r\n".encode(),
+            ]
+
+        def sendall(self, data: bytes):
+            self.sent += data
+
+        def recv(self, size):
+            if self.buffer:
+                return self.buffer.pop(0)
+            return b""
+
+        def close(self):
+            pass
+
+    client = RelayAttemptSocket()
+
+    protocol = SMTPProtocol(
+        SMTPConnection(client, ("127.0.0.1", 10000)),
+        hostname=local_hostname,
+        pipeline=Pipeline(),
+        address_policy=policy,
+    )
+
+    # Processiamo soltanto EHLO e MAIL FROM.
+    protocol.send_greeting()
+    assert protocol.process_one_command() is True
+    assert protocol.process_one_command() is True
+
+    assert (
+        protocol.session.message.envelope.sender
+        == f"alice@{local_hostname}"
+    )
+    assert protocol.session.message.envelope.recipients == []
+
+    state_before_rcpt = protocol.session.state
+
+    # Il destinatario remoto deve essere rifiutato.
+    assert protocol.process_one_command() is True
+
+    assert protocol.session.message.envelope.recipients == []
+    assert protocol.session.state == state_before_rcpt
+
+    responses = [
+        response
+        for response in client.sent.split(b"\r\n")
+        if response
+    ]
+
+    assert responses[-1].startswith(b"550 "), responses
 
 
 def test_smtp_protocol_configures_e2ee_capability():
