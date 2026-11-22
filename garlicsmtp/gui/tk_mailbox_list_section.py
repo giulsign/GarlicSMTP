@@ -36,7 +36,7 @@ class MailboxListSection(DashboardCard):
 
         self.custom_addresses_checkbox = ttk.Checkbutton(
             self,
-            text="Indirizzi personalizzati",
+            text="Custom addresses",
             variable=self.custom_addresses_var,
             command=self._on_custom_addresses_changed,
         )
@@ -128,15 +128,15 @@ class MailboxListSection(DashboardCard):
 
         if requested:
             confirmed = messagebox.askyesno(
-                "Abilitare indirizzi personalizzati?",
-                (
-                    "Vuoi consentire indirizzi email personalizzati "
-                    "per questa sessione?\n\n"
-                    "Per impostazione predefinita è consentito "
-                    "soltanto garlicsmtp@<tuo-onion>.onion.\n\n"
-                    "Questa opzione non modifica le mailbox esistenti "
-                    "e verrà disattivata al prossimo avvio."
-                ),
+                "Enable custom addresses?",
+                    (
+                        "Do you want to allow custom email addresses "
+                        "for this session?\n\n"
+                        "By default, only "
+                        "garlicsmtp@<your-onion>.onion is allowed.\n\n"
+                        "This option does not modify existing mailboxes "
+                        "and will be disabled on the next startup."
+                    ),
                 parent=self.winfo_toplevel(),
             )
 
